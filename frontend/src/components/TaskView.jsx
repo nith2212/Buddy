@@ -31,6 +31,7 @@ export default function TaskView({
   setAgentMessage,
 }) {
   const [simulating, setSimulating]     = useState(false)
+  const [simulated, setSimulated]       = useState(false)
   const [completing, setCompleting]     = useState(false)
   const [showConfetti, setShowConfetti] = useState(false)
   const [events, setEvents]             = useState([])
@@ -51,6 +52,7 @@ export default function TaskView({
   // Simulate a day passing — logs missed_checkin, gets proactive message,
   // updates notification bubble (does NOT auto-navigate to chat)
   async function handleSimulate() {
+    if (simulated) return
     setSimulating(true)
     try {
       const res  = await fetch(`${API}/simulate-next-day`, {
@@ -62,6 +64,7 @@ export default function TaskView({
       setReasoning(data.reasoning)
       setInitiated(true)
       setAgentMessage(data.reply)
+      setSimulated(true)
       fetchEvents()
     } catch (e) {
       console.error(e)
@@ -239,12 +242,12 @@ export default function TaskView({
 
           <button
             onClick={handleSimulate}
-            disabled={simulating}
+            disabled={simulating || simulated}
             style={{
               padding: '14px 0',
               borderRadius: 12,
-              background: simulating ? 'var(--lavender)' : 'var(--brain-deep)',
-              color: simulating ? 'var(--text-muted)' : '#E8C0D8',
+              background: simulating || simulated ? 'var(--lavender)' : 'var(--brain-deep)',
+              color: simulating || simulated ? 'var(--text-muted)' : '#E8C0D8',
               fontSize: 14,
               fontWeight: 500,
               fontFamily: 'var(--font-mono)',
@@ -252,7 +255,7 @@ export default function TaskView({
               transition: 'all 0.2s',
             }}
           >
-            {simulating ? 'thinking…' : '⏭ simulate next day'}
+            {simulated ? '✓ day simulated' : simulating ? 'thinking…' : '⏭ simulate next day'}
           </button>
         </div>
 
