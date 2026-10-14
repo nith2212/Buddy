@@ -17,7 +17,9 @@
         "backgroundImage": "./assets/images/android-icon-background.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "package": "com.nithya22.buddy",
+      "googleServicesFile": "./google-services.json"
     },
     "web": {
       "output": "static",
@@ -25,6 +27,7 @@
     },
     "plugins": [
       "expo-router",
+      "expo-notifications",
       [
         "expo-splash-screen",
         {
@@ -37,6 +40,13 @@
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
-    }
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "cc46c583-0ae7-4c8b-8fe6-cddf3161db1b"
+      }
+    },
+    "owner": "nithya22"
   }
 }

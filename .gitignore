@@ -41,3 +41,10 @@ example
 # generated native folders
 /ios
 /android
+
+# Firebase secrets
+buddy-app-*-firebase-adminsdk-*.json
+backend/buddy.db
+backend/__pycache__/
+backend/notifications/__pycache__/
+google-services.json
