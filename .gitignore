@@ -48,3 +48,9 @@ backend/buddy.db
 backend/__pycache__/
 backend/notifications/__pycache__/
 google-services.json
+
+# Local DBs, caches, env, Firebase config
+*.db
+__pycache__/
+.env*
+google-services.json
