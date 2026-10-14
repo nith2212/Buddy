@@ -3,5 +3,6 @@ uvicorn
 google-genai
 python-dotenv
 groq
-azure-search-documents
-azure-identity
+qdrant-client 
+sentence-transformers
+python-frontmatter
