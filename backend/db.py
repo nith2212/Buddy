@@ -2,7 +2,7 @@
 # Defaults to SQLite locally. Set DATABASE_URL env var to switch to Postgres in production.
 
 import os
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, event
 from sqlalchemy.orm import sessionmaker, DeclarativeBase
 from dotenv import load_dotenv
 
@@ -15,6 +15,12 @@ engine = create_engine(
     # SQLite requires this flag when used with FastAPI's threaded request handling.
     connect_args={"check_same_thread": False} if DATABASE_URL.startswith("sqlite") else {},
 )
+
+if DATABASE_URL.startswith("sqlite"):
+    @event.listens_for(engine, "connect")
+    def _enable_sqlite_fks(dbapi_conn, _record):
+        # SQLite ignores foreign keys unless asked; Postgres always enforces them.
+        dbapi_conn.execute("PRAGMA foreign_keys=ON")
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 

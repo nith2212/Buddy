@@ -73,3 +73,10 @@ def db():
         yield s
     finally:
         s.close()
+
+
+@pytest.fixture
+def api():
+    """Client for the real app (all routers); tables come from the autouse fresh_db fixture."""
+    from main import app
+    return TestClient(app)

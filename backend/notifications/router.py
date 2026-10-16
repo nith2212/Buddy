@@ -1,23 +1,20 @@
-# FastAPI router for all notification-related endpoints.
+# FastAPI router for notification-related endpoints. Identity always comes from the Bearer token.
 #
-# Production endpoints:
-#   POST /devices/register  — upserts a user's Expo push token
+#   POST /devices/register  — registers the caller's Expo push token (one user may have several devices)
 #   POST /checkin/action    — handles notification button taps, drives the check-in stage machine
-#
-# Temporary dev/test endpoints (remove before production):
-#   POST /tasks/create      — creates a bare task row for testing
-#   POST /test/send-push    — triggers send_push directly via curl
 
 import logging
-from typing import Any, Literal
+from typing import Any, Literal, Optional
 
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
+from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from auth import current_user, owned_or_404
 from db import get_db
-from models import DeviceToken, EmotionLog, Task
-from notifications.service import send_push
+from models import DeviceToken, EmotionLog, Task, User
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -28,12 +25,12 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 
 class RegisterDeviceRequest(BaseModel):
-    user_id: str
-    expo_push_token: str  # Must be a valid ExponentPushToken[...] string.
+    # Expo push tokens look like ExponentPushToken[...] (or ExpoPushToken[...]).
+    expo_push_token: str = Field(pattern=r"^Expo(nent)?PushToken\[[^\]]+\]$")
+    platform: Optional[str] = Field(default=None, max_length=20)
 
 
 class CheckinActionRequest(BaseModel):
-    user_id: str
     task_id: int
     stage: Literal["task_state", "emotion", "chat_opt_in"]  # Which step of the check-in flow.
     value: str  # The button value the user tapped.
@@ -44,16 +41,28 @@ class CheckinActionRequest(BaseModel):
 # ---------------------------------------------------------------------------
 
 @router.post("/devices/register", status_code=200)
-def register_device(payload: RegisterDeviceRequest, db: Session = Depends(get_db)):
-    # Upsert: update token if user already exists, otherwise insert a new row.
-    row = db.query(DeviceToken).filter(DeviceToken.user_id == payload.user_id).first()
-    if row:
-        row.expo_push_token = payload.expo_push_token
-    else:
-        row = DeviceToken(user_id=payload.user_id, expo_push_token=payload.expo_push_token)
-        db.add(row)
-    db.commit()
-    return {"status": "ok"}
+def register_device(
+    payload: RegisterDeviceRequest,
+    user: User = Depends(current_user),
+    db: Session = Depends(get_db),
+):
+    # Upsert by token. A token already held by another account (e.g. phone re-installed under a new
+    # identity) moves to the caller, so pushes follow whoever is actually using the device.
+    for _ in range(2):
+        row = db.execute(
+            select(DeviceToken).where(DeviceToken.expo_push_token == payload.expo_push_token)
+        ).scalar_one_or_none()
+        if row:
+            row.user_id = user.id
+            row.platform = payload.platform or row.platform
+        else:
+            db.add(DeviceToken(user_id=user.id, expo_push_token=payload.expo_push_token, platform=payload.platform))
+        try:
+            db.commit()
+            return {"status": "ok"}
+        except IntegrityError:
+            db.rollback()  # lost a race with a concurrent insert of the same token; retry as an update
+    raise HTTPException(status_code=409, detail="Could not register device")
 
 
 # ---------------------------------------------------------------------------
@@ -102,18 +111,21 @@ def _chat_opt_in_response(task_id: int) -> dict[str, Any]:
 
 
 @router.post("/checkin/action")
-async def checkin_action(payload: CheckinActionRequest, db: Session = Depends(get_db)):
+def checkin_action(
+    payload: CheckinActionRequest,
+    user: User = Depends(current_user),
+    db: Session = Depends(get_db),
+):
+    # Plain `def`: all work here is synchronous DB access, so FastAPI runs it in the threadpool.
     logger.info(
         "checkin_action user_id=%s task_id=%s stage=%s value=%s",
-        payload.user_id,
+        user.id,
         payload.task_id,
         payload.stage,
         payload.value,
     )
 
-    task = db.query(Task).filter(Task.id == payload.task_id, Task.user_id == payload.user_id).first()
-    if not task:
-        raise HTTPException(status_code=404, detail="Task not found")
+    task = owned_or_404(db, Task, payload.task_id, user)
 
     if payload.stage == "task_state":
         # Save what state the task is in, then prompt for emotion.
@@ -123,7 +135,7 @@ async def checkin_action(payload: CheckinActionRequest, db: Session = Depends(ge
 
     if payload.stage == "emotion":
         # Create a new emotion log row, then prompt for chat opt-in.
-        log = EmotionLog(user_id=payload.user_id, task_id=task.id, emotion=payload.value)
+        log = EmotionLog(user_id=user.id, task_id=task.id, emotion=payload.value)
         db.add(log)
         db.commit()
         return _chat_opt_in_response(task.id)
@@ -132,7 +144,7 @@ async def checkin_action(payload: CheckinActionRequest, db: Session = Depends(ge
         # Update the most recent emotion log with the chat opt-in decision.
         log = db.query(EmotionLog).filter(
             EmotionLog.task_id == task.id,
-            EmotionLog.user_id == payload.user_id,
+            EmotionLog.user_id == user.id,
         ).order_by(EmotionLog.id.desc()).first()
 
         opted_in = payload.value == "yes"
@@ -163,34 +175,3 @@ async def checkin_action(payload: CheckinActionRequest, db: Session = Depends(ge
         }
 
     raise HTTPException(status_code=400, detail="Unknown stage")
-
-
-# ---------------------------------------------------------------------------
-# POST /tasks/create  (temporary — remove before production)
-# ---------------------------------------------------------------------------
-
-@router.post("/tasks/create")
-def create_task(user_id: str, db: Session = Depends(get_db)):
-    # Creates a bare task row. Used during dev to get a task_id for testing /checkin/action.
-    task = Task(user_id=user_id)
-    db.add(task)
-    db.commit()
-    db.refresh(task)
-    return {"task_id": task.id}
-
-
-# ---------------------------------------------------------------------------
-# POST /test/send-push  (temporary — remove before production)
-# ---------------------------------------------------------------------------
-
-@router.post("/test/send-push")
-async def test_send_push(user_id: str, db: Session = Depends(get_db)):
-    # Triggers send_push directly so you can verify FCM delivery end-to-end via curl.
-    ticket = await send_push(
-        db=db,
-        user_id=user_id,
-        title="Backend test 🚀",
-        body="This came from your FastAPI send_push function!",
-        data={"source": "test"},
-    )
-    return {"ticket": ticket}

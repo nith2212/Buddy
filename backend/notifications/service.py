@@ -2,6 +2,8 @@
 # send_push() — sends a single push via Expo's push API.
 # send_daily_checkin() — scheduler entry point for the daily task-state notification.
 
+from __future__ import annotations
+
 import logging
 from typing import Any
 

@@ -1,5 +1,3 @@
-import sys
-
 import pytest
 
 import models
@@ -104,8 +102,7 @@ def test_each_registration_gets_distinct_user_and_token(client):
     assert a_id != b_id and a_h != b_h
 
 
-@pytest.mark.skipif(sys.version_info < (3, 10), reason="existing notifications module needs Python 3.10+")
 def test_existing_endpoints_still_mounted():
     from main import app
     paths = {r.path for r in app.routes}
-    assert {"/auth/anonymous", "/devices/register", "/checkin/action"} <= paths
+    assert {"/auth/anonymous", "/devices/register", "/checkin/action", "/tasks", "/me"} <= paths

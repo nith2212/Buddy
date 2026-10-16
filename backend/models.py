@@ -3,10 +3,7 @@
 # Identity: `users` holds server-issued accounts (uuid id, sha256 of the bearer token).
 # Every per-user table carries an indexed `user_id`; all access must be filtered by it.
 #
-# Legacy check-in tables (device_tokens, tasks, emotion_logs) are extended in place so the
-# existing /devices/register and /checkin/action endpoints keep working. Their user_id is
-# not yet a foreign key to users.id because those endpoints still accept client-supplied ids;
-# that tightens when they move to header auth.
+# Check-in tables (device_tokens, tasks, emotion_logs) predate the users table and were extended in place.
 
 import uuid
 from datetime import datetime, timezone
@@ -47,7 +44,7 @@ class DeviceToken(Base):
     __tablename__ = "device_tokens"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    user_id: Mapped[str] = mapped_column(String, nullable=False, index=True)
+    user_id: Mapped[str] = mapped_column(String(36), ForeignKey("users.id"), nullable=False, index=True)
     expo_push_token: Mapped[str] = mapped_column(String, nullable=False, unique=True)
     platform: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     updated_at: Mapped[datetime] = _ts(onupdate=utcnow)
@@ -58,7 +55,7 @@ class Task(Base):
     __table_args__ = (Index("ix_tasks_user_status", "user_id", "status"),)
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    user_id: Mapped[str] = mapped_column(String, nullable=False, index=True)
+    user_id: Mapped[str] = mapped_column(String(36), ForeignKey("users.id"), nullable=False, index=True)
     title: Mapped[Optional[str]] = mapped_column(String, nullable=True)  # legacy bare tasks have none
     due_date: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     status: Mapped[str] = mapped_column(String, nullable=False, default="open")  # open | done
@@ -92,7 +89,7 @@ class EmotionLog(Base):
     __tablename__ = "emotion_logs"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    user_id: Mapped[str] = mapped_column(String, nullable=False, index=True)
+    user_id: Mapped[str] = mapped_column(String(36), ForeignKey("users.id"), nullable=False, index=True)
     task_id: Mapped[int] = mapped_column(Integer, ForeignKey("tasks.id"), nullable=False)
     emotion: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     chat_opt_in: Mapped[Optional[bool]] = mapped_column(nullable=True)
