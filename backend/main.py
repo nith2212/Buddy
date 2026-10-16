@@ -6,6 +6,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
+from auth import router as auth_router
 from db import Base, engine
 from notifications.router import router as notifications_router
 
@@ -20,6 +21,9 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="Buddy API", lifespan=lifespan)
+
+# Server-issued token auth: POST /auth/anonymous.
+app.include_router(auth_router)
 
 # All notification-related routes: /devices/register, /checkin/action, and temp test routes.
 app.include_router(notifications_router)
