@@ -1,9 +1,3 @@
-// Root layout for the Buddy app.
-// Handles:
-//   - Notification permission request and push token logging (dev helper)
-//   - Global notification handler (controls foreground display behaviour)
-//   - Notification received listener (logs incoming notifications to Metro console)
-
 import { DarkTheme, DefaultTheme, ThemeProvider } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { useEffect } from 'react';
@@ -13,47 +7,59 @@ import * as Device from 'expo-device';
 
 import { AnimatedSplashOverlay } from '@/components/animated-icon';
 import AppTabs from '@/components/app-tabs';
+import { useAuth } from '@/hooks/use-auth';
+import { API_BASE_URL } from '@/constants/api';
 
 SplashScreen.preventAutoHideAsync();
 
-// Requests notification permission and logs the Expo push token to the Metro console.
-// Token looks like: ExponentPushToken[xxxxxxxxxxxxxxxxxxxxxxxx]
-// Only runs on physical devices — emulators don't support push tokens.
-async function logPushToken() {
-  if (!Device.isDevice) {
-    console.log('[PushToken] Must use a physical device for push tokens');
-    return;
-  }
-  const { status } = await Notifications.requestPermissionsAsync();
-  if (status !== 'granted') {
-    console.log('[PushToken] Permission not granted');
-    return;
-  }
-  const token = await Notifications.getExpoPushTokenAsync();
-  console.log('[PushToken]', token.data);
-}
-
-// Controls how notifications behave when the app is in the foreground.
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
-    shouldShowBanner: true,  // Show the notification banner while app is open.
-    shouldShowList: true,    // Include in the notification tray.
+    shouldShowBanner: true,
+    shouldShowList: true,
     shouldPlaySound: true,
     shouldSetBadge: false,
   }),
 });
 
+async function registerPushToken(token: string) {
+  if (!Device.isDevice) return;
+
+  const { status } = await Notifications.requestPermissionsAsync();
+  if (status !== 'granted') {
+    console.log('[PushToken] Permission not granted');
+    return;
+  }
+
+  const pushToken = await Notifications.getExpoPushTokenAsync();
+
+  await fetch(`${API_BASE_URL}/devices/register`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`,
+    },
+    body: JSON.stringify({
+      expo_push_token: pushToken.data,
+      platform: 'android',
+    }),
+  });
+
+  console.log('[PushToken] Registered:', pushToken.data);
+}
+
 export default function TabLayout() {
   const colorScheme = useColorScheme();
+  const auth = useAuth();
 
   useEffect(() => {
-    logPushToken();
-    // Log all incoming notifications to Metro for debugging.
+    if (auth.status !== 'ready') return;
+    registerPushToken(auth.token);
+
     const sub = Notifications.addNotificationReceivedListener(n =>
       console.log('[NotificationReceived]', JSON.stringify(n))
     );
     return () => sub.remove();
-  }, []);
+  }, [auth.status]);
 
   return (
     <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
