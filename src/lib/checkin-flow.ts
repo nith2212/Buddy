@@ -36,6 +36,10 @@ export async function handleCheckinResponse(
     body: JSON.stringify({ task_id: data.task_id, stage: data.stage, value: actionIdentifier }),
   });
 
+  // Clear the notification that was just acted on, success or not — leaving it
+  // in the shade with stale buttons invites a duplicate/conflicting tap.
+  await Notifications.dismissNotificationAsync(response.notification.request.identifier);
+
   if (!res.ok) {
     console.warn('[Checkin] /checkin/action failed:', res.status);
     return;

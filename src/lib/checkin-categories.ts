@@ -4,20 +4,26 @@
 
 import * as Notifications from 'expo-notifications';
 
+// opensAppToForeground: false — these buttons submit in the background and chain
+// to the next stage's local notification; nothing about answering "in progress"
+// or picking an emotion needs the app to come to the foreground. (Once a real
+// chat screen exists, flip chat_opt_in's "yes" to true so tapping it opens chat.)
+const BACKGROUND = { opensAppToForeground: false } as const;
+
 export const CHECKIN_CATEGORIES = {
   task_state: [
-    { identifier: 'not_started', buttonTitle: 'Not started' },
-    { identifier: 'in_progress', buttonTitle: 'In progress' },
-    { identifier: 'done', buttonTitle: 'Done' },
+    { identifier: 'not_started', buttonTitle: 'Not started', options: BACKGROUND },
+    { identifier: 'in_progress', buttonTitle: 'In progress', options: BACKGROUND },
+    { identifier: 'done', buttonTitle: 'Done', options: BACKGROUND },
   ],
   emotion: [
-    { identifier: 'good', buttonTitle: '😊 Good' },
-    { identifier: 'neutral', buttonTitle: '😐 Neutral' },
-    { identifier: 'low', buttonTitle: '😔 Low' },
+    { identifier: 'good', buttonTitle: '😊 Good', options: BACKGROUND },
+    { identifier: 'neutral', buttonTitle: '😐 Neutral', options: BACKGROUND },
+    { identifier: 'low', buttonTitle: '😔 Low', options: BACKGROUND },
   ],
   chat_opt_in: [
-    { identifier: 'yes', buttonTitle: "Yes, let's chat" },
-    { identifier: 'no', buttonTitle: 'No thanks' },
+    { identifier: 'yes', buttonTitle: "Yes, let's chat", options: BACKGROUND },
+    { identifier: 'no', buttonTitle: 'No thanks', options: BACKGROUND },
   ],
 } as const;
 
