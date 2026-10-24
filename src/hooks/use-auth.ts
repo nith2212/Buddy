@@ -25,6 +25,7 @@ export function useAuth(): AuthState {
       ]);
 
       if (storedToken && storedUserId) {
+        console.log('[Auth] Using stored identity. token:', storedToken, 'user_id:', storedUserId);
         setState({ status: 'ready', token: storedToken, userId: storedUserId });
         return;
       }
@@ -44,6 +45,7 @@ export function useAuth(): AuthState {
         SecureStore.setItemAsync(USER_ID_KEY, user_id),
       ]);
 
+      console.log('[Auth] Registered new identity. token:', token, 'user_id:', user_id);
       setState({ status: 'ready', token, userId: user_id });
     } catch (e: any) {
       setState({ status: 'error', message: e.message ?? 'Auth failed' });

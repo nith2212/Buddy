@@ -1,287 +1,198 @@
-"""
-tools.py
---------
-Database access layer for Buddy V2.
-All DB reads and writes go through these functions — nothing else touches the DB directly.
+# Database access layer for Buddy's brain. All DB reads/writes the agent needs go
+# through these functions — nothing else in brain/ touches the DB directly.
+#
+# Rewritten against the real deployed schema (models.py / SQLAlchemy), replacing
+# the hackathon version that queried a raw-sqlite schema via a `database.py`
+# module that was never ported (import would fail — database.py doesn't exist
+# in this repo). Every function takes `db: Session`, passed in by the caller
+# (FastAPI endpoint or cron job), matching the rest of the codebase's pattern —
+# nothing here opens or closes its own connection.
+#
+# Every user-scoped query filters by user_id; nothing here trusts a bare id
+# from the caller without it. Conversation turns go to the `Message` table
+# (role/content/reasoning columns already exist there) rather than the old
+# hack of packing "content|||reasoning_json" into a text field.
 
-Key changes from hackathon version:
-- get_user_memory() returns full rows (key, value, confidence, source) not flat dict
-- update_memory() accepts confidence + source, uses proper upsert on (user_id, key)
-- log_event() matches new events table shape and returns lastrowid
-- log_emotion_pick() — new, for the emotion picker tap (source='user', highest-trust signal)
-- save_conversation_turn() unchanged in contract, logs to events table instead of conversations
-- get_conversation_history() reads from events table (conversation_turn rows)
-"""
+from __future__ import annotations
 
 import json
-from datetime import datetime
-from database import get_conn
+from datetime import datetime, timezone
+from typing import Optional
+
+from sqlalchemy import select
+from sqlalchemy.orm import Session
+
+from models import Event, Memory, Message, Task
+
+VALID_EVENT_TYPES = {
+    "postponed", "completed", "progress_logged", "emotion_picked",
+    "notification_sent", "notification_ignored", "checkin_initiated",
+    "checkin_responded", "silence", "echo_ran",
+}
+VALID_EMOTIONS = {"overwhelmed", "tired", "unclear", "bored", "anxious"}
 
 
 # ── Task history ──────────────────────────────────────────────────────────────
 
-def get_task_history(task_id: int) -> dict:
-    """Return the task row and all associated events, ordered by creation time."""
-    conn = get_conn()
-    c    = conn.cursor()
-    task   = c.execute("SELECT * FROM tasks WHERE id = ?", (task_id,)).fetchone()
-    events = c.execute(
-        "SELECT * FROM events WHERE task_id = ? ORDER BY created_at ASC",
-        (task_id,),
-    ).fetchall()
-    conn.close()
+def get_task_history(db: Session, user_id: str, task_id: int) -> dict:
+    """Return the task row (scoped to user_id) and its events, oldest first."""
+    task = db.execute(
+        select(Task).where(Task.id == task_id, Task.user_id == user_id)
+    ).scalar_one_or_none()
+    events = db.execute(
+        select(Event)
+        .where(Event.task_id == task_id, Event.user_id == user_id)
+        .order_by(Event.created_at.asc())
+    ).scalars().all()
     return {
-        "task":   dict(task) if task else None,
-        "events": [dict(e) for e in events],
+        "task": {
+            "id": task.id,
+            "title": task.title,
+            "status": task.status,
+            "task_state": task.task_state,
+            "due_date": task.due_date,
+        } if task else None,
+        "events": [
+            {
+                "id": e.id,
+                "type": e.type,
+                "payload": e.payload,
+                "detected_state": e.detected_state,
+                "source": e.source,
+                "created_at": e.created_at,
+            }
+            for e in events
+        ],
     }
 
 
 # ── Memory ────────────────────────────────────────────────────────────────────
 
-def get_user_memory(user_id: int) -> list[dict]:
+def get_user_memory(db: Session, user_id: str) -> list[dict]:
     """
-    Return all memory rows for a user, ordered by confidence descending.
-
-    Returns a list of dicts — NOT a flat key/value dict — so callers can see
-    confidence and source. Buddy's system prompt injection uses all three fields.
-
-    When multiple rows exist for overlapping semantic keys (e.g. onboarding.work_time
-    and echo.pattern.work_time), the highest-confidence row wins — that logic lives
-    in the caller (agent.py), not here.
+    Return all memory rows for a user, highest confidence first. A list of dicts
+    (not a flat key/value map) so callers can see confidence and source —
+    the system-prompt injection shows all three so Buddy can weigh trust.
     """
-    conn = get_conn()
-    rows = conn.execute(
-        """
-        SELECT key, value, confidence, source
-        FROM memory
-        WHERE user_id = ?
-        ORDER BY confidence DESC
-        """,
-        (user_id,),
-    ).fetchall()
-    conn.close()
-    return [dict(r) for r in rows]
+    rows = db.execute(
+        select(Memory).where(Memory.user_id == user_id).order_by(Memory.confidence.desc())
+    ).scalars().all()
+    return [{"key": r.key, "value": r.value, "confidence": r.confidence, "source": r.source} for r in rows]
 
 
-def update_memory(
-    user_id: int,
-    key: str,
-    value: str,
-    confidence: float = 0.5,
-    source: str = "buddy",
-):
+def update_memory(db: Session, user_id: str, key: str, value: str, confidence: float = 0.5, source: str = "buddy") -> None:
     """
-    Upsert a memory entry for a user.
+    Upsert a memory entry for (user_id, key).
 
     Key naming convention (enforce in callers):
-      onboarding.*         — seeded from form, pass confidence=0.3, source='onboarding'
-      buddy.last_*         — after each conversation turn
-      buddy.recent_*       — rolling window (e.g. last 3 interventions)
-      echo.pattern.*       — Echo's behavioral pattern observations
-      echo.belief.*        — Echo's tentative interpretive hypotheses (not facts)
-      echo.notification.*  — learned notification timing/copy preferences
-      echo.intervention.*  — intervention effectiveness per state
-
-    On conflict: update value, confidence, source, and updated_at.
-    This means Echo can overwrite a buddy.* entry by writing to the same key
-    with higher confidence — or write to a separate echo.* key and let the
-    agent pick the highest-confidence one.
+      onboarding.*  — seeded from form, confidence=0.3, source='onboarding'
+      buddy.last_*  — written after each conversation turn
+      buddy.recent_* — rolling window (e.g. last 3 interventions)
+      echo.*        — Echo's weekly pattern observations, highest trust
     """
-    conn = get_conn()
-    now  = datetime.now().isoformat()
-    conn.execute(
-        """
-        INSERT INTO memory (user_id, key, value, confidence, source, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
-        ON CONFLICT(user_id, key) DO UPDATE SET
-            value      = excluded.value,
-            confidence = excluded.confidence,
-            source     = excluded.source,
-            updated_at = excluded.updated_at
-        """,
-        (user_id, key, value, confidence, source, now, now),
-    )
-    conn.commit()
-    conn.close()
+    row = db.execute(
+        select(Memory).where(Memory.user_id == user_id, Memory.key == key)
+    ).scalar_one_or_none()
+    if row:
+        row.value, row.confidence, row.source = value, confidence, source
+    else:
+        db.add(Memory(user_id=user_id, key=key, value=value, confidence=confidence, source=source))
+    db.commit()
 
 
 # ── Event logging ─────────────────────────────────────────────────────────────
 
 def log_event(
-    user_id: int,
+    db: Session,
+    user_id: str,
     event_type: str,
-    note: str = None,
-    task_id: int = None,
+    task_id: Optional[int] = None,
+    payload: Optional[str] = None,
+    detected_state: Optional[str] = None,
     source: str = "system",
 ) -> int:
     """
-    Append an event to the events table. Returns the new row's id (lastrowid).
+    Append a row to `events`. Returns the new row's id.
 
-    event_type enum (enforced here, not at DB level):
-      postponed | completed | progress_logged | emotion_picked |
-      notification_sent | notification_ignored | checkin_initiated |
-      checkin_responded | silence | conversation_turn | echo_ran
-
-    source:
-      'user'   — direct self-report (emotion tap, explicit completion message)
-      'buddy'  — agent-inferred or agent-generated
-      'system' — scheduler, migration, automated
-
-    Returning lastrowid matters when the caller (e.g. log_progress_if_needed)
-    needs to reference the event it just created.
+    source: 'user' (direct self-report) | 'buddy' (agent-inferred/generated) | 'system' (scheduler).
     """
-    valid_event_types = {
-        "postponed", "completed", "progress_logged", "emotion_picked",
-        "notification_sent", "notification_ignored", "checkin_initiated",
-        "checkin_responded", "silence", "conversation_turn", "echo_ran",
-    }
-    if event_type not in valid_event_types:
-        raise ValueError(f"Invalid event_type '{event_type}'. Must be one of: {valid_event_types}")
+    if event_type not in VALID_EVENT_TYPES:
+        raise ValueError(f"Invalid event_type '{event_type}'. Must be one of: {VALID_EVENT_TYPES}")
 
-    conn = get_conn()
-    cursor = conn.execute(
-        """
-        INSERT INTO events (user_id, task_id, event_type, note, source)
-        VALUES (?, ?, ?, ?, ?)
-        """,
-        (user_id, task_id, event_type, note, source),
+    event = Event(
+        user_id=user_id, task_id=task_id, type=event_type,
+        payload=payload, detected_state=detected_state, source=source,
     )
-    event_id = cursor.lastrowid
-    conn.commit()
-    conn.close()
-    return event_id
+    db.add(event)
+    db.commit()
+    db.refresh(event)
+    return event.id
 
 
-def log_emotion_pick(user_id: int, emotion: str, task_id: int = None) -> int:
-    """
-    Log an emotion picker tap. Source is always 'user' — this is direct self-report,
-    the highest-trust signal in the system. Do not use log_event() for this directly,
-    because source must never be inferred or defaulted away from 'user'.
-
-    Valid emotions for V2 default set: overwhelmed, tired, unclear
-    Full set (once Echo personalises): overwhelmed, tired, unclear, bored, anxious
-
-    Returns the new event's id.
-    """
-    valid_emotions = {"overwhelmed", "tired", "unclear", "bored", "anxious"}
-    if emotion not in valid_emotions:
-        raise ValueError(f"Invalid emotion '{emotion}'. Must be one of: {valid_emotions}")
-
-    return log_event(
-        user_id=user_id,
-        event_type="emotion_picked",
-        note=emotion,
-        task_id=task_id,
-        source="user",
-    )
+def log_emotion_pick(db: Session, user_id: str, emotion: str, task_id: Optional[int] = None) -> int:
+    """Log an emotion-picker tap. Source is always 'user' — the highest-trust signal."""
+    if emotion not in VALID_EMOTIONS:
+        raise ValueError(f"Invalid emotion '{emotion}'. Must be one of: {VALID_EMOTIONS}")
+    return log_event(db, user_id, "emotion_picked", task_id=task_id, payload=emotion, source="user")
 
 
 # ── Conversation history ───────────────────────────────────────────────────────
 
 def save_conversation_turn(
-    user_id: int,
+    db: Session,
+    user_id: str,
     role: str,
     content: str,
-    task_id: int = None,
-    reasoning: str = None,
-):
-    """
-    Persist a single conversation turn to the events table as a conversation_turn event.
-    reasoning is a JSON string (assistant turns only) — stored in the note field prefixed
-    so it's retrievable but doesn't collide with plain note text.
-
-    role: 'user' | 'assistant'
-    """
-    source = "user" if role == "user" else "buddy"
-
-    # For assistant turns with reasoning, store content + reasoning together in note
-    # so we don't need a separate column. Format: "CONTENT|||REASONING_JSON"
-    if role == "assistant" and reasoning:
-        note = f"{content}|||{reasoning}"
-    else:
-        note = content
-
-    log_event(
-        user_id=user_id,
-        event_type="conversation_turn",
-        note=note,
-        task_id=task_id,
-        source=source,
+    task_id: Optional[int] = None,
+    reasoning: Optional[dict] = None,
+) -> int:
+    """Persist one turn to `messages`. role: 'user' | 'assistant'. Returns the new row's id."""
+    message = Message(
+        user_id=user_id, task_id=task_id, role=role, content=content,
+        reasoning=json.dumps(reasoning) if reasoning else None,
     )
+    db.add(message)
+    db.commit()
+    db.refresh(message)
+    return message.id
 
 
-def get_conversation_history(user_id: int, limit: int = 20) -> list:
-    """
-    Return the last `limit` conversation turns as role/content dicts, oldest first.
-    Strips the reasoning suffix from assistant notes before returning.
-    """
-    conn = get_conn()
-    rows = conn.execute(
-        """
-        SELECT source, note FROM events
-        WHERE user_id = ? AND event_type = 'conversation_turn'
-        ORDER BY created_at DESC LIMIT ?
-        """,
-        (user_id, limit),
-    ).fetchall()
-    conn.close()
+def get_conversation_history(db: Session, user_id: str, limit: int = 20) -> list[dict]:
+    """Return the last `limit` turns as {"role", "content"} dicts, oldest first."""
+    rows = db.execute(
+        select(Message).where(Message.user_id == user_id).order_by(Message.created_at.desc()).limit(limit)
+    ).scalars().all()
+    return [{"role": m.role, "content": m.content} for m in reversed(rows)]
 
+
+def get_reasoning_history(db: Session, user_id: str) -> list[dict]:
+    """Return all stored reasoning snapshots for assistant turns, oldest first."""
+    rows = db.execute(
+        select(Message)
+        .where(Message.user_id == user_id, Message.role == "assistant", Message.reasoning.is_not(None))
+        .order_by(Message.created_at.asc())
+    ).scalars().all()
     history = []
-    for r in reversed(rows):
-        role    = "user" if r["source"] == "user" else "assistant"
-        content = r["note"] or ""
-        # Strip reasoning suffix if present
-        if "|||" in content:
-            content = content.split("|||")[0]
-        history.append({"role": role, "content": content})
-    return history
-
-
-def get_reasoning_history(user_id: int) -> list:
-    """
-    Return all stored reasoning snapshots for assistant turns, parsed from JSON.
-    """
-    conn = get_conn()
-    rows = conn.execute(
-        """
-        SELECT note, created_at FROM events
-        WHERE user_id = ? AND event_type = 'conversation_turn' AND source = 'buddy'
-        ORDER BY created_at ASC
-        """,
-        (user_id,),
-    ).fetchall()
-    conn.close()
-
-    history = []
-    for r in rows:
-        note = r["note"] or ""
-        if "|||" not in note:
-            continue
+    for m in rows:
         try:
-            _, reasoning_json = note.split("|||", 1)
-            parsed = json.loads(reasoning_json)
-            parsed["timestamp"] = r["created_at"]
-            history.append(parsed)
-        except Exception:
+            parsed = json.loads(m.reasoning)
+        except (TypeError, ValueError):
             continue
+        parsed["timestamp"] = m.created_at
+        history.append(parsed)
     return history
 
 
 # ── Task actions ──────────────────────────────────────────────────────────────
 
-def complete_task(task_id: int, user_id: int = 1):
-    """Mark a task as completed and log the completion event."""
-    conn = get_conn()
-    conn.execute(
-        "UPDATE tasks SET status = 'completed' WHERE id = ?",
-        (task_id,),
-    )
-    conn.commit()
-    conn.close()
-    log_event(
-        user_id=user_id,
-        event_type="completed",
-        note="User marked task as done",
-        task_id=task_id,
-        source="user",
-    )
+def complete_task(db: Session, user_id: str, task_id: int) -> None:
+    """Mark a task done (scoped to user_id) and log the completion event. No-op if not found/owned."""
+    task = db.execute(
+        select(Task).where(Task.id == task_id, Task.user_id == user_id)
+    ).scalar_one_or_none()
+    if not task:
+        return
+    task.status = "done"
+    task.completed_at = datetime.now(timezone.utc)
+    db.commit()
+    log_event(db, user_id, "completed", task_id=task_id, payload="User marked task as done", source="user")
