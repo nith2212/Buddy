@@ -7,6 +7,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 
 from auth import router as auth_router
+from cron import router as cron_router
 from db import Base, engine
 from me import router as me_router
 from notifications.router import router as notifications_router
@@ -33,3 +34,6 @@ app.include_router(notifications_router)
 # Tasks (POST/GET /tasks) and account deletion (DELETE /me).
 app.include_router(tasks_router)
 app.include_router(me_router)
+
+# Cron-triggered endpoints (gated by X-Cron-Secret), called by cron-job.org.
+app.include_router(cron_router)
