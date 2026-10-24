@@ -23,6 +23,7 @@ async def send_push(
     title: str,
     body: str,
     data: dict[str, Any] | None = None,
+    category_id: str | None = None,
 ) -> dict | None:
     # Look up the user's registered Expo push token.
     row = db.query(DeviceToken).filter(DeviceToken.user_id == user_id).first()
@@ -38,6 +39,10 @@ async def send_push(
         "channelId": "buddy-checkin",  # Android notification channel.
         "priority": "high",            # Bypasses Doze mode on Android.
     }
+    if category_id:
+        # Must match a category registered client-side via setNotificationCategoryAsync —
+        # this is what makes Android render the action buttons at all.
+        payload["categoryId"] = category_id
 
     async with httpx.AsyncClient() as client:
         resp = await client.post(
@@ -63,7 +68,7 @@ async def send_push(
     return ticket
 
 
-async def send_daily_checkin(db: Session, user_id: str) -> dict | None:
+async def send_daily_checkin(db: Session, user_id: str, task_id: int) -> dict | None:
     """
     Scheduler entry point. Sends the initial task-state check-in notification.
     Wire bandit logic here to choose the optimal time/content before calling send_push.
@@ -75,10 +80,12 @@ async def send_daily_checkin(db: Session, user_id: str) -> dict | None:
         body="How's your task going today?",
         data={
             "stage": "task_state",
+            "task_id": task_id,
             "actions": [
                 {"label": "Not started", "value": "not_started"},
                 {"label": "In progress", "value": "in_progress"},
                 {"label": "Done", "value": "done"},
             ],
         },
+        category_id="task_state",
     )

@@ -9,6 +9,8 @@ import { AnimatedSplashOverlay } from '@/components/animated-icon';
 import AppTabs from '@/components/app-tabs';
 import { useAuth } from '@/hooks/use-auth';
 import { API_BASE_URL } from '@/constants/api';
+import { registerCheckinCategories } from '@/lib/checkin-categories';
+import { handleCheckinResponse } from '@/lib/checkin-flow';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -53,12 +55,21 @@ export default function TabLayout() {
 
   useEffect(() => {
     if (auth.status !== 'ready') return;
+    registerCheckinCategories();
     registerPushToken(auth.token);
 
-    const sub = Notifications.addNotificationReceivedListener(n =>
+    const receivedSub = Notifications.addNotificationReceivedListener(n =>
       console.log('[NotificationReceived]', JSON.stringify(n))
     );
-    return () => sub.remove();
+    const responseSub = Notifications.addNotificationResponseReceivedListener(response => {
+      handleCheckinResponse(response, auth.token).catch(e =>
+        console.warn('[Checkin] handleCheckinResponse failed:', e)
+      );
+    });
+    return () => {
+      receivedSub.remove();
+      responseSub.remove();
+    };
   }, [auth.status]);
 
   return (

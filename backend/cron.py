@@ -67,7 +67,7 @@ async def cron_checkins(_: None = Depends(require_cron_secret)):
         tasks = _eligible_tasks(db, datetime.now(timezone.utc))
         for task in tasks:
             try:
-                result = await send_daily_checkin(db, task.user_id)
+                result = await send_daily_checkin(db, task.user_id, task.id)
             except Exception:
                 logger.exception("cron checkin failed for user_id=%s task_id=%s", task.user_id, task.id)
                 failed.append(task.id)

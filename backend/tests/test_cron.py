@@ -42,7 +42,7 @@ def test_cron_sends_and_records_event_for_due_task(api, db, monkeypatch):
         "/tasks", json={"title": "overdue", "due_date": "2020-01-01T00:00:00Z"}, headers=h
     ).json()["id"]
 
-    async def fake_send(db_, uid):
+    async def fake_send(db_, uid, tid):
         return {"status": "ok"}
 
     monkeypatch.setattr("cron.send_daily_checkin", fake_send)
@@ -63,7 +63,7 @@ def test_cron_does_not_renudge_within_cooldown(api, db, monkeypatch):
     db.add(models.Event(user_id=user_id, task_id=task_id, type="checkin_sent"))
     db.commit()
 
-    async def fake_send(db_, uid):
+    async def fake_send(db_, uid, tid):
         return {"status": "ok"}
 
     monkeypatch.setattr("cron.send_daily_checkin", fake_send)
@@ -90,7 +90,7 @@ def test_cron_isolates_failure_per_user(api, db, monkeypatch):
 
     calls = {"n": 0}
 
-    async def flaky_send(db_, uid):
+    async def flaky_send(db_, uid, tid):
         calls["n"] += 1
         if calls["n"] == 1:
             raise RuntimeError("expo is down")
