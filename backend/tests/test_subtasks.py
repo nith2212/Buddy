@@ -182,3 +182,25 @@ def test_checkin_task_state_in_progress_does_not_mark_done(api, users, db):
     api.post("/checkin/action", json={"task_id": t, "stage": "task_state", "value": "in_progress"}, headers=h)
     task = db.get(models.Task, t)
     assert task.status == "open" and task.completed_at is None
+
+
+# ── GET /tasks/{id} ──────────────────────────────────────────────────────────
+
+def test_get_single_task_includes_subtasks(api, users):
+    (_, h), _ = users
+    t = make_task(api, h, due_date="2026-12-01T00:00:00Z")
+    api.post(f"/tasks/{t}/subtasks", json={"title": "step 1"}, headers=h)
+
+    r = api.get(f"/tasks/{t}", headers=h)
+    assert r.status_code == 200
+    body = r.json()
+    assert body["id"] == t and body["due_date"].startswith("2026-12-01")
+    assert [s["title"] for s in body["subtasks"]] == ["step 1"]
+
+
+def test_get_single_task_is_scoped_and_authenticated(api, users):
+    (_, a_h), (_, b_h) = users
+    b_task = make_task(api, b_h)
+    assert api.get(f"/tasks/{b_task}", headers=a_h).status_code == 404
+    assert api.get(f"/tasks/{b_task}").status_code == 401
+    assert api.get("/tasks/999999", headers=a_h).status_code == 404

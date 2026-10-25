@@ -2,6 +2,7 @@
 #
 #   POST   /tasks                              — create a task (title, optional due_date)
 #   GET    /tasks                               — list the caller's tasks, newest first (capped)
+#   GET    /tasks/{task_id}                     — one task with its subtasks
 #   PATCH  /tasks/{task_id}                      — edit title/due_date, or mark status
 #   POST   /tasks/{task_id}/subtasks             — add a subtask
 #   PATCH  /tasks/{task_id}/subtasks/{subtask_id} — edit title and/or toggle done
@@ -18,7 +19,7 @@ from typing import Literal, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from pydantic import BaseModel, Field
 from sqlalchemy import select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
 from auth import current_user, owned_or_404
 from db import get_db
@@ -103,10 +104,15 @@ def list_tasks(
     user: User = Depends(current_user),
     db: Session = Depends(get_db),
 ):
-    q = select(Task).where(Task.user_id == user.id)
+    q = select(Task).where(Task.user_id == user.id).options(selectinload(Task.subtasks))  # not N+1
     if status:
         q = q.where(Task.status == status)
     return db.execute(q.order_by(Task.created_at.desc(), Task.id.desc()).limit(limit)).scalars().all()
+
+
+@router.get("/{task_id}", response_model=TaskOut)
+def get_task(task_id: int, user: User = Depends(current_user), db: Session = Depends(get_db)):
+    return owned_or_404(db, Task, task_id, user)
 
 
 @router.patch("/{task_id}", response_model=TaskOut)

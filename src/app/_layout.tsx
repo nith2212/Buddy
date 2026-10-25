@@ -1,13 +1,15 @@
-import { DarkTheme, DefaultTheme, ThemeProvider } from 'expo-router';
+import { DarkTheme, DefaultTheme, Stack, ThemeProvider, useRouter } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { useEffect } from 'react';
-import { useColorScheme } from 'react-native';
+import { ActivityIndicator, StyleSheet, useColorScheme } from 'react-native';
 import * as Notifications from 'expo-notifications';
 import * as Device from 'expo-device';
 
 import { AnimatedSplashOverlay } from '@/components/animated-icon';
-import AppTabs from '@/components/app-tabs';
+import { ThemedText } from '@/components/themed-text';
+import { ThemedView } from '@/components/themed-view';
 import { useAuth } from '@/hooks/use-auth';
+import { SessionProvider } from '@/hooks/use-session';
 import { API_BASE_URL } from '@/constants/api';
 import { registerCheckinCategories } from '@/lib/checkin-categories';
 import { handleCheckinResponse } from '@/lib/checkin-flow';
@@ -49,33 +51,61 @@ async function registerPushToken(token: string) {
   console.log('[PushToken] Registered:', pushToken.data);
 }
 
-export default function TabLayout() {
+export default function RootLayout() {
   const colorScheme = useColorScheme();
   const auth = useAuth();
+  const router = useRouter();
+  const token = auth.status === 'ready' ? auth.token : null;
 
   useEffect(() => {
-    if (auth.status !== 'ready') return;
+    if (!token) return;
     registerCheckinCategories();
-    registerPushToken(auth.token);
+    registerPushToken(token);
 
-    const receivedSub = Notifications.addNotificationReceivedListener(n =>
-      console.log('[NotificationReceived]', JSON.stringify(n))
-    );
-    const responseSub = Notifications.addNotificationResponseReceivedListener(response => {
-      handleCheckinResponse(response, auth.token).catch(e =>
-        console.warn('[Checkin] handleCheckinResponse failed:', e)
-      );
+    const respond = (response: Notifications.NotificationResponse) =>
+      handleCheckinResponse(response, token, {
+        openChat: (taskId) => router.push({ pathname: '/task/[id]', params: { id: String(taskId) } }),
+      }).catch((e) => console.warn('[Checkin] handleCheckinResponse failed:', e));
+
+    // A tap that launched the app from a killed state isn't guaranteed to reach the
+    // live listener below, so pick it up explicitly (handleCheckinResponse dedupes).
+    Notifications.getLastNotificationResponseAsync().then((last) => {
+      if (last) respond(last);
     });
+
+    const receivedSub = Notifications.addNotificationReceivedListener((n) =>
+      console.log('[NotificationReceived]', JSON.stringify(n)),
+    );
+    const responseSub = Notifications.addNotificationResponseReceivedListener(respond);
     return () => {
       receivedSub.remove();
       responseSub.remove();
     };
-  }, [auth.status]);
+  }, [token, router]);
 
   return (
     <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
+      {auth.status === 'ready' ? (
+        <SessionProvider value={auth.token}>
+          <Stack screenOptions={{ headerShown: false }} />
+        </SessionProvider>
+      ) : (
+        <ThemedView style={styles.center}>
+          {auth.status === 'loading' ? (
+            <ActivityIndicator />
+          ) : (
+            <ThemedText style={styles.centerText}>
+              Couldn&apos;t reach Buddy. Check your connection and reopen the app.
+            </ThemedText>
+          )}
+        </ThemedView>
+      )}
       <AnimatedSplashOverlay />
-      <AppTabs />
     </ThemeProvider>
   );
 }
+
+const styles = StyleSheet.create({
+  center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24 },
+  centerText: { textAlign: 'center' },
+});
