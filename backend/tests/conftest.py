@@ -6,6 +6,9 @@ import tempfile
 _tmp = tempfile.mkdtemp(prefix="buddy-test-")
 os.environ["DATABASE_URL"] = f"sqlite:///{_tmp}/test.db"
 os.environ["INVITE_CODE"] = "test-invite"
+# Tests must never hit the real Groq API: blank the key before db.py's load_dotenv()
+# runs (it doesn't override existing vars). Tests that need replies patch llm.complete.
+os.environ["GROQ_API_KEY"] = ""
 
 import pytest  # noqa: E402
 from fastapi import Depends, FastAPI  # noqa: E402

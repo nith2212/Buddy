@@ -24,6 +24,7 @@ class PlaybookDoc:
     body: str
     designed_for_states: tuple[str, ...] = ()
     state: str | None = None
+    intervention: str | None = None
 
 
 def _parse_frontmatter(text: str) -> tuple[dict, str]:
@@ -57,8 +58,25 @@ def _load_docs() -> tuple[PlaybookDoc, ...]:
             body=body,
             designed_for_states=tuple(meta.get("designed_for_states", [])),
             state=meta.get("state"),
+            intervention=meta.get("intervention"),
         ))
     return tuple(docs)
+
+
+def get_doc(doc_id: str) -> str | None:
+    """Body of a single doc by doc_id (e.g. "core_buddy_philosophy"), or None."""
+    return next((d.body for d in _load_docs() if d.doc_id == doc_id), None)
+
+
+def get_state_doc(state: str | None) -> str | None:
+    return next((d.body for d in _load_docs() if d.category == "state_definition" and d.state == state), None)
+
+
+def interventions_for(state: str | None) -> list[PlaybookDoc]:
+    """Intervention docs tagged for `state`; every intervention if the state is unknown/None."""
+    all_interventions = [d for d in _load_docs() if d.category == "intervention"]
+    tagged = [d for d in all_interventions if state in d.designed_for_states]
+    return tagged or all_interventions
 
 
 def get_playbook(state: str) -> str:

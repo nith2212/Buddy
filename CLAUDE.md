@@ -70,7 +70,7 @@ If a task seems to need something from NOT NOW, stop and ask.
 - Secrets only in env vars. Never commit .env. DB URL, API keys, cron secret, host config all via env.
 
 ## Stack
-FastAPI on Render free, Neon Postgres, Groq llama-3.1-8b-instant, Qdrant Cloud, cron-job.org, Expo push. Mobile: Expo, EAS APK.
+FastAPI on Render free, Neon Postgres, Groq openai/gpt-oss-20b (llama-3.1-8b-instant was retired on Groq; override via GROQ_MODEL), Qdrant Cloud, cron-job.org, Expo push. Mobile: Expo, EAS APK.
 
 ## Working style
 - One feature end to end at a time. Plan first for anything touching multiple files.

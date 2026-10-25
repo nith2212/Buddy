@@ -7,6 +7,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 
 from auth import router as auth_router
+from chat import router as chat_router
 from cron import router as cron_router
 from db import Base, engine
 from me import router as me_router
@@ -37,3 +38,6 @@ app.include_router(me_router)
 
 # Cron-triggered endpoints (gated by X-Cron-Secret), called by cron-job.org.
 app.include_router(cron_router)
+
+# Chat with Buddy: POST /chat, POST /initiate, GET /chat/history.
+app.include_router(chat_router)

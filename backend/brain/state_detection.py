@@ -83,7 +83,7 @@ def _consecutive_ignored(checkin_sent_at: list[datetime], activity_at: list[date
     return streak
 
 
-def _aware(dt: Optional[datetime]) -> Optional[datetime]:
+def as_utc(dt: Optional[datetime]) -> Optional[datetime]:
     """
     SQLite drops timezone info on round-trip for DateTime(timezone=True) columns
     (Postgres/Neon doesn't) — every value we write is already UTC (models.utcnow()),
@@ -119,9 +119,9 @@ def detect_state(
 
     return classify(
         task_status=task.status,
-        due_date=_aware(task.due_date),
+        due_date=as_utc(task.due_date),
         emotion_tap=emotion_tap,
-        checkin_sent_at=[_aware(d) for d in sent_at],
-        activity_at=[_aware(task.updated_at), *(_aware(d) for d in subtask_updates)],
+        checkin_sent_at=[as_utc(d) for d in sent_at],
+        activity_at=[as_utc(task.updated_at), *(as_utc(d) for d in subtask_updates)],
         now=datetime.now(timezone.utc),
     )

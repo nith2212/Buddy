@@ -13,6 +13,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from auth import current_user, owned_or_404
+from brain.agent import run_turn
 from db import get_db
 from models import DeviceToken, EmotionLog, Task, User
 from tasks import _mark_done
@@ -116,12 +117,12 @@ def _chat_opt_in_response(task_id: int) -> dict[str, Any]:
 
 
 @router.post("/checkin/action")
-def checkin_action(
+async def checkin_action(
     payload: CheckinActionRequest,
     user: User = Depends(current_user),
     db: Session = Depends(get_db),
 ):
-    # Plain `def`: all work here is synchronous DB access, so FastAPI runs it in the threadpool.
+    # async: the declined-chat branch awaits a Groq call for the tailored closing note.
     logger.info(
         "checkin_action user_id=%s task_id=%s stage=%s value=%s",
         user.id,
@@ -172,13 +173,14 @@ def checkin_action(
                     "data": {"stage": "chat", "task_id": task.id},
                 },
             }
-        # User declined chat — check-in is complete.
+        # User declined chat: the brain still runs and writes ONE tailored closing note.
+        closing = await run_turn(db, user.id, task, mode="closing")
         return {
             "next_stage": "done",
             "task_id": task.id,
             "notification": {
                 "title": "All done for now ✅",
-                "body": "Great job checking in today!",
+                "body": closing["reply"],
                 "data": {"stage": "done", "task_id": task.id},
             },
         }

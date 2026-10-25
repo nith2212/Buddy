@@ -80,7 +80,10 @@ def get_user_memory(db: Session, user_id: str) -> list[dict]:
     return [{"key": r.key, "value": r.value, "confidence": r.confidence, "source": r.source} for r in rows]
 
 
-def update_memory(db: Session, user_id: str, key: str, value: str, confidence: float = 0.5, source: str = "buddy") -> None:
+def update_memory(
+    db: Session, user_id: str, key: str, value: str,
+    confidence: float = 0.5, source: str = "buddy", commit: bool = True,
+) -> None:
     """
     Upsert a memory entry for (user_id, key).
 
@@ -97,7 +100,10 @@ def update_memory(db: Session, user_id: str, key: str, value: str, confidence: f
         row.value, row.confidence, row.source = value, confidence, source
     else:
         db.add(Memory(user_id=user_id, key=key, value=value, confidence=confidence, source=source))
-    db.commit()
+    if commit:
+        db.commit()
+    else:
+        db.flush()  # make the row visible to later queries in the same transaction
 
 
 # ── Event logging ─────────────────────────────────────────────────────────────
@@ -145,23 +151,30 @@ def save_conversation_turn(
     content: str,
     task_id: Optional[int] = None,
     reasoning: Optional[dict] = None,
+    commit: bool = True,
 ) -> int:
     """Persist one turn to `messages`. role: 'user' | 'assistant'. Returns the new row's id."""
     message = Message(
         user_id=user_id, task_id=task_id, role=role, content=content,
-        reasoning=json.dumps(reasoning) if reasoning else None,
+        reasoning=json.dumps(reasoning, default=str) if reasoning else None,
     )
     db.add(message)
-    db.commit()
-    db.refresh(message)
+    if commit:
+        db.commit()
+        db.refresh(message)
+    else:
+        db.flush()
     return message.id
 
 
-def get_conversation_history(db: Session, user_id: str, limit: int = 20) -> list[dict]:
+def get_conversation_history(
+    db: Session, user_id: str, limit: int = 20, task_id: Optional[int] = None,
+) -> list[dict]:
     """Return the last `limit` turns as {"role", "content"} dicts, oldest first."""
-    rows = db.execute(
-        select(Message).where(Message.user_id == user_id).order_by(Message.created_at.desc()).limit(limit)
-    ).scalars().all()
+    q = select(Message).where(Message.user_id == user_id)
+    if task_id is not None:
+        q = q.where(Message.task_id == task_id)
+    rows = db.execute(q.order_by(Message.created_at.desc(), Message.id.desc()).limit(limit)).scalars().all()
     return [{"role": m.role, "content": m.content} for m in reversed(rows)]
 
 
