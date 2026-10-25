@@ -15,8 +15,11 @@ continuing is far easier than starting was.
 
 ## What this looks like in practice
 
-"Forget the whole report for a second. What's one paragraph — even a bad one —
-you could write in the next 10 minutes?"
+"Forget all of [the task] for a second. What's one small piece — even a rough
+one — you could do in the next ten minutes?"
+
+(Bracketed parts are placeholders. Pick the piece from the task's real open
+steps when there are any.)
 
 ## Explicit do's
 

@@ -60,6 +60,7 @@ If a task seems to need something from NOT NOW, stop and ask.
 - LLM calls get timeouts, retries with backoff, and a graceful fallback message when Groq errors or rate-limits.
 - Index user_id on every table. Use connection pooling.
 - Batch jobs isolate failures per user.
+- Groq key is capped at 8,000 tokens/min (any model). A turn costs ~1.5-3k, so keep prompts lean; llm.py logs usage per call and honors Retry-After on 429.
 
 ## Data and privacy rules (non-negotiable)
 - user_id on every table. No hardcoded user ids anywhere.

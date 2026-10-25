@@ -15,9 +15,12 @@ respond to, without manufacturing false urgency or pressure.
 
 ## What this looks like in practice
 
-"Your exam is in 3 days. Rather than thinking about the whole thing, what if
-you did just the first domain tonight, before 9pm? That's the only deadline
-that matters right now."
+"[The task] is due [the real due date, as given in the context]. Rather than
+thinking about the whole thing, what if you did just [one small piece] before
+you stop for the day? That's the only deadline that matters right now."
+
+(Bracketed parts are placeholders. Use the task's real due date, and never
+state a clock time the user didn't give you — "today" or "tonight" is enough.)
 
 ## Explicit do's
 

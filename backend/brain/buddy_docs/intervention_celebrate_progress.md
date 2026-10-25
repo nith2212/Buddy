@@ -15,6 +15,10 @@ happened, not just that something happened.
 
 ## What this looks like in practice
 
+Use a line like these only when the matching fact is actually in the context
+(a step ticked, a return after days away). Never claim a streak, an earlier
+effort, or momentum that isn't there, and name the real thing.
+
 Resilience: "You were tired earlier and still did it. That's persistence."
 
 Comeback: "You struggled with this yesterday but came back today. That matters."

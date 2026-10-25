@@ -14,8 +14,12 @@ intervention can work, the user needs to feel understood — not optimized.
 
 ## What this looks like in practice
 
-"That sounds genuinely draining. Makes sense you don't want to look at this
-right now."
+"[The task] has been sitting heavy. No plan needed right now. What's the
+hardest part of even looking at it?"
+
+(Bracketed parts are placeholders for the user's real task and details. This
+shows the idea, never the exact wording — and it deliberately doesn't open
+with sympathy filler like "That sounds…" or "It's okay to feel…".)
 
 (Then — only if the user signals readiness — gently transition toward a next
 step. Never force the transition in the same message.)

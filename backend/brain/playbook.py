@@ -11,6 +11,7 @@
 from __future__ import annotations
 
 import os
+import re
 from dataclasses import dataclass
 from functools import lru_cache
 
@@ -61,6 +62,43 @@ def _load_docs() -> tuple[PlaybookDoc, ...]:
             intervention=meta.get("intervention"),
         ))
     return tuple(docs)
+
+
+_HEADING = re.compile(r"^## (.+)$", re.MULTILINE)
+
+# Parts of an intervention doc the model should not see when writing: quoted example lines get
+# cloned almost word for word (a literal "before 9pm" became every reply's deadline), and the
+# academic grounding theory is tokens spent on nothing the writer can use.
+_NOT_FOR_WRITER = ("What this looks like", "Grounding theory")
+# What a state doc tells Buddy about how to *be* with someone in that state.
+_STANCE = ("What this is", "What it is NOT", "Buddy's internal")
+
+
+def _sections(body: str) -> list[tuple[str, str]]:
+    parts = _HEADING.split(body)  # [preamble, heading, text, heading, text, ...]
+    return [("", parts[0])] + [(parts[i], parts[i + 1]) for i in range(1, len(parts), 2)]
+
+
+def _join(sections: list[tuple[str, str]]) -> str:
+    return "".join(f"## {h}{t}" if h else t for h, t in sections).strip()
+
+
+def drop_sections(body: str, prefixes: tuple[str, ...]) -> str:
+    return _join([(h, t) for h, t in _sections(body) if not h.startswith(prefixes)])
+
+
+def keep_sections(body: str, prefixes: tuple[str, ...]) -> str:
+    return _join([(h, t) for h, t in _sections(body) if h == "" or h.startswith(prefixes)])
+
+
+def intervention_text(doc: PlaybookDoc) -> str:
+    """An intervention doc as the model should read it: purpose and do's/don'ts, no examples or theory."""
+    return drop_sections(doc.body, _NOT_FOR_WRITER)
+
+
+def state_stance(state: str | None) -> str | None:
+    body = get_state_doc(state)
+    return keep_sections(body, _STANCE) if body else None
 
 
 def get_doc(doc_id: str) -> str | None:

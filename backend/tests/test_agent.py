@@ -22,7 +22,7 @@ def make_task(api, h, **extra):
 class FakeLLM:
     """Records every call; returns a decide-JSON for json_mode calls, prose otherwise."""
 
-    def __init__(self, choice="surface_smallest_step", reply="Let's find one tiny first step.", fail=False):
+    def __init__(self, choice="surface_smallest_step", reply="Let's find one tiny first step on your report.", fail=False):
         self.calls, self.choice, self.reply, self.fail = [], choice, reply, fail
 
     async def __call__(self, messages, **kw):
@@ -62,12 +62,12 @@ def test_chat_happy_path_saves_turns_and_memory(api, db, fake_llm):
     r = api.post("/chat", json={"task_id": t, "message": "I can't get started"}, headers=h)
     assert r.status_code == 200, r.text
     body = r.json()
-    assert body["reply"] == "Let's find one tiny first step."
+    assert body["reply"] == "Let's find one tiny first step on your report."
     assert body["intervention"] == "surface_smallest_step"
 
     msgs = db.query(models.Message).filter(models.Message.task_id == t).order_by(models.Message.id).all()
     assert [(m.role, m.content) for m in msgs] == [
-        ("user", "I can't get started"), ("assistant", "Let's find one tiny first step."),
+        ("user", "I can't get started"), ("assistant", "Let's find one tiny first step on your report."),
     ]
     memory = {m.key: m.value for m in db.query(models.Memory).filter(models.Memory.user_id == user_id)}
     assert memory["buddy.last_intervention"] == "surface_smallest_step"
@@ -140,7 +140,7 @@ def test_chat_history_is_sent_back_to_the_model(api, fake_llm):
     api.post("/chat", json={"task_id": t, "message": "second message"}, headers=h)
     sent = fake_llm.write_calls[-1]["messages"]
     contents = [m["content"] for m in sent if m["role"] != "system"]
-    assert contents == ["first message", "Let's find one tiny first step.", "second message"]
+    assert contents == ["first message", "Let's find one tiny first step on your report.", "second message"]
 
 
 @pytest.mark.parametrize("message", ["", "   ", "x" * 1001])
@@ -189,7 +189,7 @@ def test_history_is_scoped_to_the_task(api, fake_llm):
     api.post("/chat", json={"task_id": t1, "message": "about t1"}, headers=h)
     api.post("/chat", json={"task_id": t2, "message": "about t2"}, headers=h)
     history = api.get(f"/chat/history?task_id={t1}", headers=h).json()
-    assert [turn["content"] for turn in history] == ["about t1", "Let's find one tiny first step."]
+    assert [turn["content"] for turn in history] == ["about t1", "Let's find one tiny first step on your report."]
 
 
 # ── declined chat -> tailored closing notification ──────────────────────────

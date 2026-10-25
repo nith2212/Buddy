@@ -31,6 +31,7 @@ async def complete(
     json_mode: bool = False,
     timeout: float = 15.0,
     retries: int = 2,
+    max_wait: float = 20.0,
 ) -> str:
     key = os.getenv("GROQ_API_KEY")
     if not key:
@@ -52,21 +53,45 @@ async def complete(
 
     delay = 1.0
     last_error: Exception | None = None
+    attempts = 0
     async with httpx.AsyncClient(timeout=timeout) as client:
         for attempt in range(retries + 1):
+            attempts += 1
+            advised: float | None = None
             try:
                 resp = await client.post(GROQ_URL, json=body, headers={"Authorization": f"Bearer {key}"})
             except httpx.HTTPError as e:
                 last_error = e
             else:
                 if resp.status_code == 200:
-                    content = resp.json()["choices"][0]["message"]["content"]
-                    return (content or "").strip()
+                    data = resp.json()
+                    _log_usage(data)
+                    return (data["choices"][0]["message"]["content"] or "").strip()
                 if resp.status_code not in RETRYABLE_STATUS:
                     raise LLMError(f"Groq returned {resp.status_code}: {resp.text[:200]}")
                 last_error = LLMError(f"Groq returned {resp.status_code}")
+                advised = _advised_wait(resp)
             if attempt < retries:
-                logger.warning("Groq call failed (attempt %d), retrying in %.1fs: %s", attempt + 1, delay, last_error)
-                await asyncio.sleep(delay)
+                pause = advised if advised is not None else delay
+                if pause > max_wait:
+                    break  # Groq says to wait longer than this caller can; fail now and let it fall back
+                logger.warning("Groq call failed (attempt %d), retrying in %.1fs: %s", attempt + 1, pause, last_error)
+                await asyncio.sleep(pause)
                 delay *= 2
-    raise LLMError(f"Groq call failed after {retries + 1} attempts: {last_error}")
+    raise LLMError(f"Groq call failed after {attempts} attempt(s): {last_error}")
+
+
+def _advised_wait(resp) -> float | None:
+    """Groq's 429s say how long to wait (Retry-After, seconds) — far better than guessing."""
+    try:
+        return max(0.0, float(resp.headers.get("retry-after")))
+    except (AttributeError, TypeError, ValueError):
+        return None
+
+
+def _log_usage(data: dict) -> None:
+    """Groq caps this key at a few thousand tokens per minute, so what each call costs matters."""
+    usage = data.get("usage") or {}
+    reasoning = (usage.get("completion_tokens_details") or {}).get("reasoning_tokens")
+    logger.info("groq usage: prompt=%s completion=%s (reasoning=%s)",
+                usage.get("prompt_tokens"), usage.get("completion_tokens"), reasoning)
