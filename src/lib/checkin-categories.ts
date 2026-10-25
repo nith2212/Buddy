@@ -16,10 +16,12 @@ export const CHECKIN_CATEGORIES = {
     { identifier: 'in_progress', buttonTitle: 'In progress', options: BACKGROUND },
     { identifier: 'done', buttonTitle: 'Done', options: BACKGROUND },
   ],
+  // Each value maps straight to a playbook state (fatigue/overwhelm/ambiguity).
+  // "avoidance" has no button on purpose — see backend/notifications/router.py.
   emotion: [
-    { identifier: 'good', buttonTitle: '😊 Good', options: BACKGROUND },
-    { identifier: 'neutral', buttonTitle: '😐 Neutral', options: BACKGROUND },
-    { identifier: 'low', buttonTitle: '😔 Low', options: BACKGROUND },
+    { identifier: 'tired', buttonTitle: '😴 Tired', options: BACKGROUND },
+    { identifier: 'too_much', buttonTitle: '😤 Too much', options: BACKGROUND },
+    { identifier: 'unclear', buttonTitle: "🤷 Don't know where to start", options: BACKGROUND },
   ],
   chat_opt_in: [
     { identifier: 'yes', buttonTitle: "Yes, let's chat", options: BACKGROUND },

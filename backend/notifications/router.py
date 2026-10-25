@@ -15,6 +15,7 @@ from sqlalchemy.orm import Session
 from auth import current_user, owned_or_404
 from db import get_db
 from models import DeviceToken, EmotionLog, Task, User
+from tasks import _mark_done
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -80,10 +81,14 @@ def _emotion_picker_response(task_id: int) -> dict[str, Any]:
             "data": {
                 "stage": "emotion",
                 "task_id": task_id,
+                # Each value maps straight to a playbook state (fatigue/overwhelm/
+                # ambiguity) — a direct self-report, trusted over any inference.
+                # "avoidance" has no button on purpose: it's rarely self-admitted
+                # in the moment, and gets inferred from repeated silence instead.
                 "actions": [
-                    {"label": "😊 Good", "value": "good"},
-                    {"label": "😐 Neutral", "value": "neutral"},
-                    {"label": "😔 Low", "value": "low"},
+                    {"label": "😴 Tired", "value": "tired"},
+                    {"label": "😤 Too much", "value": "too_much"},
+                    {"label": "🤷 Don't know where to start", "value": "unclear"},
                 ],
             },
         },
@@ -130,6 +135,10 @@ def checkin_action(
     if payload.stage == "task_state":
         # Save what state the task is in, then prompt for emotion.
         task.task_state = payload.value
+        if payload.value == "done":
+            # Keep status/completed_at in lockstep with task_state — state detection's
+            # "task marked done" rule reads status, and cron must stop nudging about it.
+            _mark_done(task, db)
         db.commit()
         return _emotion_picker_response(task.id)
 

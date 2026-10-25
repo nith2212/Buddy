@@ -24,6 +24,7 @@ KINDS = {
     "device_token": (models.DeviceToken, "expo_push_token"),
     "event": (models.Event, "type"),
     "memory": (models.Memory, "value"),
+    "subtask": (models.Subtask, "title"),
 }
 
 
