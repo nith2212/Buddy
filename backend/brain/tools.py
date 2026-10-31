@@ -107,6 +107,30 @@ def update_memory(
         db.flush()  # make the row visible to later queries in the same transaction
 
 
+def get_memory_entry(db: Session, user_id: str, key: str) -> Optional[Memory]:
+    return db.execute(
+        select(Memory).where(Memory.user_id == user_id, Memory.key == key)
+    ).scalar_one_or_none()
+
+
+def record_confirmed_cause(db: Session, user_id: str, task_id: int, cause: str, commit: bool = True) -> None:
+    """
+    Remember a cause the user CONFIRMED: blocker.task.<id> = the cause, and pattern.blocker.<cause>
+    counts how often it has been confirmed. Only called for confirmed causes, never guesses.
+    """
+    if cause not in VALID_EMOTIONS:
+        raise ValueError(f"Invalid cause '{cause}'. Must be one of: {VALID_EMOTIONS}")
+    update_memory(db, user_id, f"blocker.task.{task_id}", cause, confidence=0.9, source="user", commit=False)
+    row = get_memory_entry(db, user_id, f"pattern.blocker.{cause}")
+    try:
+        count = int(row.value) if row else 0
+    except (TypeError, ValueError):
+        count = 0
+    update_memory(db, user_id, f"pattern.blocker.{cause}", str(count + 1), confidence=0.8, source="buddy", commit=False)
+    if commit:
+        db.commit()
+
+
 # ── Event logging ─────────────────────────────────────────────────────────────
 
 def log_event(

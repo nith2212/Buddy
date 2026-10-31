@@ -106,6 +106,11 @@ def get_doc(doc_id: str) -> str | None:
     return next((d.body for d in _load_docs() if d.doc_id == doc_id), None)
 
 
+def get_intervention(name: str) -> PlaybookDoc | None:
+    """One intervention doc by its id (e.g. "find_the_cause"), or None."""
+    return next((d for d in _load_docs() if d.category == "intervention" and d.intervention == name), None)
+
+
 def get_state_doc(state: str | None) -> str | None:
     return next((d.body for d in _load_docs() if d.category == "state_definition" and d.state == state), None)
 

@@ -8,28 +8,40 @@
 # while the phone handles a notification tap in the background, so it must be fast.
 #
 # Any Groq failure degrades to a fixed fallback reply; the user always gets an answer.
+#
+# Root cause first: when the user has tapped a reason, Buddy diagnoses before it advises.
+# Phases (what the writer is told to do this turn):
+#   ask         — reflect the tapped reason, ask ONE specific question, no advice
+#   guess       — offer a read of the cause as a question, no advice
+#   first_move  — the user CONFIRMED a cause: one tiny first move that fits it
+#   release     — a short acknowledgment ("okay thanks"): close the loop, nothing new
+#   normal      — everything else (the decide call picks among the state's interventions)
+# A cause is saved only when the user confirms it (judged by a small LLM call, not keywords).
 
 from __future__ import annotations
 
 import json
 import logging
+import re
 from datetime import datetime, timedelta, timezone
 from typing import Literal, Optional
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from brain import llm, tools
 from brain.playbook import (
-    PlaybookDoc, drop_sections, get_doc, get_state_doc, intervention_text, interventions_for, state_stance,
+    PlaybookDoc, drop_sections, get_doc, get_intervention, get_state_doc, intervention_text, interventions_for,
+    state_stance,
 )
 from brain.reply_check import check_reply, salient_words
-from brain.state_detection import as_utc, detect_state
-from models import EmotionLog, Subtask, Task
+from brain.state_detection import EMOTION_TO_STATE, as_utc, detect_state
+from models import EmotionLog, Message, Subtask, Task
 
 logger = logging.getLogger(__name__)
 
 Mode = Literal["chat", "initiate", "closing"]
+Phase = Literal["normal", "ask", "guess", "first_move", "release"]
 
 HISTORY_TURNS = 12
 MAX_CHARS_PER_TURN = 600
@@ -62,6 +74,30 @@ SITUATION = {
 
 MAX_SENTENCES = {"chat": 3, "initiate": 3, "closing": 2}
 MAX_QUESTIONS = {"chat": 1, "initiate": 1, "closing": 0}
+# (max sentences, max questions) for the diagnosing phases; "normal" uses the mode's limits above.
+PHASE_LIMITS = {"ask": (3, 1), "guess": (3, 1), "first_move": (3, 1), "release": (2, 0)}
+
+DIAGNOSE_MAX_BUDDY_TURNS = 4  # after this many Buddy turns since the tap with no confirmed cause, stop probing
+PATTERN_MIN = 3               # a cause must be confirmed this many times before Buddy may mention a pattern
+
+# What each tapped reason means, in the words the model should use.
+CAUSE_WORDS = {
+    "unclear": "not knowing where to start",
+    "too_much": "the task feels too big",
+    "afraid": "fear that it won't be good enough",
+    "bored": "it feels boring or pointless",
+    "tired": "being tired or drained",
+}
+_CAUSE_KEYS = ("blocker.", "pattern.")  # memory rows shown to the writer only as the one pattern line
+
+# A short thank-you or sign-off: every word is one of these, five words at most, no question.
+_ACK_WORDS = {
+    "ok", "okay", "okie", "k", "kk", "thanks", "thank", "thx", "ty", "you", "got", "it", "cool", "sure",
+    "alright", "will", "do", "noted", "great", "perfect", "awesome", "nice", "good", "sounds", "appreciate",
+    "that", "helps", "helpful", "yep", "yup", "so", "much", "very",
+}
+# After these, a polite "okay" is more likely avoidance than agreement.
+_NO_RELEASE_STATES = {"avoidance", "commitment_drift"}
 CLOSING_MAX_CHARS = 200  # phone notification; the prompt asks for under 160
 
 
@@ -73,18 +109,36 @@ async def run_turn(
     user_message: Optional[str] = None,
 ) -> dict:
     """Run one Buddy turn for `task` (already ownership-checked by the caller)."""
-    emotion = _fresh_emotion(db, user_id, task.id)
-    hypotheses = detect_state(db, user_id, task.id, emotion_tap=emotion)
+    task_id = task.id
+    emotion_row = _fresh_emotion(db, user_id, task_id)
+    emotion = emotion_row.emotion if emotion_row else None
+    hypotheses = detect_state(db, user_id, task_id, emotion_tap=emotion)
     top = hypotheses[0] if hypotheses else None
     top_state = top.state if top else None
 
-    memory = tools.get_user_memory(db, user_id)[:MEMORY_ROWS]
+    all_memory = tools.get_user_memory(db, user_id)
+    memory = [m for m in all_memory if not m["key"].startswith(_CAUSE_KEYS)][:MEMORY_ROWS]
     history = [] if mode == "closing" else tools.get_conversation_history(
-        db, user_id, limit=HISTORY_TURNS, task_id=task.id
+        db, user_id, limit=HISTORY_TURNS, task_id=task_id
     )
     steps = _load_steps(db, task)
     situation = _situation_text(task, steps, emotion, top, datetime.now(timezone.utc))
     anchors = salient_words(task.title, *(s.title for s in steps if not s.done))
+
+    # Diagnosing: a reason was tapped this check-in cycle and the user hasn't confirmed a cause since.
+    confirmed = tools.get_memory_entry(db, user_id, f"blocker.task.{task_id}")
+    already_confirmed = bool(confirmed and emotion_row
+                             and as_utc(confirmed.updated_at) > as_utc(emotion_row.created_at))
+    buddy_turns = _buddy_turns_since(db, user_id, task_id, emotion_row) if emotion_row else 0
+    diagnosing = (mode != "closing" and emotion in EMOTION_TO_STATE and not already_confirmed
+                  and buddy_turns < DIAGNOSE_MAX_BUDDY_TURNS)
+    if emotion_row and not already_confirmed and buddy_turns >= DIAGNOSE_MAX_BUDDY_TURNS:
+        situation += "\nYou have already asked several questions about why. Do not ask why again."
+    if confirmed and confirmed.value in CAUSE_WORDS:
+        situation += f"\nThe cause they confirmed for this task: {CAUSE_WORDS[confirmed.value]}"
+    pattern = _pattern_line(all_memory)
+    if pattern:
+        situation += f"\n{pattern}"
 
     recent = _recent_interventions(memory)
     candidates = interventions_for(top_state)
@@ -95,26 +149,51 @@ async def run_turn(
         reply = FALLBACK_REPLY["closing"]
         reasoning = {"mode": mode, "hypotheses": [], "top_state": None, "intervention": None,
                      "reason": "no confident state; neutral closing", "fallback": False}
-        _learn(db, user_id, task.id, None, reply, reasoning, None, None, recent)
+        _learn(db, user_id, task_id, None, reply, reasoning, None, None, recent)
         return {"reply": reply, "state": None, "intervention": None, "fallback": False}
+
+    # Everything above was read-only. End that transaction so the connection goes back to the
+    # pool instead of sitting idle while we wait on Groq. Nothing below may touch ORM objects.
+    db.rollback()
 
     fallback = False
     checks: dict = {}
+    phase: Phase = "normal"
+    confirmed_cause: Optional[str] = None
     try:
-        if mode == "closing" or len(available) == 1:
+        if mode == "closing":
+            chosen, reason = available[0], "only/first available candidate"
+        elif diagnosing and get_intervention("find_the_cause") and get_intervention("surface_smallest_step"):
+            verdict, cause = "not_yet", None
+            if user_message and buddy_turns >= 1:
+                verdict, cause = await _judge_cause(emotion, history, user_message)
+            if verdict == "yes":
+                confirmed_cause = cause or emotion
+                chosen, phase, reason = get_intervention("surface_smallest_step"), "first_move", "cause confirmed by user"
+                situation += f"\nThe user just confirmed what is in the way: {CAUSE_WORDS[confirmed_cause]}"
+            else:
+                chosen, reason = get_intervention("find_the_cause"), f"diagnosing (verdict: {verdict})"
+                phase = "ask" if user_message is None else "guess"
+                if verdict == "no":
+                    situation += "\nThey said your last read was not right. Do not repeat it; try a different one."
+        elif _is_ack(user_message) and top_state not in _NO_RELEASE_STATES and get_intervention("affirm_and_release"):
+            chosen, phase, reason = get_intervention("affirm_and_release"), "release", "short acknowledgment"
+        elif len(available) == 1:
             chosen, reason = available[0], "only/first available candidate"
         else:
             chosen, reason = await _decide(top_state, situation, history, user_message, available)
-        reply, checks = await _write_checked(mode, chosen, top_state, situation, memory, history, user_message, anchors)
+        reply, checks = await _write_checked(
+            mode, chosen, top_state, situation, memory, history, user_message, anchors, phase)
         if reply is None:
             raise llm.LLMError(f"reply rejected by checks: {checks['hard']}")
     except llm.LLMError as e:
-        logger.warning("Buddy turn fell back (mode=%s task_id=%s): %s", mode, task.id, e)
-        fallback, reply = True, FALLBACK_REPLY[mode]
+        logger.warning("Buddy turn fell back (mode=%s task_id=%s): %s", mode, task_id, e)
+        fallback, reply, confirmed_cause = True, FALLBACK_REPLY[mode], None
         chosen, reason = available[0], "fallback"
 
     reasoning = {
         "mode": mode,
+        "phase": phase,
         "hypotheses": [{"state": h.state, "confidence": h.confidence} for h in hypotheses],
         "top_state": top_state,
         "intervention": None if fallback else chosen.intervention,
@@ -122,8 +201,8 @@ async def run_turn(
         "fallback": fallback,
         "checks": checks,
     }
-    _learn(db, user_id, task.id, user_message, reply, reasoning, top_state,
-           None if fallback else chosen.intervention, recent)
+    _learn(db, user_id, task_id, user_message, reply, reasoning, top_state,
+           None if fallback else chosen.intervention, recent, confirmed_cause)
 
     return {
         "reply": reply,
@@ -135,7 +214,7 @@ async def run_turn(
 
 # ── context ─────────────────────────────────────────────────────────────────
 
-def _fresh_emotion(db: Session, user_id: str, task_id: int) -> Optional[str]:
+def _fresh_emotion(db: Session, user_id: str, task_id: int) -> Optional[EmotionLog]:
     """The latest emotion tap for this task, if it's from the current check-in cycle."""
     row = db.execute(
         select(EmotionLog)
@@ -147,7 +226,44 @@ def _fresh_emotion(db: Session, user_id: str, task_id: int) -> Optional[str]:
         return None
     if datetime.now(timezone.utc) - as_utc(row.created_at) > EMOTION_FRESHNESS:
         return None
-    return row.emotion
+    return row
+
+
+def _buddy_turns_since(db: Session, user_id: str, task_id: int, emotion_row: EmotionLog) -> int:
+    """How many times Buddy has spoken on this task since the user's latest tap."""
+    return db.execute(
+        select(func.count()).select_from(Message).where(
+            Message.user_id == user_id, Message.task_id == task_id, Message.role == "assistant",
+            Message.created_at >= emotion_row.created_at,
+        )
+    ).scalar_one()
+
+
+def _is_ack(message: Optional[str]) -> bool:
+    """A bare thank-you or sign-off ("okay thanks", "got it"): nothing to answer, only to receive."""
+    if not message or "?" in message:
+        return False
+    words = re.findall(r"[a-z']+", message.lower())
+    return 0 < len(words) <= 5 and all(w in _ACK_WORDS for w in words)
+
+
+def _pattern_line(memory: list[dict]) -> Optional[str]:
+    """One line about the cause confirmed most often, only once it has been confirmed PATTERN_MIN+ times."""
+    counts = {}
+    for m in memory:
+        cause = m["key"].removeprefix("pattern.blocker.")
+        if cause != m["key"] and cause in CAUSE_WORDS:
+            try:
+                counts[cause] = int(m["value"])
+            except (TypeError, ValueError):
+                pass
+    if not counts:
+        return None
+    cause, n = max(counts.items(), key=lambda kv: kv[1])
+    if n < PATTERN_MIN:
+        return None
+    return (f"Pattern: {CAUSE_WORDS[cause]} has come up for them a few times before. You may mention it once, "
+            "softly, only if it fits. Never give a number.")
 
 
 def _load_steps(db: Session, task: Task) -> list[Subtask]:
@@ -247,27 +363,109 @@ async def _decide(
         chosen = next(c for c in available if c.intervention == parsed.get("intervention"))
         return chosen, str(parsed.get("reason", ""))[:300]
     except (ValueError, StopIteration, AttributeError):
-        logger.warning("Decide call returned an unusable choice: %r", raw[:200])
+        logger.warning("Decide call returned an unusable choice (%d chars)", len(raw))
         return available[0], "decide call returned an invalid choice; used first candidate"
+
+
+async def _judge_cause(
+    tapped: Optional[str], history: list[dict], user_message: str,
+) -> tuple[str, Optional[str]]:
+    """
+    Has the user CONFIRMED what is in the way? Returns (verdict, cause): verdict is "yes", "no" or
+    "not_yet"; cause is one of CAUSE_WORDS (only meaningful for "yes"). A model reads the exchange
+    instead of keyword matching, so "kind of, but more that..." isn't counted as a yes. Any failure
+    means "not_yet": we never save a cause on a guess.
+    """
+    causes = "\n".join(f"- {k}: {v}" for k, v in CAUSE_WORDS.items())
+    prompt = (
+        f"Causes:\n{causes}\n\n"
+        f"The reason the user first picked: {tapped or 'none'}\n\n"
+        f"Recent conversation:\n{_history_text(history)}\n\n"
+        f"User's latest message: {user_message[:MAX_CHARS_PER_TURN]}"
+    )
+    try:
+        raw = await llm.complete(
+            [
+                {"role": "system", "content": (
+                    "Buddy is helping a user find what is really in the way of a task. Decide whether the user's "
+                    "latest message CONFIRMS a specific cause, either by agreeing with a cause Buddy proposed or by "
+                    "clearly stating one themselves. \"yes\" only when it is clear. \"no\" if they reject what "
+                    "Buddy proposed. \"not_yet\" if they only answered a question, are unsure, or partly agree. "
+                    'Reply with JSON only: {"confirmed": "yes" | "no" | "not_yet", '
+                    '"cause": "<one cause key above or null>"}'
+                )},
+                {"role": "user", "content": prompt},
+            ],
+            temperature=0.0, max_tokens=400, json_mode=True, timeout=10.0, retries=1,
+        )
+        parsed = json.loads(raw)
+        verdict = parsed.get("confirmed")
+        cause = parsed.get("cause")
+    except (llm.LLMError, ValueError, AttributeError):
+        return "not_yet", None
+    if verdict not in ("yes", "no", "not_yet"):
+        return "not_yet", None
+    return verdict, cause if cause in CAUSE_WORDS else None
 
 
 # ── LLM call 2: write ───────────────────────────────────────────────────────
 
-def _rules(mode: Mode) -> str:
-    if mode == "closing":
-        shape = ("One or two short sentences (under 160 characters) for a phone notification, and no question: "
-                 "they chose not to chat, so ask nothing of them.")
-    else:
-        shape = (f"At most {MAX_SENTENCES[mode]} short sentences and at most one question, only if it moves them "
-                 "forward. Plain text, no markdown or lists.")
-    return (
-        "RULES. Follow every one:\n"
+def _limits(mode: Mode, phase: Phase = "normal") -> tuple[int, int]:
+    """(max sentences, max questions) for a reply."""
+    return PHASE_LIMITS.get(phase, (MAX_SENTENCES[mode], MAX_QUESTIONS[mode]))
+
+
+_NO_INVENTING = "Never invent tools, videos, tutorials, buttons or menu names."
+_RULE_1 = {
+    "normal": (
         "1. Sound like a friend texting, not a manual. Mention the task naturally inside a sentence (never as a "
         "label followed by a colon). Build on what they just said where it helps, and never open two replies the "
         "same way. Then, unless rule 6 or 7 says otherwise, give ONE concrete next move taken from the task's open "
         "steps, small enough to start in a few minutes. If you speak first, begin with the task and one real fact "
-        "from the context (its timing or an open step). Never invent tools, videos, tutorials, buttons or menu "
-        "names.\n"
+        f"from the context (its timing or an open step). {_NO_INVENTING}\n"
+    ),
+    "ask": (
+        "1. Sound like a friend texting, not a manual. Mention the task naturally inside a sentence (never as a "
+        "label followed by a colon). You are finding out what is really in the way, so do NOT suggest any step, "
+        "plan, timer or fix yet. Reflect the reason they picked in a few plain words (attribute it: \"you said...\"), "
+        "then ask ONE specific question about this task that helps find the cause. Begin with the task and one real "
+        f"fact from the context (its timing or an open step). {_NO_INVENTING}\n"
+    ),
+    "guess": (
+        "1. Sound like a friend texting, not a manual. Mention the task naturally inside a sentence (never as a "
+        "label followed by a colon). You are still finding out what is really in the way, so do NOT suggest any "
+        "step, plan, timer or fix yet. Using what they just said, offer your best read of the cause as a question "
+        "(\"is it more that...?\"), never as a fact or a label. If they rejected an earlier read, try a different "
+        f"one. {_NO_INVENTING}\n"
+    ),
+    "first_move": (
+        "1. Sound like a friend texting, not a manual. Mention the task naturally inside a sentence (never as a "
+        "label followed by a colon). They just confirmed what is in the way (see the context). Do not ask why "
+        "again. Give ONE tiny first move that fits that cause, following the 'First move by cause' list above, "
+        "taken from the task's open steps where possible and small enough to start in a few minutes. If the cause "
+        f"is being tired, follow rule 6 instead of giving a task move. {_NO_INVENTING}\n"
+    ),
+    "release": (
+        "1. Sound like a friend texting. They just acknowledged you, so only receive it. Name what they just did or "
+        "decided in their own words, end on a full stop, and add nothing new: no step, no tip, no question. You may "
+        f"say you're around if they get stuck. {_NO_INVENTING}\n"
+    ),
+}
+
+
+def _rules(mode: Mode, phase: Phase = "normal") -> str:
+    max_sentences, max_questions = _limits(mode, phase)
+    if mode == "closing":
+        shape = ("One or two short sentences (under 160 characters) for a phone notification, and no question: "
+                 "they chose not to chat, so ask nothing of them.")
+    elif max_questions == 0:
+        shape = f"At most {max_sentences} short sentences and no question. Plain text, no markdown or lists."
+    else:
+        shape = (f"At most {max_sentences} short sentences and at most one question, only if it moves them "
+                 "forward. Plain text, no markdown or lists.")
+    return (
+        "RULES. Follow every one:\n"
+        f"{_RULE_1[phase]}"
         f"2. {shape}\n"
         '3. No sympathy filler. Never use or open with: "That sounds…", "It\'s okay to feel…", '
         '"It\'s totally understandable", "I hear you", "I understand", "Hey there". Start with the substance.\n'
@@ -291,6 +489,7 @@ def _rules(mode: Mode) -> str:
 
 def _system_prompt(
     mode: Mode, chosen: PlaybookDoc, situation: str, memory: list[dict], top_state: Optional[str] = None,
+    phase: Phase = "normal",
 ) -> str:
     memory_text = "\n".join(
         f"- {m['key']}: {m['value']} (confidence {m['confidence']:.2f}, source {m['source']})" for m in memory
@@ -305,7 +504,7 @@ def _system_prompt(
         f"Situation: {SITUATION[mode]}\n\n"
         f"Context (for you only, don't recite it):\n{situation}\n\n"
         f"What you remember about this user (trust 'echo' most, 'onboarding' least):\n{memory_text}\n\n"
-        f"{_rules(mode)}"
+        f"{_rules(mode, phase)}"
     )
 
 
@@ -318,9 +517,10 @@ async def _write(
     history: list[dict],
     user_message: Optional[str],
     rewrite: Optional[tuple[str, str]] = None,
+    phase: Phase = "normal",
 ) -> str:
     """One generation. `rewrite` is (rejected draft, what was wrong with it) for the retry."""
-    messages = [{"role": "system", "content": _system_prompt(mode, chosen, situation, memory, top_state)},
+    messages = [{"role": "system", "content": _system_prompt(mode, chosen, situation, memory, top_state, phase)},
                 *_history_messages(history)]
     if user_message:
         messages.append({"role": "user", "content": user_message[:MAX_CHARS_PER_TURN * 2]})
@@ -348,25 +548,28 @@ async def _write_checked(
     history: list[dict],
     user_message: Optional[str],
     anchors: set[str],
+    phase: Phase = "normal",
 ) -> tuple[Optional[str], dict]:
     """
     Generate, check, and rewrite once if the draft breaks a rule. Returns (reply, checks); reply is
     None when every draft contains a hard violation (the caller then sends the safe fallback).
     The closing note is a single attempt: it runs during a background notification tap.
     """
+    max_sentences, max_questions = _limits(mode, phase)
+
     def check(text: str):
         return check_reply(
-            text, max_sentences=MAX_SENTENCES[mode], max_questions=MAX_QUESTIONS[mode],
-            user_message=user_message, anchor_words=anchors,
+            text, max_sentences=max_sentences, max_questions=max_questions,
+            user_message=user_message, anchor_words=set() if phase == "release" else anchors,
             max_chars=CLOSING_MAX_CHARS if mode == "closing" else None,
         )
 
-    first = await _write(mode, chosen, top_state, situation, memory, history, user_message)
+    first = await _write(mode, chosen, top_state, situation, memory, history, user_message, phase=phase)
     drafts = [(first, check(first))]
     if drafts[0][1].any and mode != "closing":
         try:
             second = await _write(mode, chosen, top_state, situation, memory, history, user_message,
-                                  rewrite=(first, drafts[0][1].describe()))
+                                  rewrite=(first, drafts[0][1].describe()), phase=phase)
             drafts.append((second, check(second)))
         except llm.LLMError:
             pass  # keep the first draft if it's usable
@@ -389,6 +592,7 @@ def _learn(
     top_state: Optional[str],
     intervention: Optional[str],
     recent: list[str],
+    confirmed_cause: Optional[str] = None,
 ) -> None:
     try:
         if user_message:
@@ -401,6 +605,8 @@ def _learn(
             tools.update_memory(db, user_id, "buddy.last_intervention", intervention, commit=False)
             tools.update_memory(db, user_id, "buddy.recent_interventions",
                                 ",".join((recent + [intervention])[-RECENT_KEPT:]), commit=False)
+        if confirmed_cause:
+            tools.record_confirmed_cause(db, user_id, task_id, confirmed_cause, commit=False)
         db.commit()
     except Exception:
         db.rollback()
