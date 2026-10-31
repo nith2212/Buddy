@@ -2,6 +2,7 @@
 // timeout and error shape so screens only deal with data.
 
 import { API_BASE_URL } from '@/constants/api';
+import type { Reason } from '@/lib/reasons';
 
 export type Subtask = { id: number; title: string; done: boolean; position: number; created_at: string };
 
@@ -57,8 +58,9 @@ export function api(token: string) {
     updateSubtask: (taskId: number, subtaskId: number, patch: { done?: boolean }) =>
       request<Subtask>(token, `/tasks/${taskId}/subtasks/${subtaskId}`, 'PATCH', patch),
     chatHistory: (taskId: number) => request<ChatTurn[]>(token, `/chat/history?task_id=${taskId}`),
-    chat: (taskId: number, message: string) =>
-      request<BuddyReply>(token, '/chat', 'POST', { task_id: taskId, message }),
+    // A typed message, a tapped reason, or both (the backend needs at least one).
+    chat: (taskId: number, input: { message?: string; reason?: Reason }) =>
+      request<BuddyReply>(token, '/chat', 'POST', { task_id: taskId, ...input }),
     initiate: (taskId: number) => request<BuddyReply>(token, '/initiate', 'POST', { task_id: taskId }),
   };
 }

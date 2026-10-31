@@ -19,9 +19,10 @@ import { useToken } from '@/hooks/use-session';
 import { useTheme } from '@/hooks/use-theme';
 import { api, ChatTurn, Subtask, Task } from '@/lib/api';
 import { formatDue, isOverdue } from '@/lib/dates';
+import { Reason, REASONS } from '@/lib/reasons';
 
 export default function TaskChatScreen() {
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id, from } = useLocalSearchParams<{ id: string; from?: string }>();
   const taskId = Number(id);
   const token = useToken();
   const client = useMemo(() => api(token), [token]);
@@ -50,8 +51,9 @@ export default function TaskChatScreen() {
         setTurns(history);
         setLoadState('ready');
 
-        if (history.length === 0) {
-          // First time in this chat: Buddy speaks first (this is what "Yes, let's chat" leads to).
+        if (history.length === 0 && from === 'checkin') {
+          // Arrived from a check-in ("Yes, let's chat"): they already told us how it feels, so Buddy
+          // speaks first. Opened from the task list instead, the reason chips below ask first.
           setSending(true);
           try {
             const opening = await client.initiate(taskId);
@@ -69,7 +71,7 @@ export default function TaskChatScreen() {
     return () => {
       cancelled = true;
     };
-  }, [client, taskId]);
+  }, [client, taskId, from]);
 
   // Scroll to the newest message once the list has actually laid it out.
   useEffect(() => {
@@ -89,12 +91,27 @@ export default function TaskChatScreen() {
     setSending(true);
     setTurns((prev) => [...prev, { role: 'user', content: text }]);
     try {
-      const res = await client.chat(taskId, text);
+      const res = await client.chat(taskId, { message: text });
       setTurns((prev) => [...prev, { role: 'assistant', content: res.reply }]);
     } catch {
       setTurns((prev) => prev.slice(0, -1)); // take the unsent message back out…
       setInput(text); // …and give it back to the user to resend
       setSendFailed(true);
+    } finally {
+      setSending(false);
+    }
+  }
+
+  async function pickReason(reason: Reason) {
+    if (sending) return;
+    setSendFailed(false);
+    setSending(true);
+    try {
+      // The tap isn't a typed message: Buddy answers it by asking its first question.
+      const res = await client.chat(taskId, { reason });
+      setTurns([{ role: 'assistant', content: res.reply }]);
+    } catch {
+      setSendFailed(true); // chips stay, so they can tap again
     } finally {
       setSending(false);
     }
@@ -123,6 +140,8 @@ export default function TaskChatScreen() {
       setNewStep(title);
     }
   }
+
+  const showReasons = turns.length === 0 && !sending;
 
   const header = (
     <View style={styles.header}>
@@ -217,7 +236,23 @@ export default function TaskChatScreen() {
           renderItem={renderTurn}
           ListHeaderComponent={header}
           ListFooterComponent={
-            sending ? (
+            showReasons ? (
+              <View style={styles.reasons}>
+                <ThemedText themeColor="textSecondary">What&apos;s making this one hard to start?</ThemedText>
+                <View style={styles.chips}>
+                  {REASONS.map((r) => (
+                    <Pressable
+                      key={r.value}
+                      onPress={() => pickReason(r.value)}
+                      accessibilityRole="button"
+                      accessibilityLabel={r.label}
+                      style={[styles.chip, { backgroundColor: theme.backgroundElement, borderColor: theme.backgroundSelected }]}>
+                      <ThemedText>{r.label}</ThemedText>
+                    </Pressable>
+                  ))}
+                </View>
+              </View>
+            ) : sending ? (
               <View style={[styles.bubble, styles.theirs, { backgroundColor: theme.backgroundElement }]}>
                 <ThemedText themeColor="textSecondary">Buddy is typing…</ThemedText>
               </View>
@@ -235,7 +270,7 @@ export default function TaskChatScreen() {
         />
         {sendFailed ? (
           <ThemedText type="small" style={[styles.error, { color: Danger }]}>
-            Couldn&apos;t send that. Your message is back in the box. Try again.
+            Couldn&apos;t send that. {turns.length === 0 ? 'Try again.' : 'Your message is back in the box. Try again.'}
           </ThemedText>
         ) : null}
         <View style={[styles.inputBar, { paddingBottom: insets.bottom + Spacing.two, borderTopColor: theme.backgroundSelected }]}>
@@ -296,6 +331,14 @@ const styles = StyleSheet.create({
   mine: { alignSelf: 'flex-end' },
   theirs: { alignSelf: 'flex-start' },
   mineText: { color: '#ffffff' },
+  reasons: { gap: Spacing.two, marginTop: Spacing.two },
+  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.two },
+  chip: {
+    borderRadius: Spacing.four,
+    borderWidth: StyleSheet.hairlineWidth,
+    paddingHorizontal: Spacing.three,
+    paddingVertical: Spacing.two,
+  },
   error: { paddingHorizontal: Spacing.three, paddingBottom: Spacing.one },
   inputBar: {
     flexDirection: 'row',

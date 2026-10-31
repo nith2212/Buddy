@@ -64,7 +64,7 @@ export default function RootLayout() {
 
     const respond = (response: Notifications.NotificationResponse) =>
       handleCheckinResponse(response, token, {
-        openChat: (taskId) => router.push({ pathname: '/task/[id]', params: { id: String(taskId) } }),
+        openChat: (taskId) => router.push({ pathname: '/task/[id]', params: { id: String(taskId), from: 'checkin' } }),
       }).catch((e) => console.warn('[Checkin] handleCheckinResponse failed:', e));
 
     // A tap that launched the app from a killed state isn't guaranteed to reach the
