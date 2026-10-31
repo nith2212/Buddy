@@ -346,6 +346,12 @@ def memory_of(db, user_id):
     return {m.key: m.value for m in db.query(models.Memory).filter_by(user_id=user_id)}
 
 
+def reach_guess(api, h, t, reason, answer="it's for my manager"):
+    """Tap a reason, answer Buddy's question: Buddy's latest turn is now a guess waiting on a yes/no."""
+    api.post("/chat", json={"task_id": t, "reason": reason}, headers=h)
+    return api.post("/chat", json={"task_id": t, "message": answer}, headers=h).json()
+
+
 def test_reason_tap_opens_with_one_question_and_no_advice(api, db, fake_llm):
     user_id, h = register(api)
     t = make_task(api, h)
@@ -358,13 +364,24 @@ def test_reason_tap_opens_with_one_question_and_no_advice(api, db, fake_llm):
     assert not any(k.startswith(("blocker.", "pattern.")) for k in memory_of(db, user_id))
 
 
-def test_answer_gets_judged_and_unconfirmed_cause_is_not_saved(api, db, fake_llm):
+def test_answering_the_question_makes_buddy_guess_and_is_never_a_confirmation(api, db, monkeypatch):
     user_id, h = register(api)
     t = make_task(api, h)
-    api.post("/chat", json={"task_id": t, "reason": "afraid"}, headers=h)
+    fake = FakeLLM(judge=("yes", "afraid"))  # even a judge that would say yes must not be asked yet
+    monkeypatch.setattr(llm, "complete", fake)
 
-    body = api.post("/chat", json={"task_id": t, "message": "my manager will read it"}, headers=h).json()
-    assert len(fake_llm.judge_calls) == 1
+    body = reach_guess(api, h, t, "afraid", "my manager will read it")
+    assert fake.judge_calls == []
+    assert body["intervention"] == "find_the_cause" and reasoning_of(db, t)["phase"] == "guess"
+    assert not any(k.startswith(("blocker.", "pattern.")) for k in memory_of(db, user_id))
+
+
+def test_unconfirmed_reply_to_a_guess_is_judged_and_not_saved(api, db, fake_llm):
+    user_id, h = register(api)
+    t = make_task(api, h)
+    reach_guess(api, h, t, "afraid")
+    body = api.post("/chat", json={"task_id": t, "message": "hmm maybe"}, headers=h).json()
+    assert len(fake_llm.judge_calls) == 1  # default fake verdict: not_yet
     assert body["intervention"] == "find_the_cause" and reasoning_of(db, t)["phase"] == "guess"
     assert not any(k.startswith(("blocker.", "pattern.")) for k in memory_of(db, user_id))
 
@@ -374,7 +391,7 @@ def test_confirmed_cause_gets_first_move_and_is_saved_once(api, db, monkeypatch)
     t = make_task(api, h)
     fake = FakeLLM(judge=("yes", "afraid"))
     monkeypatch.setattr(llm, "complete", fake)
-    api.post("/chat", json={"task_id": t, "reason": "afraid"}, headers=h)
+    reach_guess(api, h, t, "afraid")
 
     body = api.post("/chat", json={"task_id": t, "message": "yes, exactly that"}, headers=h).json()
     assert body["intervention"] == "surface_smallest_step"
@@ -394,7 +411,7 @@ def test_yes_without_a_named_cause_uses_the_tapped_reason(api, db, monkeypatch):
     user_id, h = register(api)
     t = make_task(api, h)
     monkeypatch.setattr(llm, "complete", FakeLLM(judge=("yes", None)))
-    api.post("/chat", json={"task_id": t, "reason": "bored"}, headers=h)
+    reach_guess(api, h, t, "bored")
     api.post("/chat", json={"task_id": t, "message": "yeah it's just dull"}, headers=h)
     assert memory_of(db, user_id)[f"blocker.task.{t}"] == "bored"
 
@@ -404,7 +421,7 @@ def test_rejected_read_is_not_counted_and_next_read_must_differ(api, db, monkeyp
     t = make_task(api, h)
     fake = FakeLLM(judge=("no", None))
     monkeypatch.setattr(llm, "complete", fake)
-    api.post("/chat", json={"task_id": t, "reason": "afraid"}, headers=h)
+    reach_guess(api, h, t, "afraid")
     api.post("/chat", json={"task_id": t, "message": "no, not really"}, headers=h)
     assert "was not right" in system_of(fake.write_calls[-1])
     assert not any(k.startswith(("blocker.", "pattern.")) for k in memory_of(db, user_id))
@@ -421,7 +438,7 @@ def test_garbled_judge_output_never_saves_a_cause(api, db, monkeypatch, bad):
             return bad if kw.get("json_mode") else out
 
     monkeypatch.setattr(llm, "complete", Garbled())
-    api.post("/chat", json={"task_id": t, "reason": "afraid"}, headers=h)
+    reach_guess(api, h, t, "afraid")
     r = api.post("/chat", json={"task_id": t, "message": "yes"}, headers=h)
     assert r.status_code == 200 and r.json()["intervention"] == "find_the_cause"
     assert not any(k.startswith("blocker.") for k in memory_of(db, user_id))
@@ -438,7 +455,7 @@ def test_judge_failure_does_not_save_and_still_replies(api, db, monkeypatch):
             return await super().__call__(messages, **kw)
 
     monkeypatch.setattr(llm, "complete", JudgeDown())
-    api.post("/chat", json={"task_id": t, "reason": "afraid"}, headers=h)
+    reach_guess(api, h, t, "afraid")
     r = api.post("/chat", json={"task_id": t, "message": "yes"}, headers=h)
     assert r.status_code == 200 and not r.json()["reply"] == agent.FALLBACK_REPLY["chat"]
     assert not any(k.startswith("blocker.") for k in memory_of(db, user_id))
@@ -479,7 +496,7 @@ def test_real_messages_are_not_mistaken_for_acknowledgments(api, db, fake_llm, m
 def test_okay_in_the_middle_of_diagnosing_is_judged_not_released(api, db, fake_llm):
     _, h = register(api)
     t = make_task(api, h)
-    api.post("/chat", json={"task_id": t, "reason": "afraid"}, headers=h)
+    reach_guess(api, h, t, "afraid")
     api.post("/chat", json={"task_id": t, "message": "okay"}, headers=h)
     assert len(fake_llm.judge_calls) == 1 and reasoning_of(db, t)["phase"] == "guess"
 
@@ -527,7 +544,7 @@ def test_confirmed_causes_are_wiped_by_delete_me(api, db, monkeypatch):
     user_id, h = register(api)
     t = make_task(api, h)
     monkeypatch.setattr(llm, "complete", FakeLLM(judge=("yes", "unclear")))
-    api.post("/chat", json={"task_id": t, "reason": "unclear"}, headers=h)
+    reach_guess(api, h, t, "unclear")
     api.post("/chat", json={"task_id": t, "message": "yes that's it"}, headers=h)
     assert any(k.startswith("blocker.") for k in memory_of(db, user_id))
 
@@ -563,3 +580,16 @@ def test_chat_text_is_never_logged(api, monkeypatch, caplog):
     monkeypatch.setattr(llm, "complete", FakeLLM(choice="nonsense"))  # unusable decide choice logs too
     api.post("/chat", json={"task_id": t, "message": secret}, headers=h)
     assert secret not in caplog.text
+
+
+def test_after_a_cause_is_confirmed_buddy_does_not_ask_why_again(api, db, monkeypatch):
+    _, h = register(api)
+    t = make_task(api, h)
+    fake = FakeLLM(judge=("yes", "afraid"), choice="find_the_cause")  # a decide call that tries to pick it
+    monkeypatch.setattr(llm, "complete", fake)
+    reach_guess(api, h, t, "afraid")
+    api.post("/chat", json={"task_id": t, "message": "yes"}, headers=h)
+
+    api.post("/chat", json={"task_id": t, "message": "ok so what about the intro"}, headers=h)
+    assert reasoning_of(db, t)["intervention"] != "find_the_cause"
+    assert all("id: find_the_cause" not in c["messages"][-1]["content"] for c in fake.decide_calls)

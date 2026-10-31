@@ -130,9 +130,12 @@ async def run_turn(
     already_confirmed = bool(confirmed and emotion_row
                              and as_utc(confirmed.updated_at) > as_utc(emotion_row.created_at))
     buddy_turns = _buddy_turns_since(db, user_id, task_id, emotion_row) if emotion_row else 0
+    probing_capped = bool(emotion_row) and not already_confirmed and buddy_turns >= DIAGNOSE_MAX_BUDDY_TURNS
     diagnosing = (mode != "closing" and emotion in EMOTION_TO_STATE and not already_confirmed
-                  and buddy_turns < DIAGNOSE_MAX_BUDDY_TURNS)
-    if emotion_row and not already_confirmed and buddy_turns >= DIAGNOSE_MAX_BUDDY_TURNS:
+                  and not probing_capped)
+    # A "yes" only counts as a confirmation of a read Buddy actually offered, not of the user's own answer.
+    last_phase = _last_buddy_phase(db, user_id, task_id) if diagnosing and user_message else None
+    if probing_capped:
         situation += "\nYou have already asked several questions about why. Do not ask why again."
     if confirmed and confirmed.value in CAUSE_WORDS:
         situation += f"\nThe cause they confirmed for this task: {CAUSE_WORDS[confirmed.value]}"
@@ -143,6 +146,9 @@ async def run_turn(
     recent = _recent_interventions(memory)
     candidates = interventions_for(top_state)
     available = [c for c in candidates if c.intervention not in recent[-EXCLUDE_RECENT:]] or candidates
+    if already_confirmed or probing_capped:
+        # the question has been asked, or answered; asking it again just repeats the last reply
+        available = [c for c in available if c.intervention != "find_the_cause"] or available
 
     if mode == "closing" and top is None:
         # No confident state: neutral closing, no LLM call (CLAUDE.md state-detection spec).
@@ -165,7 +171,7 @@ async def run_turn(
             chosen, reason = available[0], "only/first available candidate"
         elif diagnosing and get_intervention("find_the_cause") and get_intervention("surface_smallest_step"):
             verdict, cause = "not_yet", None
-            if user_message and buddy_turns >= 1:
+            if user_message and last_phase == "guess":
                 verdict, cause = await _judge_cause(emotion, history, user_message)
             if verdict == "yes":
                 confirmed_cause = cause or emotion
@@ -237,6 +243,19 @@ def _buddy_turns_since(db: Session, user_id: str, task_id: int, emotion_row: Emo
             Message.created_at >= emotion_row.created_at,
         )
     ).scalar_one()
+
+
+def _last_buddy_phase(db: Session, user_id: str, task_id: int) -> Optional[str]:
+    """The phase of Buddy's latest turn on this task (from its saved reasoning), if any."""
+    raw = db.execute(
+        select(Message.reasoning).where(
+            Message.user_id == user_id, Message.task_id == task_id, Message.role == "assistant")
+        .order_by(Message.created_at.desc(), Message.id.desc()).limit(1)
+    ).scalar_one_or_none()
+    try:
+        return json.loads(raw).get("phase") if raw else None
+    except (ValueError, AttributeError):
+        return None
 
 
 def _is_ack(message: Optional[str]) -> bool:
@@ -434,21 +453,24 @@ _RULE_1 = {
     "guess": (
         "1. Sound like a friend texting, not a manual. Mention the task naturally inside a sentence (never as a "
         "label followed by a colon). You are still finding out what is really in the way, so do NOT suggest any "
-        "step, plan, timer or fix yet. Using what they just said, offer your best read of the cause as a question "
-        "(\"is it more that...?\"), never as a fact or a label. If they rejected an earlier read, try a different "
+        "step, plan, timer or fix yet. Do NOT ask them for more detail. Your one question must name ONE specific cause, "
+        "in your own words and built from what they just said, and ask whether that is it (\"is it more that...?\"). "
+        "Offer it as a question, never as a fact or a label. If they rejected an earlier read, offer a different "
         f"one. {_NO_INVENTING}\n"
     ),
     "first_move": (
         "1. Sound like a friend texting, not a manual. Mention the task naturally inside a sentence (never as a "
         "label followed by a colon). They just confirmed what is in the way (see the context). Do not ask why "
         "again. Give ONE tiny first move that fits that cause, following the 'First move by cause' list above, "
-        "taken from the task's open steps where possible and small enough to start in a few minutes. If the cause "
+        "taken from the task's open steps where possible and small enough to start in a few minutes. Describe the "
+        "move; never write the content for them and never give sample wording. If the cause "
         f"is being tired, follow rule 6 instead of giving a task move. {_NO_INVENTING}\n"
     ),
     "release": (
-        "1. Sound like a friend texting. They just acknowledged you, so only receive it. Name what they just did or "
-        "decided in their own words, end on a full stop, and add nothing new: no step, no tip, no question. You may "
-        f"say you're around if they get stuck. {_NO_INVENTING}\n"
+        "1. Sound like a friend texting. They just acknowledged you, so only receive it. Do not mention or quote their "
+        "thanks. Say, briefly, that they're taking on the step you last suggested (or what they just decided), end on "
+        "a full stop, and add nothing new: no step, no tip, no question. You may say you're around if they get "
+        f"stuck. {_NO_INVENTING}\n"
     ),
 }
 
