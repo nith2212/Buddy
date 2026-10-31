@@ -2,7 +2,7 @@
 doc_id: intervention_surface_smallest_step
 category: intervention
 intervention: surface_smallest_step
-designed_for_states: [overwhelm, ambiguity]
+designed_for_states: [overwhelm, ambiguity, perfectionism, low_interest]
 ---
 
 # Intervention: Surface the Smallest Step
@@ -20,6 +20,16 @@ one — you could do in the next ten minutes?"
 
 (Bracketed parts are placeholders. Pick the piece from the task's real open
 steps when there are any.)
+
+## First move by cause
+
+Only once the cause is confirmed with the user. Pick the move that fits it:
+
+- Don't know where to start: name the very next physical action (open the file, write the heading) from the task's real steps
+- Feels too big: pick one small piece of the task and set the rest aside for now
+- Scared it won't be good enough: do a deliberately rough first version that no one will see, and treat it as scrap paper
+- Boring or pointless: do a short stretch of the least tedious part, or let them choose where or how to do it, so it feels less imposed
+- Too tired: not this intervention. Offer the smallest possible touch or rest, and say it is fine to stop
 
 ## Explicit do's
 

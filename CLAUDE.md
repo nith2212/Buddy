@@ -1,86 +1,75 @@
 @AGENTS.md
-Note: the old hackathon code (incl. the React web frontend) lives only on origin/main (backend/, frontend/) and in git history (9f26c73). Use the frontend as UX reference only. Only the backend is being ported.
 
-# Buddy: project rules
+# Buddy
 
-## What this is
-Proactive accountability companion. Expo (React Native, Android first) app + FastAPI backend. Buddy notices when a user is struggling with a task and reaches out first. Tone: calm, non-judgmental, never generic (Baymax). It detects WORK states only (avoidance, overwhelm, fatigue, ambiguity, etc.), never mental-health states. If signals go beyond work, it steps back honestly.
+## The product (read this first)
+Buddy helps you START by finding out WHY you're stuck.
+Other apps track the task. Buddy tracks the human. When someone is avoiding a task, Buddy doesn't say "just start". It finds the real cause (not knowing where to start, it feels too big, fear of doing it badly, boredom, tiredness), helps with that specific cause, and remembers it so it can show the pattern over time ("this is the third time fear of doing it badly stopped you").
 
-## Layout
-- backend/  : live FastAPI backend
-- src/, app.json, eas.json : Expo app (repo root, not a mobile/ folder)
-- backend/brain/ : imported hackathon brain (agent, echo, tools, rag, ingest, buddy_docs). Being ported to the rules below.
-- origin/main : old hackathon code. READ-ONLY reference. Port from it, never edit it.
+Tone: Baymax. Calm, short, warm, non-judgmental. Never shames, lectures, optimizes or cheerleads.
 
-## Locked scope
-Deadline: core deployed and working on a real phone by Oct 24. Skeleton deployed by Oct 17. Stretch window Oct 25-31.
+If a request conflicts with this section, STOP and ask.
 
-CORE:
-- Onboarding, tasks with due dates + manual subtasks
-- Proactive notification check-in (task status -> feeling -> "want to talk?")
-- Chat with the brain when the user opts in
-- If user declines chat: brain still runs and sends ONE tailored closing notification
-- Event-sourced memory
-- Echo (weekly, night) writing patterns back to memory
-- Backend deployed, APK installed on phone
+## What makes it different
+1. Root cause first, advice second. Buddy diagnoses before it suggests.
+2. Proactive. Buddy reaches out first, from task activity, idle time and ignored check-ins. Silence is data.
+3. Work states only, never mental-health diagnosis. If a chat reveals something bigger than work, Buddy steps back honestly and does not keep probing.
+4. Remembers causes per person and surfaces patterns (softly, and only when earned).
+5. Checks its own playbook (buddy_docs/) before choosing how to respond.
 
-STRETCH (only after core is deployed): tone adaptation/reinforcement, then bandit, Notes UI, context trimming.
+## How a conversation goes
+1. User taps a rough reason (notification buttons or in-app chips): don't know where to start / feels too big / scared it won't be good enough / boring or pointless / too tired.
+2. Buddy reflects what they tapped, then asks ONE specific question to find the real cause.
+3. Buddy offers its guess as a QUESTION, never as a fact or label.
+4. Only after the cause is confirmed, Buddy suggests ONE tiny first move matched to that cause.
+5. Short acknowledgments ("okay thanks") get a brief affirm-and-release. No new instructions, no new question.
 
-NOT NOW (do not build or propose mid-task): multi-agent split, weekly/monthly reflections, per-user playbook annotations, accounts/passwords/OAuth, web frontend, Play Store, second deployment, queues (Redis/Celery), autoscaling, caching layers.
-If a task seems to need something from NOT NOW, stop and ask.
+## Reply rules (enforced by reply_check, do not weaken)
+- 2-3 short sentences. At most one question. One concrete next move.
+- No stock empathy ("That sounds exhausting", "It's totally understandable").
+- Always name the task or a step.
+- Praise only for something the person actually did.
+- Never invent deadlines or clock times. Only the task's real due_date.
+- Respect what the user said. If they say they need to finish, help with the smallest piece. Don't talk them out of it.
+- Firm about the plan, never about the person.
 
-## Per-turn pipeline (chat)
-1. Identify user: auth header token -> user_id
-2. Load context: active task, recent events, memory rows. ALL scoped by user_id and CAPPED (limit rows and characters injected)
-3. Reason: layer 1 behavioral (task deltas, idle time), layer 2 keywords, layer 3 LLM only when 1 and 2 conflict -> confidence-weighted hypotheses
-4. Retrieve playbook for the top state
-5. Decide: LLM call 1 picks an intervention + justification, excluding recently used interventions
-6. Act: LLM call 2 writes the message
-7. Learn: save events + memory in ONE transaction
+## Memory of causes
+- Save a cause only when the user CONFIRMS it. If they say "no, not really", it is not counted.
+- Keys: blocker.task.<id> and pattern.blocker.<reason>, written in the same transaction as the turn.
+- Mention a pattern only when a cause has been confirmed 3+ times, softly ("this has come up a few times"). Never invent counts.
+- Inject at most one capped line of top pattern into the situation text.
 
-## Playbook retrieval
-- The playbook (13 docs in buddy_docs/: states, interventions, core) is shared across users and holds NO user data.
-- Default: get_playbook(state) reads the local buddy_docs/ files (state doc + its linked intervention docs + core docs). Optional USE_QDRANT=1: filter by detected state in Qdrant (no query embedding); if unreachable, fall back to the local files. No local torch embedding model: the host has little RAM. If semantic search is added later, use a lightweight ONNX embedder (e.g. fastembed). Never fall back to an LLM call.
+## Build plan (hard stop: Nov 8, then testing and study)
+Already shipped: auth, tasks and steps, chat, push notifications with 3 buttons, deploy on Render + Neon. Unfinished: weekly Echo.
+Steps, each shippable alone, tested and committed before the next:
+- A. Playbook docs in backend/brain/buddy_docs/: state_perfectionism.md, state_low_interest.md, intervention_find_the_cause.md, intervention_affirm_and_release.md, plus a cause-to-first-move mapping in intervention_surface_smallest_step.md. The OWNER reviews the wording. Do not finalize it without her.
+- B. Reasons become states: extend EMOTION_TO_STATE; accept the new reason values in the notification route and log_emotion_pick; add an optional explicit `reason` field to ChatRequest (never an in-band control string).
+- C. Diagnose behavior in run_turn: tapped reason with few chat turns forces find_the_cause; after the answer, pick the matched first move; short acknowledgments force affirm_and_release and skip the decide call (Groq is capped at about 8k tokens/min). Write memory in _learn.
+- D. Mobile: reason chips when the chat is empty (src/app/task/[id].tsx, src/lib/api.ts). Notification buttons stay at 3 because of the Android limit: tired / too much / don't know where to start. Fear and boredom are in-app chips only.
+- E. Finish weekly Echo: per user, minimum-events threshold, manual trigger, summarizes pattern.* memory. It runs from cron, protected by X-Cron-Secret.
 
-## Non-chat paths
-- Proactive check-in: external cron calls POST /cron/checkins -> pick users with due or untouched tasks not nudged recently -> per-user try/except -> Expo push in batches. Taps come back as events.
-- User declines chat: run steps 2-7 on the logged taps; output is ONE tailored closing notification.
-- Echo: cron calls POST /cron/echo weekly at night (writes echo.* memory only; no user-facing push) -> loop users one at a time -> skip users under a minimum-events threshold -> write echo.* memory for that user only. Also expose a manual trigger.
-- Check-ins are proactive, driven by task state (due date proximity, untouched time). No fixed user-set times.
+## Parked (do NOT build or propose; add to a "later" list instead)
+Sprint timer, check-back commitments, firmness levels, escalation, a patterns endpoint or patterns UI, onboarding, UI polish or Figma work, a date picker, bandit, notes UI, multi-agent split, monthly reflections, accounts or passwords, web frontend, Play Store, second deployment.
 
-## Hosting reality (free tier)
-- Render free sleeps and has an ephemeral disk: NO in-process schedulers (no APScheduler), no data on local disk.
-- Neon Postgres in prod, SQLite locally. Keep the DB layer portable.
-- cron-job.org fires the cron endpoints. Every /cron/* endpoint requires an X-Cron-Secret header matching an env var, else 401. Set generous timeouts for cold starts.
-- Push via Expo push API, batched.
+## Later (ideas parked on purpose; not for now)
+- Precise references: every "Grounding theory" section in buddy_docs/ (old and new) cites authors from memory. Replace each with an exact, checkable source (authors, year, title, venue) and trim any claim the source does not support. Ethical reason: the playbook shapes how Buddy talks to people.
+- Eval system: scripted conversations per reason and state, scored for reply rules (reply_check) and for the cause-then-move order, run against the real model before changing prompts or docs. Also track whether confirmed causes match what the user said.
 
-## Reliability rules
-- The backend is stateless: no per-user data held in server memory.
-- LLM calls must NOT block the event loop: use async clients or run sync calls in a thread pool.
-- LLM calls get timeouts, retries with backoff, and a graceful fallback message when Groq errors or rate-limits.
-- Index user_id on every table. Use connection pooling.
-- Batch jobs isolate failures per user.
-- Groq key is capped at 8,000 tokens/min (any model). A turn costs ~1.5-3k, so keep prompts lean; llm.py logs usage per call and honors Retry-After on 429.
+## Data and privacy (non-negotiable)
+- user_id on every table. No hardcoded users.
+- Identity comes ONLY from the Bearer token. Never from the body, URL or in-message text.
+- Every query is scoped to the caller. Cross-user access returns 404. Keep the isolation tests green and extend them for any new table or key.
+- DELETE /me must wipe everything, including causes and patterns.
+- Secrets only in env vars. Never commit .env or *.db.
+- Chat text goes to Groq. Don't log message content.
 
-## Data and privacy rules (non-negotiable)
-- user_id on every table. No hardcoded user ids anywhere.
-- Identity comes from an auth header token issued by the server at first launch (stored in expo-secure-store on the phone). NEVER from request body or URL params.
-- Echo and all queries are scoped to one user at a time.
-- Keep a test proving user A cannot read user B's tasks, events, memory or chats.
-- DELETE /me wipes all of a user's rows.
-- Secrets only in env vars. Never commit .env. DB URL, API keys, cron secret, host config all via env.
-
-## Stack
-FastAPI on Render free, Neon Postgres, Groq openai/gpt-oss-20b (llama-3.1-8b-instant was retired on Groq; override via GROQ_MODEL), Qdrant Cloud, cron-job.org, Expo push. Mobile: Expo, EAS APK.
+## Hosting reality
+Render free sleeps and has an ephemeral disk. No in-process schedulers. No local data. Neon Postgres in prod, SQLite locally. cron-job.org fires /cron/* endpoints with X-Cron-Secret. LLM calls are async, with timeouts, retries and a canned fallback, and never return a 500 on a Groq failure. Never hold a DB session across an LLM call.
 
 ## Working style
-- One feature end to end at a time. Plan first for anything touching multiple files.
+- Read this file, then do ONE step. Say which files you'll touch before you change them.
 - Small diffs. No unrelated refactors. Ask before adding dependencies.
-- Don't re-read the whole repo each time; read only what the task needs.
-- Say what you changed and how to verify it.
-
-
-## Merge plan status
-Base branch: merge-brain. Brain imported at backend/brain/ (unwired). No runtime embeddings: playbook = local files in buddy_docs/, get_playbook(state); Qdrant only behind optional USE_QDRANT flag.
-Steps: 1 schema+auth+isolation (DONE) | 2 auth on existing endpoints + POST/GET /tasks + DELETE /me (DONE) | 3 Render+Neon skeleton, mobile secure-store bootstrap + register push token | 4 cron endpoints + Expo batch push (static text) | 5 repo layer + get_playbook | 6 rewrite state detection on task deltas/idle time (no postponement) | 7 port agent turn (async Groq, timeouts, fallbacks, /chat, /initiate) | 8 mobile chat + task UI + notification response handler | 9 weekly Echo via /cron/echo.
-Known issues to fix in the brain: keyword substring bugs (use word boundaries), [System:]/[EmotionPick:] in-band control strings (use explicit params), /run-echo must be behind X-Cron-Secret, `/later` means notification_ignored not postponed.
+- Don't re-read the whole repo. Read only what the step needs.
+- Tests for every step. The suite must be green. Fix or delete known-red tests, don't ignore them.
+- After each step: say what changed, how to verify it on the phone, then wait.
+- When the user proposes a new idea, check it against "The product". If it doesn't help Buddy find the cause, notice earlier, or respond in the Baymax voice, add it to the later list and don't build it.

@@ -110,5 +110,5 @@ def test_each_registration_gets_distinct_user_and_token(client):
 
 def test_existing_endpoints_still_mounted():
     from main import app
-    paths = {r.path for r in app.routes}
+    paths = set(app.openapi()["paths"])
     assert {"/auth/anonymous", "/devices/register", "/checkin/action", "/tasks", "/me"} <= paths

@@ -74,16 +74,19 @@ def test_chat_happy_path_saves_turns_and_memory(api, db, fake_llm):
     assert memory["buddy.recent_interventions"] == "surface_smallest_step"
 
 
-def test_emotion_tap_drives_state_and_single_candidate_skips_decide_call(api, fake_llm):
+def test_emotion_tap_drives_state_and_offers_its_candidates(api, monkeypatch):
     _, h = register(api)
     t = make_task(api, h)
-    tap_emotion(api, h, t, "tired")  # -> fatigue, whose only intervention is acknowledge_emotion
+    fake = FakeLLM(choice="find_the_cause")
+    monkeypatch.setattr(llm, "complete", fake)
+    tap_emotion(api, h, t, "tired")  # -> fatigue: acknowledge_emotion or find_the_cause
 
     body = api.post("/chat", json={"task_id": t, "message": "ugh"}, headers=h).json()
     assert body["state"] == "fatigue"
-    assert body["intervention"] == "acknowledge_emotion"
-    assert fake_llm.decide_calls == []  # nothing to choose between — no wasted LLM call
-    assert len(fake_llm.write_calls) == 1
+    assert body["intervention"] == "find_the_cause"
+    decide_prompt = fake.decide_calls[0]["messages"][-1]["content"]
+    assert "id: acknowledge_emotion" in decide_prompt and "id: find_the_cause" in decide_prompt
+    assert len(fake.write_calls) == 1
 
 
 def test_recently_used_interventions_are_excluded(api, db, fake_llm):
