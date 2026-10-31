@@ -142,14 +142,24 @@ def test_missing_groq_key_falls_back_instead_of_500(api):
     assert r.status_code == 200 and r.json()["reply"] == agent.FALLBACK_REPLY["chat"]
 
 
-def test_chat_history_is_sent_back_to_the_model(api, fake_llm):
+def test_chat_history_is_sent_back_to_the_model(api, monkeypatch):
+    class Varying(FakeLLM):
+        async def __call__(self, messages, **kw):
+            out = await super().__call__(messages, **kw)
+            if kw.get("json_mode"):
+                return out
+            return ["Let's start with the report outline.", "Pick the shortest section of the report to open.",
+                    "What would the first line of the report say?"][len(self.write_calls) % 3 - 1]
+
+    fake = Varying()
+    monkeypatch.setattr(llm, "complete", fake)
     _, h = register(api)
     t = make_task(api, h)
-    api.post("/chat", json={"task_id": t, "message": "first message"}, headers=h)
+    first = api.post("/chat", json={"task_id": t, "message": "first message"}, headers=h).json()["reply"]
     api.post("/chat", json={"task_id": t, "message": "second message"}, headers=h)
-    sent = fake_llm.write_calls[-1]["messages"]
+    sent = fake.write_calls[-1]["messages"]
     contents = [m["content"] for m in sent if m["role"] != "system"]
-    assert contents == ["first message", "Let's find one tiny first step on your report.", "second message"]
+    assert contents == ["first message", first, "second message"]
 
 
 @pytest.mark.parametrize("message", ["", "   ", "x" * 1001])
@@ -593,3 +603,51 @@ def test_after_a_cause_is_confirmed_buddy_does_not_ask_why_again(api, db, monkey
     api.post("/chat", json={"task_id": t, "message": "ok so what about the intro"}, headers=h)
     assert reasoning_of(db, t)["intervention"] != "find_the_cause"
     assert all("id: find_the_cause" not in c["messages"][-1]["content"] for c in fake.decide_calls)
+
+
+# ── a reply must not repeat the one before it ───────────────────────────────
+
+def test_check_reply_flags_a_repeat_of_the_previous_reply():
+    from brain.reply_check import check_reply
+    prev = "Finishing echo is due in about 27 hours. Is it more that you're not sure which feature to tackle first?"
+    same = check_reply(prev, max_sentences=3, max_questions=1, user_message=None, anchor_words={"echo"},
+                       previous_reply=prev)
+    assert "repeats_previous" in same.soft
+    fresh = check_reply("Which of those features would you ship first if you had to pick one?", max_sentences=3,
+                        max_questions=1, user_message=None, anchor_words=set(), previous_reply=prev)
+    assert "repeats_previous" not in fresh.soft
+
+
+def test_a_repeated_draft_gets_one_rewrite_with_the_reason(api, monkeypatch):
+    class Repeats(FakeLLM):
+        async def __call__(self, messages, **kw):
+            out = await super().__call__(messages, **kw)
+            if kw.get("json_mode") or any("already said this" in m["content"] for m in messages):
+                return out if kw.get("json_mode") else "Which part of the report would you start with if you had to pick?"
+            return "Writing the report is due soon. Which part feels biggest?"
+
+    fake = Repeats()
+    monkeypatch.setattr(llm, "complete", fake)
+    _, h = register(api)
+    t = make_task(api, h)
+    api.post("/chat", json={"task_id": t, "message": "hi"}, headers=h)
+    r = api.post("/chat", json={"task_id": t, "message": "not sure"}, headers=h).json()
+    assert r["reply"] == "Which part of the report would you start with if you had to pick?"
+
+
+def test_glued_sentences_get_a_space(api, monkeypatch):
+    monkeypatch.setattr(llm, "complete", FakeLLM(reply="Open the report and write one line.Got it. Shout if you hit a snag."))
+    _, h = register(api)
+    t = make_task(api, h)
+    reply = api.post("/chat", json={"task_id": t, "message": "ok so what now"}, headers=h).json()["reply"]
+    assert "line. Got it." in reply
+
+
+def test_an_unsure_answer_to_a_guess_tells_the_writer_not_to_repeat_it(api, monkeypatch):
+    fake = FakeLLM(judge=("not_yet", None))
+    monkeypatch.setattr(llm, "complete", fake)
+    _, h = register(api)
+    t = make_task(api, h)
+    reach_guess(api, h, t, "unclear")
+    api.post("/chat", json={"task_id": t, "message": "hmm yeah maybe"}, headers=h)
+    assert "They were unsure about your last read" in fake.write_calls[-1]["messages"][0]["content"]

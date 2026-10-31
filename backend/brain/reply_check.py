@@ -10,6 +10,7 @@
 from __future__ import annotations
 
 import re
+from difflib import SequenceMatcher
 from dataclasses import dataclass
 from typing import Iterable
 
@@ -43,7 +44,22 @@ _STOPWORDS = {
     "make", "write", "finish", "start", "about", "have", "done", "what", "when", "then",
 }
 
+# "needs.Got it": the model sometimes glues two sentences with no space after the full stop.
+_GLUED = re.compile(r"([.!?])(?=[A-Z][a-z])")
+REPEAT_RATIO = 0.85  # how alike two replies must be to count as the same reply
+
+
+def tidy(text: str) -> str:
+    return _GLUED.sub(r"\1 ", text)
+
+
+def _normalize(text: str) -> str:
+    return re.sub(r"\W+", " ", text.lower()).strip()
+
+
 _MESSAGES = {
+    "repeats_previous": "Your last message already said this. Say something new that builds on what they just "
+                        "told you, and do not reuse your earlier wording or open the same way.",
     "stock_phrase": 'Do not use sympathy filler. Never open with or use "That sounds…", '
                     '"It\'s okay to feel…", "It\'s totally understandable", "I hear you", "I understand" or "Hey there".',
     "clock_time": "Do not mention any clock time or date. Say things like \"today\" or \"tonight\" instead.",
@@ -91,6 +107,7 @@ def check_reply(
     user_message: str | None,
     anchor_words: Iterable[str],
     max_chars: int | None = None,
+    previous_reply: str | None = None,
 ) -> Violations:
     hard: list[str] = []
     soft: list[str] = []
@@ -112,6 +129,9 @@ def check_reply(
     context_words = f"{user_message or ''} {' '.join(anchor_words)}".lower()
     if any(m.group(0).lower().rstrip("s") not in context_words for m in _RESOURCES.finditer(reply)):
         soft.append("invented_resource")
+
+    if previous_reply and SequenceMatcher(None, _normalize(reply), _normalize(previous_reply)).ratio() >= REPEAT_RATIO:
+        soft.append("repeats_previous")
 
     if _LABEL_START.match(reply):
         soft.append("label_style")

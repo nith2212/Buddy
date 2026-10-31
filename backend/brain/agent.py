@@ -34,7 +34,7 @@ from brain.playbook import (
     PlaybookDoc, drop_sections, get_doc, get_intervention, get_state_doc, intervention_text, interventions_for,
     state_stance,
 )
-from brain.reply_check import check_reply, salient_words
+from brain.reply_check import check_reply, salient_words, tidy
 from brain.state_detection import EMOTION_TO_STATE, as_utc, detect_state
 from models import EmotionLog, Message, Subtask, Task
 
@@ -182,6 +182,9 @@ async def run_turn(
                 phase = "ask" if user_message is None else "guess"
                 if verdict == "no":
                     situation += "\nThey said your last read was not right. Do not repeat it; try a different one."
+                elif last_phase == "guess" and verdict == "not_yet":
+                    situation += ("\nThey were unsure about your last read. Do not say it again. Take what they said "
+                                  "and narrow it: offer a more specific read as a question, or ask which part of it fits.")
         elif _is_ack(user_message) and top_state not in _NO_RELEASE_STATES and get_intervention("affirm_and_release"):
             chosen, phase, reason = get_intervention("affirm_and_release"), "release", "short acknowledgment"
         elif len(available) == 1:
@@ -189,7 +192,8 @@ async def run_turn(
         else:
             chosen, reason = await _decide(top_state, situation, history, user_message, available)
         reply, checks = await _write_checked(
-            mode, chosen, top_state, situation, memory, history, user_message, anchors, phase)
+            mode, chosen, top_state, situation, memory, history, user_message, anchors, phase,
+            previous_reply=next((h["content"] for h in reversed(history) if h["role"] == "assistant"), None))
         if reply is None:
             raise llm.LLMError(f"reply rejected by checks: {checks['hard']}")
     except llm.LLMError as e:
@@ -446,14 +450,15 @@ _RULE_1 = {
     "ask": (
         "1. Sound like a friend texting, not a manual. Mention the task naturally inside a sentence (never as a "
         "label followed by a colon). You are finding out what is really in the way, so do NOT suggest any step, "
-        "plan, timer or fix yet. Reflect the reason they picked in a few plain words (attribute it: \"you said...\"), "
+        "plan, timer or fix yet. Never open two replies the same way. Reflect the reason they picked in a few plain words (attribute it: \"you said...\"), "
         "then ask ONE specific question about this task that helps find the cause. Begin with the task and one real "
         f"fact from the context (its timing or an open step). {_NO_INVENTING}\n"
     ),
     "guess": (
         "1. Sound like a friend texting, not a manual. Mention the task naturally inside a sentence (never as a "
         "label followed by a colon). You are still finding out what is really in the way, so do NOT suggest any "
-        "step, plan, timer or fix yet. Do NOT ask them for more detail. Your one question must name ONE specific cause, "
+        "step, plan, timer or fix yet. Start from what they just said; do not repeat the due time or any wording "
+        "from your earlier messages. Do NOT ask them for more detail. Your one question must name ONE specific cause, "
         "in your own words and built from what they just said, and ask whether that is it (\"is it more that...?\"). "
         "Offer it as a question, never as a fact or a label. If they rejected an earlier read, offer a different "
         f"one. {_NO_INVENTING}\n"
@@ -461,7 +466,7 @@ _RULE_1 = {
     "first_move": (
         "1. Sound like a friend texting, not a manual. Mention the task naturally inside a sentence (never as a "
         "label followed by a colon). They just confirmed what is in the way (see the context). Do not ask why "
-        "again. Give ONE tiny first move that fits that cause, following the 'First move by cause' list above, "
+        "again, and do not repeat your earlier wording or the due time. Give ONE tiny first move that fits that cause, following the 'First move by cause' list above, "
         "taken from the task's open steps where possible and small enough to start in a few minutes. Describe the "
         "move; never write the content for them and never give sample wording. If the cause "
         f"is being tired, follow rule 6 instead of giving a task move. {_NO_INVENTING}\n"
@@ -557,8 +562,8 @@ async def _write(
     # max_tokens includes a reasoning model's hidden thinking — the rules in the prompt are what
     # keep replies short; these are just headroom so they don't truncate.
     if mode == "closing":
-        return await llm.complete(messages, temperature=0.6, max_tokens=300, timeout=8.0, retries=0, max_wait=0)
-    return await llm.complete(messages, temperature=0.7, max_tokens=600)
+        return tidy(await llm.complete(messages, temperature=0.6, max_tokens=300, timeout=8.0, retries=0, max_wait=0))
+    return tidy(await llm.complete(messages, temperature=0.7, max_tokens=600))
 
 
 async def _write_checked(
@@ -571,6 +576,7 @@ async def _write_checked(
     user_message: Optional[str],
     anchors: set[str],
     phase: Phase = "normal",
+    previous_reply: Optional[str] = None,
 ) -> tuple[Optional[str], dict]:
     """
     Generate, check, and rewrite once if the draft breaks a rule. Returns (reply, checks); reply is
@@ -583,7 +589,7 @@ async def _write_checked(
         return check_reply(
             text, max_sentences=max_sentences, max_questions=max_questions,
             user_message=user_message, anchor_words=set() if phase == "release" else anchors,
-            max_chars=CLOSING_MAX_CHARS if mode == "closing" else None,
+            max_chars=CLOSING_MAX_CHARS if mode == "closing" else None, previous_reply=previous_reply,
         )
 
     first = await _write(mode, chosen, top_state, situation, memory, history, user_message, phase=phase)
