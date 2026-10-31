@@ -279,3 +279,46 @@ def test_llm_json_mode_sets_response_format(monkeypatch):
     calls = _patch_post(monkeypatch, [OK])
     asyncio.run(llm.complete([{"role": "user", "content": "json please"}], json_mode=True))
     assert calls[0]["json"]["response_format"] == {"type": "json_object"}
+
+
+# ── Step B: tapped reasons on /chat ─────────────────────────────────────────
+
+@pytest.mark.parametrize("reason,state", [
+    ("tired", "fatigue"), ("too_much", "overwhelm"), ("unclear", "ambiguity"),
+    ("afraid", "perfectionism"), ("bored", "low_interest"),
+])
+def test_bare_reason_tap_makes_buddy_speak_first_in_that_state(api, db, fake_llm, reason, state):
+    user_id, h = register(api)
+    t = make_task(api, h)
+
+    r = api.post("/chat", json={"task_id": t, "reason": reason}, headers=h)
+    assert r.status_code == 200 and r.json()["state"] == state
+
+    roles = [m["role"] for m in api.get(f"/chat/history?task_id={t}", headers=h).json()]
+    assert roles == ["assistant"]  # the tap is not saved as something the user typed
+    log = db.query(models.EmotionLog).filter_by(user_id=user_id, task_id=t).one()
+    assert log.emotion == reason
+
+
+def test_reason_with_message_runs_a_normal_chat_turn(api, fake_llm):
+    _, h = register(api)
+    t = make_task(api, h)
+    body = api.post("/chat", json={"task_id": t, "reason": "afraid", "message": "what if it's bad"}, headers=h).json()
+    assert body["state"] == "perfectionism"
+    roles = [m["role"] for m in api.get(f"/chat/history?task_id={t}", headers=h).json()]
+    assert roles == ["user", "assistant"]
+
+
+@pytest.mark.parametrize("body", [{}, {"reason": "furious"}, {"message": "   "}])
+def test_chat_rejects_missing_or_unknown_reason(api, fake_llm, body):
+    _, h = register(api)
+    t = make_task(api, h)
+    assert api.post("/chat", json={"task_id": t, **body}, headers=h).status_code == 422
+
+
+def test_reason_tap_cannot_touch_another_users_task(api, db, fake_llm):
+    _, a = register(api)
+    b_id, b = register(api)
+    t = make_task(api, a)
+    assert api.post("/chat", json={"task_id": t, "reason": "afraid"}, headers=b).status_code == 404
+    assert db.query(models.EmotionLog).filter_by(user_id=b_id).count() == 0

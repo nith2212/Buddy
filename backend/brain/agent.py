@@ -49,6 +49,8 @@ EMOTION_WORDS = {
     "tired": "tired / drained",
     "too_much": "it feels like too much right now",
     "unclear": "doesn't know where to start",
+    "afraid": "scared it won't be good enough",
+    "bored": "finds it boring or pointless",
 }
 
 SITUATION = {

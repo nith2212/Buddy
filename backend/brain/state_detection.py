@@ -17,13 +17,16 @@ from sqlalchemy.orm import Session
 
 from models import Event, Subtask, Task
 
-# Each emotion button maps straight to the playbook state it's designed for.
-# "avoidance" has no button — see notifications/router.py — so it never
+# Each reason the user can tap maps straight to the playbook state it's designed for.
+# The first three are notification buttons (Android allows 3); "afraid" and "bored" are
+# in-app chips only. "avoidance" has no tap — see notifications/router.py — so it never
 # appears here; it's silence-inferred only (IGNORED_STREAK_THRESHOLD below).
 EMOTION_TO_STATE = {
     "tired": "fatigue",
     "too_much": "overwhelm",
     "unclear": "ambiguity",
+    "afraid": "perfectionism",   # scared it won't be good enough
+    "bored": "low_interest",     # boring or pointless
 }
 
 # How many check-ins in a row must go unanswered before we'll claim a state

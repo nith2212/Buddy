@@ -22,6 +22,7 @@ from typing import Optional
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from brain.state_detection import EMOTION_TO_STATE
 from models import Event, Memory, Message, Task
 
 VALID_EVENT_TYPES = {
@@ -29,7 +30,7 @@ VALID_EVENT_TYPES = {
     "notification_sent", "notification_ignored", "checkin_initiated",
     "checkin_responded", "silence", "echo_ran",
 }
-VALID_EMOTIONS = {"overwhelmed", "tired", "unclear", "bored", "anxious"}
+VALID_EMOTIONS = set(EMOTION_TO_STATE)  # the reasons a user can tap
 
 
 # ── Task history ──────────────────────────────────────────────────────────────

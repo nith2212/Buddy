@@ -84,6 +84,8 @@ def _emotion_picker_response(task_id: int) -> dict[str, Any]:
                 "task_id": task_id,
                 # Each value maps straight to a playbook state (fatigue/overwhelm/
                 # ambiguity) — a direct self-report, trusted over any inference.
+                # Android caps notification buttons at 3, so the other reasons
+                # ("afraid", "bored") are in-app chips sent to POST /chat as `reason`.
                 # "avoidance" has no button on purpose: it's rarely self-admitted
                 # in the moment, and gets inferred from repeated silence instead.
                 "actions": [

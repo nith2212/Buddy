@@ -26,6 +26,8 @@ def test_done_task_is_recovery_regardless_of_everything_else():
     ("tired", "fatigue"),
     ("too_much", "overwhelm"),
     ("unclear", "ambiguity"),
+    ("afraid", "perfectionism"),
+    ("bored", "low_interest"),
 ])
 def test_emotion_tap_maps_directly_to_its_state(tap, expected_state):
     assert classify(
