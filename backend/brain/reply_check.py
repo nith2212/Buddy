@@ -60,6 +60,8 @@ def _normalize(text: str) -> str:
 _MESSAGES = {
     "repeats_previous": "Your last message already said this. Say something new that builds on what they just "
                         "told you, and do not reuse your earlier wording or open the same way.",
+    "repeats_opening": "You opened with the same words as your last message. Start differently, from what "
+                       "they just said.",
     "stock_phrase": 'Do not use sympathy filler. Never open with or use "That sounds…", '
                     '"It\'s okay to feel…", "It\'s totally understandable", "I hear you", "I understand" or "Hey there".',
     "clock_time": "Do not mention any clock time or date. Say things like \"today\" or \"tonight\" instead.",
@@ -132,6 +134,10 @@ def check_reply(
 
     if previous_reply and SequenceMatcher(None, _normalize(reply), _normalize(previous_reply)).ratio() >= REPEAT_RATIO:
         soft.append("repeats_previous")
+
+    if previous_reply and _normalize(reply).split()[:4] == _normalize(previous_reply).split()[:4] \
+            and len(_normalize(reply).split()) >= 4:
+        soft.append("repeats_opening")
 
     if _LABEL_START.match(reply):
         soft.append("label_style")

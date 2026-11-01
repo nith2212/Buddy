@@ -13,8 +13,9 @@
 # Phases (what the writer is told to do this turn):
 #   ask         — reflect the tapped reason, ask ONE specific question, no advice
 #   guess       — offer a read of the cause as a question, no advice
-#   first_move  — the user CONFIRMED a cause: one tiny first move that fits it
-#   release     — a short acknowledgment ("okay thanks"): close the loop, nothing new
+#   offer       — the user CONFIRMED a cause: name it, ask whether they want a tiny move or have a plan
+#   first_move  — they want a move: one tiny first move that fits the cause
+#   release     — an acknowledgment or their own plan ("okay thanks", "I'll work on X"): back it, nothing new
 #   normal      — everything else (the decide call picks among the state's interventions)
 # A cause is saved only when the user confirms it (judged by a small LLM call, not keywords).
 
@@ -41,7 +42,7 @@ from models import EmotionLog, Message, Subtask, Task
 logger = logging.getLogger(__name__)
 
 Mode = Literal["chat", "initiate", "closing"]
-Phase = Literal["normal", "ask", "guess", "first_move", "release"]
+Phase = Literal["normal", "ask", "guess", "offer", "first_move", "release"]
 
 HISTORY_TURNS = 12
 MAX_CHARS_PER_TURN = 600
@@ -75,7 +76,7 @@ SITUATION = {
 MAX_SENTENCES = {"chat": 3, "initiate": 3, "closing": 2}
 MAX_QUESTIONS = {"chat": 1, "initiate": 1, "closing": 0}
 # (max sentences, max questions) for the diagnosing phases; "normal" uses the mode's limits above.
-PHASE_LIMITS = {"ask": (3, 1), "guess": (3, 1), "first_move": (3, 1), "release": (2, 0)}
+PHASE_LIMITS = {"ask": (3, 1), "guess": (3, 1), "offer": (3, 1), "first_move": (3, 1), "release": (2, 0)}
 
 DIAGNOSE_MAX_BUDDY_TURNS = 4  # after this many Buddy turns since the tap with no confirmed cause, stop probing
 PATTERN_MIN = 3               # a cause must be confirmed this many times before Buddy may mention a pattern
@@ -96,6 +97,13 @@ _ACK_WORDS = {
     "alright", "will", "do", "noted", "great", "perfect", "awesome", "nice", "good", "sounds", "appreciate",
     "that", "helps", "helpful", "yep", "yup", "so", "much", "very",
 }
+# After Buddy offered a tiny move: "yes please", "idk", "give me one" mean they want it; anything else is their own plan.
+_WANTS_MOVE = re.compile(
+    r"\b(?:yes|yeah|yep|yup|sure|please|suggest|idk|help|tiny|move|give me)\b|not sure|don'?t know|no idea",
+    re.IGNORECASE)
+# After a move or plan is settled, these mean they are still stuck, so Buddy should keep talking rather than release.
+_STILL_STUCK = re.compile(
+    r"\b(?:stuck|can'?t|cant|don'?t|dont|won'?t|no|not|hard|still|but|why|what|how)\b", re.IGNORECASE)
 # After these, a polite "okay" is more likely avoidance than agreement.
 _NO_RELEASE_STATES = {"avoidance", "commitment_drift"}
 CLOSING_MAX_CHARS = 200  # phone notification; the prompt asks for under 160
@@ -124,6 +132,10 @@ async def run_turn(
     steps = _load_steps(db, task)
     situation = _situation_text(task, steps, emotion, top, datetime.now(timezone.utc))
     anchors = salient_words(task.title, *(s.title for s in steps if not s.done))
+    if any(h["role"] == "assistant" for h in history):
+        anchors = set()  # the task is named in Buddy's first message; later replies needn't repeat it
+        # Said once is enough: leaving the timing in is what makes every reply open "X is due in 3 days".
+        situation = re.sub(r"^Timing: .*$", "Timing: already told them; do not mention it again", situation, flags=re.M)
 
     # Diagnosing: a reason was tapped this check-in cycle and the user hasn't confirmed a cause since.
     confirmed = tools.get_memory_entry(db, user_id, f"blocker.task.{task_id}")
@@ -134,7 +146,8 @@ async def run_turn(
     diagnosing = (mode != "closing" and emotion in EMOTION_TO_STATE and not already_confirmed
                   and not probing_capped)
     # A "yes" only counts as a confirmation of a read Buddy actually offered, not of the user's own answer.
-    last_phase = _last_buddy_phase(db, user_id, task_id) if diagnosing and user_message else None
+    last_phase = (_last_buddy_phase(db, user_id, task_id)
+                  if (diagnosing or already_confirmed) and user_message else None)
     if probing_capped:
         situation += "\nYou have already asked several questions about why. Do not ask why again."
     if confirmed and confirmed.value in CAUSE_WORDS:
@@ -175,7 +188,7 @@ async def run_turn(
                 verdict, cause = await _judge_cause(emotion, history, user_message)
             if verdict == "yes":
                 confirmed_cause = cause or emotion
-                chosen, phase, reason = get_intervention("surface_smallest_step"), "first_move", "cause confirmed by user"
+                chosen, phase, reason = get_intervention("find_the_cause"), "offer", "cause confirmed by user"
                 situation += f"\nThe user just confirmed what is in the way: {CAUSE_WORDS[confirmed_cause]}"
             else:
                 chosen, reason = get_intervention("find_the_cause"), f"diagnosing (verdict: {verdict})"
@@ -185,6 +198,15 @@ async def run_turn(
                 elif last_phase == "guess" and verdict == "not_yet":
                     situation += ("\nThey were unsure about your last read. Do not say it again. Take what they said "
                                   "and narrow it: offer a more specific read as a question, or ask which part of it fits.")
+        elif (already_confirmed and user_message and "?" not in user_message
+              and last_phase in ("offer", "first_move", "release") and get_intervention("affirm_and_release")
+              and get_intervention("surface_smallest_step")
+              and (last_phase == "offer" or not _STILL_STUCK.search(user_message))):
+            if last_phase == "offer" and _WANTS_MOVE.search(user_message):
+                chosen, phase, reason = get_intervention("surface_smallest_step"), "first_move", "they asked for a move"
+            else:
+                # their own plan, or a sign-off: back it as it is, never shrink it
+                chosen, phase, reason = get_intervention("affirm_and_release"), "release", "their own plan or sign-off"
         elif _is_ack(user_message) and top_state not in _NO_RELEASE_STATES and get_intervention("affirm_and_release"):
             chosen, phase, reason = get_intervention("affirm_and_release"), "release", "short acknowledgment"
         elif len(available) == 1:
@@ -413,7 +435,7 @@ async def _judge_cause(
                     "Buddy is helping a user find what is really in the way of a task. Decide whether the user's "
                     "latest message CONFIRMS a specific cause, either by agreeing with a cause Buddy proposed or by "
                     "clearly stating one themselves. \"yes\" only when it is clear. \"no\" if they reject what "
-                    "Buddy proposed. \"not_yet\" if they only answered a question, are unsure, or partly agree. "
+                    "Buddy proposed. \"not_yet\" if they only answered a question, are unsure, partly agree, or only picked one side of an either/or question. "
                     'Reply with JSON only: {"confirmed": "yes" | "no" | "not_yet", '
                     '"cause": "<one cause key above or null>"}'
                 )},
@@ -455,17 +477,25 @@ _RULE_1 = {
         f"fact from the context (its timing or an open step). {_NO_INVENTING}\n"
     ),
     "guess": (
-        "1. Sound like a friend texting, not a manual. Mention the task naturally inside a sentence (never as a "
-        "label followed by a colon). You are still finding out what is really in the way, so do NOT suggest any "
+        "1. Sound like a friend texting, not a manual. You are already mid-conversation, so do not restate the "
+        "task or open by naming it; mention it only if it helps. You are still finding out what is really in the way, so do NOT suggest any "
         "step, plan, timer or fix yet. Start from what they just said; do not repeat the due time or any wording "
         "from your earlier messages. Do NOT ask them for more detail. Your one question must name ONE specific cause, "
         "in your own words and built from what they just said, and ask whether that is it (\"is it more that...?\"). "
+        "It must be a yes/no question about that one cause, never an \"X or Y?\" choice. "
         "Offer it as a question, never as a fact or a label. If they rejected an earlier read, offer a different "
         f"one. {_NO_INVENTING}\n"
     ),
+    "offer": (
+        "1. Sound like a friend texting, not a manual. You are already mid-conversation, so do not restate the "
+        "task or open by naming it; mention it only if it helps. They just confirmed what is in the way (see the context). Say it back in your "
+        "own plain words, attributed (\"you said...\"), then ask ONE question: do they want a tiny first move, or "
+        "do they already know what they'll do? Do NOT suggest any step, plan or fix yet, and do not repeat your "
+        f"earlier wording or the due time. {_NO_INVENTING}\n"
+    ),
     "first_move": (
-        "1. Sound like a friend texting, not a manual. Mention the task naturally inside a sentence (never as a "
-        "label followed by a colon). They just confirmed what is in the way (see the context). Do not ask why "
+        "1. Sound like a friend texting, not a manual. You are already mid-conversation, so do not restate the "
+        "task or open by naming it; mention it only if it helps. They just confirmed what is in the way (see the context). Do not ask why "
         "again, and do not repeat your earlier wording or the due time. Give ONE tiny first move that fits that cause, following the 'First move by cause' list above, "
         "taken from the task's open steps where possible and small enough to start in a few minutes. Describe the "
         "move; never write the content for them and never give sample wording. If the cause "
@@ -475,7 +505,8 @@ _RULE_1 = {
         "1. Sound like a friend texting. They just acknowledged you, so only receive it. Do not mention or quote their "
         "thanks. Say, briefly, that they're taking on the step you last suggested (or what they just decided), end on "
         "a full stop, and add nothing new: no step, no tip, no question. You may say you're around if they get "
-        f"stuck. {_NO_INVENTING}\n"
+        "stuck. If they named their own plan, back it exactly as they said it: never shrink, change or add to it. "
+        f"{_NO_INVENTING}\n"
     ),
 }
 

@@ -27,7 +27,7 @@ If a request conflicts with this section, STOP and ask.
 ## Reply rules (enforced by reply_check, do not weaken)
 - 2-3 short sentences. At most one question. One concrete next move.
 - No stock empathy ("That sounds exhausting", "It's totally understandable").
-- Always name the task or a step.
+- Name the task or a step in Buddy's first message of a conversation. Later replies respond to what the user said and needn't restate it.
 - Praise only for something the person actually did.
 - Never invent deadlines or clock times. Only the task's real due_date.
 - Respect what the user said. If they say they need to finish, help with the smallest piece. Don't talk them out of it.
