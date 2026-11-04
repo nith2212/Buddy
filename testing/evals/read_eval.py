@@ -126,10 +126,11 @@ def main() -> None:
 
     from brain import llm
 
-    load_dotenv(HERE.parent.parent / ".env")  # buddy/.env, where GROQ_API_KEY lives
-    if not os.getenv("GROQ_API_KEY"):
-        sys.exit("GROQ_API_KEY is not set (it is read from buddy/.env).")
+    load_dotenv(HERE.parent.parent / ".env")  # buddy/.env, where the API keys live
     model = os.getenv("GROQ_MODEL", llm.DEFAULT_MODEL)
+    needed = "ANTHROPIC_API_KEY" if model.startswith("claude-") else "GROQ_API_KEY"
+    if not os.getenv(needed):
+        sys.exit(f"{needed} is not set (it is read from buddy/.env).")
     result = asyncio.run(run(model))
     out_dir = HERE.parent / "results"
     out_dir.mkdir(exist_ok=True)

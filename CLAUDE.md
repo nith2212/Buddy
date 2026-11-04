@@ -62,7 +62,7 @@ Sprint timer, check-back commitments, firmness levels, escalation, a patterns en
 - Every query is scoped to the caller. Cross-user access returns 404. Keep the isolation tests green and extend them for any new table or key.
 - DELETE /me must wipe everything, including causes and patterns.
 - Secrets only in env vars. Never commit .env or *.db.
-- Chat text goes to Groq. Don't log message content.
+- Chat text goes to the model provider: Groq, or Anthropic when GROQ_MODEL is a claude- model (owner OK, 2026-11-04). Don't log message content.
 
 ## Hosting reality
 Render free sleeps and has an ephemeral disk. No in-process schedulers. No local data. Neon Postgres in prod, SQLite locally. cron-job.org fires /cron/* endpoints with X-Cron-Secret. LLM calls are async, with timeouts, retries and a canned fallback, and never return a 500 on a Groq failure. Never hold a DB session across an LLM call.

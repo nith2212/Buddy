@@ -261,6 +261,24 @@ _READ_SYSTEM = (
 )
 
 
+def _nullable(schema: dict) -> dict:
+    return {"anyOf": [schema, {"type": "null"}]}
+
+
+# The reader's answer shape, owned here (models with structured outputs return exactly this).
+READ_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "kind": {"type": "string", "enum": list(KINDS)},
+        "cause": _nullable({"type": "string", "enum": list(CAUSES)}),
+        "flavor": _nullable({"type": "string"}),
+        "fact": _nullable({"type": "string"}),
+    },
+    "required": ["kind", "cause", "flavor", "fact"],
+    "additionalProperties": False,
+}
+
+
 async def read_message(state: str, stage: str, buddy_said: Optional[str], message: str) -> Reading:
     """One reading of the user's message. Any failure is 'unclear' (the caller stays on the stage)."""
     caught = pattern_read(message, buddy_said, state)
@@ -276,7 +294,7 @@ async def read_message(state: str, stage: str, buddy_said: Optional[str], messag
     try:
         raw = await llm.complete(
             [{"role": "system", "content": _READ_SYSTEM}, {"role": "user", "content": prompt}],
-            temperature=0.0, max_tokens=400, json_mode=True, timeout=10.0, retries=1,
+            temperature=0.0, max_tokens=400, json_mode=True, json_schema=READ_SCHEMA, timeout=10.0, retries=1,
         )
         parsed = json.loads(raw)
         kind = parsed.get("kind")

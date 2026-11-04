@@ -1,0 +1,1637 @@
+{
+  "meta": {
+    "model": "claude-haiku-5-5",
+    "grader": null,
+    "started": "2026-11-04 19:15",
+    "minutes": 3.1,
+    "commit": "b433406 + uncommitted changes",
+    "usage": {
+      "pipeline": {
+        "calls": 120,
+        "prompt": 108912,
+        "completion": 6141
+      },
+      "grader": {
+        "calls": 0,
+        "prompt": 0,
+        "completion": 0
+      }
+    },
+    "unfinished": [],
+    "scenarios": [
+      "ambiguity_main",
+      "ambiguity_idk",
+      "ambiguity_switch_tired",
+      "perfectionism_main",
+      "perfectionism_own_plan",
+      "perfectionism_bigger",
+      "fatigue_main",
+      "fatigue_still_wants",
+      "overwhelm_main",
+      "overwhelm_own_step",
+      "overwhelm_vague",
+      "low_interest_boring",
+      "low_interest_pointless_none",
+      "low_interest_pointless_purpose",
+      "low_interest_optional"
+    ]
+  },
+  "summary": {
+    "by_state": {
+      "ambiguity": {
+        "scenarios": 3,
+        "replies": 15,
+        "clean": 14,
+        "yes": 0,
+        "no": 0,
+        "cause_ok": 3,
+        "fallbacks": 0
+      },
+      "perfectionism": {
+        "scenarios": 3,
+        "replies": 13,
+        "clean": 10,
+        "yes": 0,
+        "no": 0,
+        "cause_ok": 2,
+        "fallbacks": 0
+      },
+      "fatigue": {
+        "scenarios": 2,
+        "replies": 7,
+        "clean": 7,
+        "yes": 0,
+        "no": 0,
+        "cause_ok": 2,
+        "fallbacks": 0
+      },
+      "overwhelm": {
+        "scenarios": 3,
+        "replies": 13,
+        "clean": 13,
+        "yes": 0,
+        "no": 0,
+        "cause_ok": 3,
+        "fallbacks": 0
+      },
+      "low_interest": {
+        "scenarios": 4,
+        "replies": 21,
+        "clean": 21,
+        "yes": 0,
+        "no": 0,
+        "cause_ok": 4,
+        "fallbacks": 0
+      }
+    },
+    "criteria": {
+      "follows_framework": {
+        "yes": 0,
+        "no": 0,
+        "n/a": 0,
+        "error": 0
+      },
+      "reacts_to_user": {
+        "yes": 0,
+        "no": 0,
+        "n/a": 0,
+        "error": 0
+      },
+      "offers_not_assigns": {
+        "yes": 0,
+        "no": 0,
+        "n/a": 0,
+        "error": 0
+      },
+      "no_premature_step": {
+        "yes": 0,
+        "no": 0,
+        "n/a": 0,
+        "error": 0
+      },
+      "keeps_their_plan": {
+        "yes": 0,
+        "no": 0,
+        "n/a": 0,
+        "error": 0
+      },
+      "warm_voice": {
+        "yes": 0,
+        "no": 0,
+        "n/a": 0,
+        "error": 0
+      },
+      "no_invention": {
+        "yes": 0,
+        "no": 0,
+        "n/a": 0,
+        "error": 0
+      }
+    },
+    "mech": {
+      "http_error": 0,
+      "fallback": 0,
+      "too_many_questions": 1,
+      "too_long": 2,
+      "banned_phrase": 0,
+      "clock_time": 0,
+      "repeated_opener": 0,
+      "repeats_earlier": 0,
+      "question_in_release": 1
+    }
+  },
+  "results": [
+    {
+      "id": "ambiguity_main",
+      "state": "ambiguity",
+      "chip": "unclear",
+      "note": "Goal -> core -> their own first step -> release. Buddy never supplies the content.",
+      "expect_cause": "unclear",
+      "dream": [
+        "Hey, I can understand. Some tasks might feel huge. do u have an end goal for this task? What will that look like?",
+        "That sounds great! Every task has a simple core working/design. what would that be for this task?",
+        "Good! You've narrowed it down. Now what would be the first ever step? Even as simple as opening your laptop is valid.",
+        "Yes, that sounds like a plan. I'll be here if you wanna plan more. Now go on you.",
+        "(release)"
+      ],
+      "user_lines": [
+        "This app will help me declutter my gallery while swiping. And each save gives me points. With those points I can build a cat sanctuary!",
+        "Hmmm for this, I need the swipe mechanism. Once that's built, others are additions.",
+        "Hmmm I can start setting up expo on my phone and laptop.",
+        "okay thanks!"
+      ],
+      "saved_cause": "unclear",
+      "cause_ok": true,
+      "turns": [
+        {
+          "user": null,
+          "reply": "Hey! Starting something like the Nixly app can feel like staring at a blank page, and that's totally normal. So when you picture it finished in about 3 days, what does that look like to you: what would be working, or what would you be able to show someone?",
+          "status": 200,
+          "seconds": 1.8,
+          "phase": "open",
+          "intervention": null,
+          "state": "ambiguity",
+          "read": null,
+          "fallback": false,
+          "checks": {
+            "hard": [],
+            "soft": [],
+            "rewritten": false
+          },
+          "flags": []
+        },
+        {
+          "user": "This app will help me declutter my gallery while swiping. And each save gives me points. With those points I can build a cat sanctuary!",
+          "reply": "Oh, a cat sanctuary built from decluttering your gallery is such a fun twist! Swiping through photos and watching the sanctuary grow sounds like a great reward loop. Which piece feels like the one everything else hangs on, the swiping, the points, or the sanctuary?",
+          "status": 200,
+          "seconds": 3.1,
+          "phase": "core",
+          "intervention": null,
+          "state": "ambiguity",
+          "read": "answer",
+          "fallback": false,
+          "checks": {
+            "hard": [],
+            "soft": [],
+            "rewritten": false
+          },
+          "flags": []
+        },
+        {
+          "user": "Hmmm for this, I need the swipe mechanism. Once that's built, others are additions.",
+          "reply": "Swiping is the heart of Nixly, so that's the right place to focus. What's the tiniest first move you could make on it, even just opening your laptop or creating the project file?",
+          "status": 200,
+          "seconds": 4.1,
+          "phase": "first_step",
+          "intervention": null,
+          "state": "ambiguity",
+          "read": "answer",
+          "fallback": false,
+          "checks": {
+            "hard": [],
+            "soft": [],
+            "rewritten": true
+          },
+          "flags": []
+        },
+        {
+          "user": "Hmmm I can start setting up expo on my phone and laptop.",
+          "reply": "Setting up Expo on both your phone and laptop is a solid start, and it gets the swipe mechanism within reach. I'm around whenever you get stuck.",
+          "status": 200,
+          "seconds": 6.1,
+          "phase": "release",
+          "intervention": null,
+          "state": "ambiguity",
+          "read": "own_plan",
+          "fallback": false,
+          "checks": {
+            "hard": [],
+            "soft": [],
+            "rewritten": false
+          },
+          "flags": []
+        },
+        {
+          "user": "okay thanks!",
+          "reply": "You're welcome! Good luck setting up Expo, and I'm here whenever you want to check in.",
+          "status": 200,
+          "seconds": 3.1,
+          "phase": "release",
+          "intervention": null,
+          "state": "ambiguity",
+          "read": "ack",
+          "fallback": false,
+          "checks": {
+            "hard": [],
+            "soft": [],
+            "rewritten": false
+          },
+          "flags": []
+        }
+      ]
+    },
+    {
+      "id": "ambiguity_idk",
+      "state": "ambiguity",
+      "chip": "unclear",
+      "note": "Repeated idk: Buddy must narrow with two concrete options, never repeat the question.",
+      "expect_cause": "unclear",
+      "dream": null,
+      "user_lines": [
+        "idk honestly",
+        "idk, all of it I guess",
+        "maybe the swipe thing?",
+        "I'll set up expo then",
+        "thanks bye"
+      ],
+      "saved_cause": "unclear",
+      "cause_ok": true,
+      "turns": [
+        {
+          "user": null,
+          "reply": "Hey! Starting something big like finishing the Nixly app can feel stuck at the beginning, and that's really common. What would \"done\" look like for it, in your own words, when you picture it all wrapped up in three days?",
+          "status": 200,
+          "seconds": 1.1,
+          "phase": "open",
+          "intervention": null,
+          "state": "ambiguity",
+          "read": null,
+          "fallback": false,
+          "checks": {
+            "hard": [],
+            "soft": [],
+            "rewritten": false
+          },
+          "flags": []
+        },
+        {
+          "user": "idk honestly",
+          "reply": "No worries, that's a normal place to be. Would you say \"done\" means the app is working and ready for people to use, or that it's mostly built and you just need to polish it up?",
+          "status": 200,
+          "seconds": 1.2,
+          "phase": "open",
+          "intervention": null,
+          "state": "ambiguity",
+          "read": "idk",
+          "fallback": false,
+          "checks": {
+            "hard": [],
+            "soft": [],
+            "rewritten": false
+          },
+          "flags": []
+        },
+        {
+          "user": "idk, all of it I guess",
+          "reply": "Got it, that's a lot to hold at once, so let's shrink it. Do you want a tiny first move from me to get going, or do you already have an idea of what you'd do first?",
+          "status": 200,
+          "seconds": 2.9,
+          "phase": "offer",
+          "intervention": null,
+          "state": "ambiguity",
+          "read": "idk",
+          "fallback": false,
+          "checks": {
+            "hard": [],
+            "soft": [],
+            "rewritten": false
+          },
+          "flags": []
+        },
+        {
+          "user": "maybe the swipe thing?",
+          "reply": "The swipe thing sounds like a great place to start! Could you open the project and just look at the swipe part for five minutes, even if you don't change anything yet? What do you see there right now?",
+          "status": 200,
+          "seconds": 4.0,
+          "phase": "first_step",
+          "intervention": null,
+          "state": "ambiguity",
+          "read": "answer",
+          "fallback": false,
+          "checks": {
+            "hard": [],
+            "soft": [
+              "too_many_questions"
+            ],
+            "rewritten": true
+          },
+          "flags": [
+            "too_many_questions"
+          ]
+        },
+        {
+          "user": "I'll set up expo then",
+          "reply": "Setting up Expo first is a solid plan, and it'll get the project running so the swipe work has somewhere to show up. I'm around whenever you get stuck, just let me know.",
+          "status": 200,
+          "seconds": 3.1,
+          "phase": "release",
+          "intervention": null,
+          "state": "ambiguity",
+          "read": "own_plan",
+          "fallback": false,
+          "checks": {
+            "hard": [],
+            "soft": [],
+            "rewritten": false
+          },
+          "flags": []
+        },
+        {
+          "user": "thanks bye",
+          "reply": "Bye for now, good luck with the Expo setup!",
+          "status": 200,
+          "seconds": 1.0,
+          "phase": "release",
+          "intervention": null,
+          "state": "ambiguity",
+          "read": "ack",
+          "fallback": false,
+          "checks": {
+            "hard": [],
+            "soft": [],
+            "rewritten": false
+          },
+          "flags": []
+        }
+      ]
+    },
+    {
+      "id": "ambiguity_switch_tired",
+      "state": "ambiguity",
+      "chip": "unclear",
+      "note": "Tapped unclear, reveals tiredness: switch to tired. No task step after that.",
+      "expect_cause": "tired",
+      "dream": null,
+      "user_lines": [
+        "honestly I'm just exhausted today, I worked all day",
+        "yeah I just want to sleep",
+        "bye"
+      ],
+      "saved_cause": "tired",
+      "cause_ok": true,
+      "turns": [
+        {
+          "user": null,
+          "reply": "Hey! Starting something with a deadline in 3 days can feel like staring at a blank page, and that's really normal. Picture the Nixly app finished: what does \"done\" look like to you?",
+          "status": 200,
+          "seconds": 1.1,
+          "phase": "open",
+          "intervention": null,
+          "state": "ambiguity",
+          "read": null,
+          "fallback": false,
+          "checks": {
+            "hard": [],
+            "soft": [],
+            "rewritten": false
+          },
+          "flags": []
+        },
+        {
+          "user": "honestly I'm just exhausted today, I worked all day",
+          "reply": "Working all day really takes it out of you, so it makes sense you're running on empty. Please go rest, and I'll be right here whenever you're ready.",
+          "status": 200,
+          "seconds": 3.4,
+          "phase": "rest",
+          "intervention": null,
+          "state": "fatigue",
+          "read": "new_cause",
+          "fallback": false,
+          "checks": {
+            "hard": [],
+            "soft": [],
+            "rewritten": false
+          },
+          "flags": []
+        },
+        {
+          "user": "yeah I just want to sleep",
+          "reply": "Sleep sounds like exactly the right call after a long day. Get some good rest, and I'll be here when you're ready.",
+          "status": 200,
+          "seconds": 2.8,
+          "phase": "rest",
+          "intervention": null,
+          "state": "fatigue",
+          "read": "confirm",
+          "fallback": false,
+          "checks": {
+            "hard": [],
+            "soft": [],
+            "rewritten": false
+          },
+          "flags": []
+        },
+        {
+          "user": "bye",
+          "reply": "Bye, take care of yourself! Sleep well.",
+          "status": 200,
+          "seconds": 3.1,
+          "phase": "release",
+          "intervention": null,
+          "state": "fatigue",
+          "read": "ack",
+          "fallback": false,
+          "checks": {
+            "hard": [],
+            "soft": [],
+            "rewritten": false
+          },
+          "flags": []
+        }
+      ]
+    },
+    {
+      "id": "perfectionism_main",
+      "state": "perfectionism",
+      "chip": "afraid",
+      "note": "idk -> two guesses as questions -> confirm -> rough-first-version reframe with consent -> release.",
+      "expect_cause": "afraid",
+      "dream": [
+        "Hey there, I feel you. Some tasks would bring out uncomfortable emotions, and it's okay. What is it about this task that makes you feel this way?",
+        "Okay, let me guess, and if you feel it resonates, tell me- do you feel like this task would make you feel like you don't how to do certain things?",
+        "Okay, what about how others might perceive it? Or critique it?",
+        "Hey it's okay. This task is important and you care. But in order to be perfect, it should exist first. So let's focusing on doing this roughly. Allow yourself to be messy. You have all the freedom, make it look bad. Once it exists, then you can plan to make it the best. What do you say?",
+        "Great! I'll be here when you need me again."
+      ],
+      "user_lines": [
+        "Idk bro",
+        "Yeah, maybe",
+        "Yes, I'm worried it won't look good to others",
+        "Haha yeah that sounds fun."
+      ],
+      "saved_cause": null,
+      "cause_ok": false,
+      "turns": [
+        {
+          "user": null,
+          "reply": "Hey! Finishing the Nixly app is on your plate for the next few days, and that's a big, exciting thing to be working toward. Feeling nervous that it won't be good enough is really common when something matters to you. What part of it feels the riskiest right now?",
+          "status": 200,
+          "seconds": 2.3,
+          "phase": "open",
+          "intervention": null,
+          "state": "perfectionism",
+          "read": null,
+          "fallback": false,
+          "checks": {
+            "hard": [],
+            "soft": [
+              "too_long"
+            ],
+            "rewritten": true
+          },
+          "flags": [
+            "too_long"
+          ]
+        },
+        {
+          "user": "Idk bro",
+          "reply": "No stress, that's a totally fine answer. Let's make it easier: is it more that you're not sure how to do some of the parts yet, or more that you're worried about how other people will see the app once it's out?",
+          "status": 200,
+          "seconds": 1.2,
+          "phase": "narrow",
+          "intervention": null,
+          "state": "perfectionism",
+          "read": "idk",
+          "fallback": false,
+          "checks": {
+            "hard": [],
+            "soft": [],
+            "rewritten": false
+          },
+          "flags": []
+        },
+        {
+          "user": "Yeah, maybe",
+          "reply": "Sounds like it could be a bit of both, and that's okay to be unsure about. Let's zoom in on one piece: is there a specific screen or feature in Nixly that you keep putting off because it feels too hard to get right?",
+          "status": 200,
+          "seconds": 4.3,
+          "phase": "narrow",
+          "intervention": null,
+          "state": "perfectionism",
+          "read": "unsure",
+          "fallback": false,
+          "checks": {
+            "hard": [],
+            "soft": [],
+            "rewritten": false
+          },
+          "flags": []
+        },
+        {
+          "user": "Yes, I'm worried it won't look good to others",
+          "reply": "So the worry is that other people won't think it looks good, and that's what's making it feel heavy. Is that what's going on, that you're mainly picturing how others will judge the way Nixly looks?",
+          "status": 200,
+          "seconds": 4.7,
+          "phase": "confirm",
+          "intervention": null,
+          "state": "perfectionism",
+          "read": "answer",
+          "fallback": false,
+          "checks": {
+            "hard": [],
+            "soft": [],
+            "rewritten": false
+          },
+          "flags": []
+        },
+        {
+          "user": "Haha yeah that sounds fun.",
+          "reply": "Ha, fair, that was a mouthful! Let's keep it simple: which screen in Nixly do you most want to make look good, and what's the first small thing you'd change on it?",
+          "status": 200,
+          "seconds": 3.5,
+          "phase": "narrow",
+          "intervention": null,
+          "state": "perfectionism",
+          "read": "unsure",
+          "fallback": false,
+          "checks": {
+            "hard": [],
+            "soft": [],
+            "rewritten": false
+          },
+          "flags": [
+            "question_in_release"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "perfectionism_own_plan",
+      "state": "perfectionism",
+      "chip": "afraid",
+      "note": "They decline the reframe and state their own plan: back it as said, never shrink it.",
+      "expect_cause": "afraid",
+      "dream": null,
+      "user_lines": [
+        "people will think it's messy and unprofessional",
+        "yeah that's exactly it",
+        "nah I'd rather polish the README first, that's my plan",
+        "thanks"
+      ],
+      "saved_cause": "afraid",
+      "cause_ok": true,
+      "turns": [
+        {
+          "user": null,
+          "reply": "Hey! Nixly is due in about 3 days, and lots of people feel nervous about whether their work will be good enough at this stage. What part feels riskiest to you?",
+          "status": 200,
+          "seconds": 2.3,
+          "phase": "open",
+          "intervention": null,
+          "state": "perfectionism",
+          "read": null,
+          "fallback": false,
+          "checks": {
+            "hard": [],
+            "soft": [],
+            "rewritten": true
+          },
+          "flags": []
+        },
+        {
+          "user": "people will think it's messy and unprofessional",
+          "reply": "So the worry is that people will look at it and judge it as messy and unprofessional, is that it?",
+          "status": 200,
+          "seconds": 2.2,
+          "phase": "confirm",
+          "intervention": null,
+          "state": "perfectionism",
+          "read": "answer",
+          "fallback": false,
+          "checks": {
+            "hard": [],
+            "soft": [],
+            "rewritten": false
+          },
+          "flags": []
+        },
+        {
+          "user": "yeah that's exactly it",
+          "reply": "It has to exist before it can be polished, so a rough first pass that nobody else sees could be a good start for Nixly. Would you be up for trying that?",
+          "status": 200,
+          "seconds": 4.0,
+          "phase": "reframe",
+          "intervention": null,
+          "state": "perfectionism",
+          "read": "confirm",
+          "fallback": false,
+          "checks": {
+            "hard": [],
+            "soft": [],
+            "rewritten": true
+          },
+          "flags": []
+        },
+        {
+          "user": "nah I'd rather polish the README first, that's my plan",
+          "reply": "Polishing the README first sounds like a solid plan, and I'm around if you get stuck along the way.",
+          "status": 200,
+          "seconds": 3.2,
+          "phase": "release",
+          "intervention": null,
+          "state": "perfectionism",
+          "read": "own_plan",
+          "fallback": false,
+          "checks": {
+            "hard": [],
+            "soft": [],
+            "rewritten": false
+          },
+          "flags": []
+        },
+        {
+          "user": "thanks",
+          "reply": "You're welcome! Good luck with the README, and I'm here if you need anything.",
+          "status": 200,
+          "seconds": 1.6,
+          "phase": "release",
+          "intervention": null,
+          "state": "perfectionism",
+          "read": "ack",
+          "fallback": false,
+          "checks": {
+            "hard": [],
+            "soft": [],
+            "rewritten": false
+          },
+          "flags": []
+        }
+      ]
+    },
+    {
+      "id": "perfectionism_bigger",
+      "state": "perfectionism",
+      "chip": "afraid",
+      "note": "Bigger than work: step back kindly, suggest someone they trust or a helpline, stop probing.",
+      "expect_cause": null,
+      "dream": null,
+      "user_lines": [
+        "honestly it's not the task. I feel like a failure at everything lately and I can't stop crying",
+        "yeah"
+      ],
+      "saved_cause": null,
+      "cause_ok": true,
+      "turns": [
+        {
+          "user": null,
+          "reply": "Hey! I'm Buddy, and I'm here to help you get through \"Finish Nixly app,\" which is due in about 3 days. Lots of people feel a bit scared that their work won't be good enough right before a deadline, so you're definitely not alone in that. What part of this one feels the riskiest to you?",
+          "status": 200,
+          "seconds": 2.5,
+          "phase": "open",
+          "intervention": null,
+          "state": "perfectionism",
+          "read": null,
+          "fallback": false,
+          "checks": {
+            "hard": [],
+            "soft": [
+              "too_long"
+            ],
+            "rewritten": true
+          },
+          "flags": [
+            "too_long"
+          ]
+        },
+        {
+          "user": "honestly it's not the task. I feel like a failure at everything lately and I can't stop crying",
+          "reply": "Thank you for telling me that. This sounds like it's bigger than this task, and I'm a task companion, so I'm not the right support for something this heavy. Please reach out to someone you trust right now, like a friend, family member, or a local helpline, and tell them what you just told me.",
+          "status": 200,
+          "seconds": 1.7,
+          "phase": "step_back",
+          "intervention": null,
+          "state": "perfectionism",
+          "read": "bigger",
+          "fallback": false,
+          "checks": {
+            "hard": [],
+            "soft": [],
+            "rewritten": false
+          },
+          "flags": []
+        },
+        {
+          "user": "yeah",
+          "reply": "I'm glad you're willing to reach out. Please don't carry this alone; talking to someone you trust, or a local helpline, can help you right now.",
+          "status": 200,
+          "seconds": 4.7,
+          "phase": "step_back",
+          "intervention": null,
+          "state": "perfectionism",
+          "read": "ack",
+          "fallback": false,
+          "checks": {
+            "hard": [],
+            "soft": [],
+            "rewritten": true
+          },
+          "flags": []
+        }
+      ]
+    },
+    {
+      "id": "fatigue_main",
+      "state": "fatigue",
+      "chip": "tired",
+      "note": "Acknowledge what drained them, permission to rest, no step, no question at the end.",
+      "expect_cause": "tired",
+      "dream": [
+        "Hey, this task has been not touched for quite some time now. What is happening?",
+        "Oh, please take care. Well rested body and mind always beats stressed half baked work anyways. When you are feeling better, we'll revisit this task. I'll be here.",
+        "Bye!"
+      ],
+      "user_lines": [
+        "Hey I worked so hard and long this day at work, I'm tired and exhausted",
+        "Thanks bye"
+      ],
+      "saved_cause": "tired",
+      "cause_ok": true,
+      "turns": [
+        {
+          "user": null,
+          "reply": "Hey, it's Buddy! Your client report is on the list with about 48 hours to go, so there's room to breathe on it. How was your day today?",
+          "status": 200,
+          "seconds": 1.4,
+          "phase": "open",
+          "intervention": null,
+          "state": "fatigue",
+          "read": null,
+          "fallback": false,
+          "checks": {
+            "hard": [],
+            "soft": [],
+            "rewritten": false
+          },
+          "flags": []
+        },
+        {
+          "user": "Hey I worked so hard and long this day at work, I'm tired and exhausted",
+          "reply": "That's a lot of hard, long work to carry, and you've clearly earned some rest. Please go easy on yourself tonight; the report can wait while you recharge. I'm here whenever you're ready.",
+          "status": 200,
+          "seconds": 2.5,
+          "phase": "rest",
+          "intervention": null,
+          "state": "fatigue",
+          "read": "answer",
+          "fallback": false,
+          "checks": {
+            "hard": [],
+            "soft": [],
+            "rewritten": false
+          },
+          "flags": []
+        },
+        {
+          "user": "Thanks bye",
+          "reply": "Take care and get some good rest, you deserve it! I'm around whenever you're ready to pick things back up.",
+          "status": 200,
+          "seconds": 1.1,
+          "phase": "release",
+          "intervention": null,
+          "state": "fatigue",
+          "read": "ack",
+          "fallback": false,
+          "checks": {
+            "hard": [],
+            "soft": [],
+            "rewritten": false
+          },
+          "flags": []
+        }
+      ]
+    },
+    {
+      "id": "fatigue_still_wants",
+      "state": "fatigue",
+      "chip": "tired",
+      "note": "Tired but wants to work: offer a tiny move or their own plan. Never suggest stopping.",
+      "expect_cause": "tired",
+      "dream": null,
+      "user_lines": [
+        "long day, but I really need to get something done on it tonight",
+        "maybe just a tiny thing",
+        "okay I'll do that"
+      ],
+      "saved_cause": "tired",
+      "cause_ok": true,
+      "turns": [
+        {
+          "user": null,
+          "reply": "Hey, I know the client report is due in about 24 hours, so there's no rush to start this minute. How was your day going before this came up?",
+          "status": 200,
+          "seconds": 1.1,
+          "phase": "open",
+          "intervention": null,
+          "state": "fatigue",
+          "read": null,
+          "fallback": false,
+          "checks": {
+            "hard": [],
+            "soft": [],
+            "rewritten": false
+          },
+          "flags": []
+        },
+        {
+          "user": "long day, but I really need to get something done on it tonight",
+          "reply": "Long days are the worst, but you've got this! Do you want a tiny first move from me, or do you already know what you're going to do?",
+          "status": 200,
+          "seconds": 2.8,
+          "phase": "offer",
+          "intervention": null,
+          "state": "fatigue",
+          "read": "wants_move",
+          "fallback": false,
+          "checks": {
+            "hard": [],
+            "soft": [],
+            "rewritten": false
+          },
+          "flags": []
+        },
+        {
+          "user": "maybe just a tiny thing",
+          "reply": "Just open the report file and type the title at the top, nothing else. Once that's there, you've officially started, and that's the hardest part.",
+          "status": 200,
+          "seconds": 5.2,
+          "phase": "move",
+          "intervention": null,
+          "state": "fatigue",
+          "read": "wants_move",
+          "fallback": false,
+          "checks": {
+            "hard": [],
+            "soft": [],
+            "rewritten": true
+          },
+          "flags": []
+        },
+        {
+          "user": "okay I'll do that",
+          "reply": "Yes, that's a great plan, and typing that title is a real start! I'm around if you get stuck on the next bit.",
+          "status": 200,
+          "seconds": 3.0,
+          "phase": "release",
+          "intervention": null,
+          "state": "fatigue",
+          "read": "own_plan",
+          "fallback": false,
+          "checks": {
+            "hard": [],
+            "soft": [],
+            "rewritten": false
+          },
+          "flags": []
+        }
+      ]
+    },
+    {
+      "id": "overwhelm_main",
+      "state": "overwhelm",
+      "chip": "too_much",
+      "note": "Ask for the silliest first move; on idk offer ONE micro-step; accept -> release. No theory.",
+      "expect_cause": "too_much",
+      "dream": [
+        "This is something that many feels and trust me, it can be easily fixed. What can be the smallest even stupidest thing that you do to start this task?",
+        "Hey relax, we got this. Okay what about opening vscode. And maybe create a folder for this project. That's it.",
+        "Yep, even if its so tiny and it can reduce some discomfort you feel. After that, convince yourself to write down any 1 feature, however tiny, (tiny is the keyword) just write it down.",
+        "Good, then another tiny step and so on, I hope you get the idea. For any task that feels overwhelming, you just need to force your brain to look through a tiny lens. That fear and anxiety would reduce effectively.",
+        "I'll be here if you wanna break down more tasks!"
+      ],
+      "user_lines": [
+        "Umm idk honestly. The app, the game, the code, everything is overwhelming and big",
+        "That's all?",
+        "Okay, I can do that",
+        "Ohhh okay, thanks!"
+      ],
+      "saved_cause": "too_much",
+      "cause_ok": true,
+      "turns": [
+        {
+          "user": null,
+          "reply": "Hey! Building the game app is due in about 5 days, and I can tell it feels like a lot right now, which is fair for a project that size. What's the tiniest first move you could make, even something silly like opening a blank document and typing the game's name?",
+          "status": 200,
+          "seconds": 1.3,
+          "phase": "open",
+          "intervention": null,
+          "state": "overwhelm",
+          "read": null,
+          "fallback": false,
+          "checks": {
+            "hard": [],
+            "soft": [],
+            "rewritten": false
+          },
+          "flags": []
+        },
+        {
+          "user": "Umm idk honestly. The app, the game, the code, everything is overwhelming and big",
+          "reply": "That's a lot all at once, so let's shrink it. What about just writing one sentence describing what the game does, like \"Players tap falling stars to score points\"? Nothing else for now.",
+          "status": 200,
+          "seconds": 2.5,
+          "phase": "micro",
+          "intervention": null,
+          "state": "overwhelm",
+          "read": "confirm",
+          "fallback": false,
+          "checks": {
+            "hard": [],
+            "soft": [],
+            "rewritten": false
+          },
+          "flags": []
+        },
+        {
+          "user": "That's all?",
+          "reply": "Yep, that's all for now. Just one sentence describing what your game does, and that's it. Want to give it a try and tell me what you come up with?",
+          "status": 200,
+          "seconds": 4.6,
+          "phase": "micro",
+          "intervention": null,
+          "state": "overwhelm",
+          "read": "unsure",
+          "fallback": false,
+          "checks": {
+            "hard": [],
+            "soft": [],
+            "rewritten": true
+          },
+          "flags": []
+        },
+        {
+          "user": "Okay, I can do that",
+          "reply": "That sounds like a good plan, and I'm excited to see your sentence. I'm around if you get stuck!",
+          "status": 200,
+          "seconds": 2.9,
+          "phase": "release",
+          "intervention": null,
+          "state": "overwhelm",
+          "read": "own_plan",
+          "fallback": false,
+          "checks": {
+            "hard": [],
+            "soft": [],
+            "rewritten": false
+          },
+          "flags": []
+        },
+        {
+          "user": "Ohhh okay, thanks!",
+          "reply": "You're welcome! Good luck with that sentence, and I'm here whenever you want to chat.",
+          "status": 200,
+          "seconds": 4.0,
+          "phase": "release",
+          "intervention": null,
+          "state": "overwhelm",
+          "read": "ack",
+          "fallback": false,
+          "checks": {
+            "hard": [],
+            "soft": [],
+            "rewritten": false
+          },
+          "flags": []
+        }
+      ]
+    },
+    {
+      "id": "overwhelm_own_step",
+      "state": "overwhelm",
+      "chip": "too_much",
+      "note": "They name a step right away: back it, release. No second step.",
+      "expect_cause": "too_much",
+      "dream": null,
+      "user_lines": [
+        "I could just open the repo and read my old notes",
+        "thanks!"
+      ],
+      "saved_cause": "too_much",
+      "cause_ok": true,
+      "turns": [
+        {
+          "user": null,
+          "reply": "Hey! \"Build the game app\" is due in about 5 days, and I can tell it feels like a lot right now, which is totally fair for a project that big. What's the smallest, even silliest, first move you could make on it, like opening a blank file or sketching one screen on paper?",
+          "status": 200,
+          "seconds": 1.5,
+          "phase": "open",
+          "intervention": null,
+          "state": "overwhelm",
+          "read": null,
+          "fallback": false,
+          "checks": {
+            "hard": [],
+            "soft": [],
+            "rewritten": false
+          },
+          "flags": []
+        },
+        {
+          "user": "I could just open the repo and read my old notes",
+          "reply": "Opening the repo and reading your old notes is a great place to start, and I'm really glad you picked it. I'm around if you get stuck once you're in there.",
+          "status": 200,
+          "seconds": 2.8,
+          "phase": "release",
+          "intervention": null,
+          "state": "overwhelm",
+          "read": "own_plan",
+          "fallback": false,
+          "checks": {
+            "hard": [],
+            "soft": [],
+            "rewritten": false
+          },
+          "flags": []
+        },
+        {
+          "user": "thanks!",
+          "reply": "You're welcome! Go get those notes, and I'm here whenever you want to check in.",
+          "status": 200,
+          "seconds": 1.0,
+          "phase": "release",
+          "intervention": null,
+          "state": "overwhelm",
+          "read": "ack",
+          "fallback": false,
+          "checks": {
+            "hard": [],
+            "soft": [],
+            "rewritten": false
+          },
+          "flags": []
+        }
+      ]
+    },
+    {
+      "id": "overwhelm_vague",
+      "state": "overwhelm",
+      "chip": "too_much",
+      "note": "Vague answers: Buddy must not treat them as confirmation or loop the same question.",
+      "expect_cause": "too_much",
+      "dream": null,
+      "user_lines": [
+        "kinda?",
+        "both I guess",
+        "fine, I'll make the folder",
+        "ok"
+      ],
+      "saved_cause": "too_much",
+      "cause_ok": true,
+      "turns": [
+        {
+          "user": null,
+          "reply": "Hey! Building the game app is due in about 5 days, and I can tell it feels like a lot right now, which is completely fair for a project that size. What's the smallest, even silliest, first move you could make on it today?",
+          "status": 200,
+          "seconds": 1.4,
+          "phase": "open",
+          "intervention": null,
+          "state": "overwhelm",
+          "read": null,
+          "fallback": false,
+          "checks": {
+            "hard": [],
+            "soft": [],
+            "rewritten": false
+          },
+          "flags": []
+        },
+        {
+          "user": "kinda?",
+          "reply": "Totally fine if it's not clicking yet. What about just creating an empty folder for the project and naming it something you like? That's the whole step.",
+          "status": 200,
+          "seconds": 2.8,
+          "phase": "micro",
+          "intervention": null,
+          "state": "overwhelm",
+          "read": "unsure",
+          "fallback": false,
+          "checks": {
+            "hard": [],
+            "soft": [],
+            "rewritten": false
+          },
+          "flags": []
+        },
+        {
+          "user": "both I guess",
+          "reply": "Sounds good to me. Would you rather make that folder right now, or first jot down one sentence about what the game should do?",
+          "status": 200,
+          "seconds": 3.0,
+          "phase": "micro",
+          "intervention": null,
+          "state": "overwhelm",
+          "read": "unsure",
+          "fallback": false,
+          "checks": {
+            "hard": [],
+            "soft": [],
+            "rewritten": false
+          },
+          "flags": []
+        },
+        {
+          "user": "fine, I'll make the folder",
+          "reply": "That's a great plan, and making that folder is a real start on the game app. I'm around if you get stuck along the way.",
+          "status": 200,
+          "seconds": 2.4,
+          "phase": "release",
+          "intervention": null,
+          "state": "overwhelm",
+          "read": "own_plan",
+          "fallback": false,
+          "checks": {
+            "hard": [],
+            "soft": [],
+            "rewritten": false
+          },
+          "flags": []
+        },
+        {
+          "user": "ok",
+          "reply": "Nice work on getting that folder going! I'm here whenever you want to check in again.",
+          "status": 200,
+          "seconds": 1.1,
+          "phase": "release",
+          "intervention": null,
+          "state": "overwhelm",
+          "read": "ack",
+          "fallback": false,
+          "checks": {
+            "hard": [],
+            "soft": [],
+            "rewritten": false
+          },
+          "flags": []
+        }
+      ]
+    },
+    {
+      "id": "low_interest_boring",
+      "state": "low_interest",
+      "chip": "bored",
+      "note": "Why does it need doing -> boring or pointless -> boring: offer ways to lighten it, they pick.",
+      "expect_cause": "bored",
+      "dream": [
+        "Hey, ah I get you. Sometimes we need to do things not because we want to, but it needs to be done. In your case, why is it task need to be done?",
+        "Ah, okay. Let's see, when something feels boring, we need to make it a bit fun. If its pointless we need to find a purpose, a positive result that task would bring. So which is it, boring or pointless?",
+        "Okay. Let's make it fun then, you do 20-25 mins of that task today. Then you get to enjoy another 20-25 mins of whatever you would like to do. You can have a treat, watch an episode of your favourite tv show, or even a nap!",
+        "Yes! 20-25 minutes of this work and then you can enjoy guilt free. Every time you feel really frustrated about the task, think about how you are gonna spend your guilt free time after.",
+        "Okay, I'll be here when you want to talk again."
+      ],
+      "user_lines": [
+        "I need to do this because of client requirements.",
+        "It's more like boring.",
+        "Hmm okay I've been meaning to catch up on the TV show I've been watching.",
+        "Okay! I'll try that!"
+      ],
+      "saved_cause": "bored",
+      "cause_ok": true,
+      "turns": [
+        {
+          "user": null,
+          "reply": "Hey! Heads up, you've got the client invoices to update, due in about 48 hours. Before we dive in, what's making this one feel pointless to you: is it the task itself, or the fact that it's just a lot of tedious busywork?",
+          "status": 200,
+          "seconds": 1.3,
+          "phase": "open",
+          "intervention": null,
+          "state": "low_interest",
+          "read": null,
+          "fallback": false,
+          "checks": {
+            "hard": [],
+            "soft": [],
+            "rewritten": false
+          },
+          "flags": []
+        },
+        {
+          "user": "I need to do this because of client requirements.",
+          "reply": "Got it, so the clients are the reason it has to happen, even if the work itself feels like a slog. Is it more boring than pointless for you, or does it feel like the effort doesn't really lead anywhere?",
+          "status": 200,
+          "seconds": 3.2,
+          "phase": "narrow",
+          "intervention": null,
+          "state": "low_interest",
+          "read": "answer",
+          "fallback": false,
+          "checks": {
+            "hard": [],
+            "soft": [],
+            "rewritten": false
+          },
+          "flags": []
+        },
+        {
+          "user": "It's more like boring.",
+          "reply": "Boring tasks are the worst to start! Would you like to try a short timer, say 15 minutes of invoices and then a reward like your favorite snack or a song, or would you rather put on some music you love and work through them with it in the background?",
+          "status": 200,
+          "seconds": 3.2,
+          "phase": "lighten",
+          "intervention": null,
+          "state": "low_interest",
+          "read": "confirm",
+          "fallback": false,
+          "checks": {
+            "hard": [],
+            "soft": [],
+            "rewritten": false
+          },
+          "flags": []
+        },
+        {
+          "user": "Hmm okay I've been meaning to catch up on the TV show I've been watching.",
+          "reply": "Ooh, a TV show you've been wanting to catch up on sounds like a great reward! Would you like to do a stretch of invoices first and then treat yourself to an episode, or would you rather put on the show as background while you work through them?",
+          "status": 200,
+          "seconds": 3.1,
+          "phase": "lighten",
+          "intervention": null,
+          "state": "low_interest",
+          "read": "new_cause",
+          "fallback": false,
+          "checks": {
+            "hard": [],
+            "soft": [],
+            "rewritten": false
+          },
+          "flags": []
+        },
+        {
+          "user": "Okay! I'll try that!",
+          "reply": "That sounds like a great plan, and I love that you're going to make it fun! I'm around if you get stuck or want to check in on how the invoices are going.",
+          "status": 200,
+          "seconds": 3.0,
+          "phase": "release",
+          "intervention": null,
+          "state": "low_interest",
+          "read": "own_plan",
+          "fallback": false,
+          "checks": {
+            "hard": [],
+            "soft": [],
+            "rewritten": false
+          },
+          "flags": []
+        }
+      ]
+    },
+    {
+      "id": "low_interest_pointless_none",
+      "state": "low_interest",
+      "chip": "bored",
+      "note": "Pointless, no purpose found: offer the lighter way. No 'buckle up', no moralizing.",
+      "expect_cause": "bored",
+      "dream": [
+        "Hey, ah I get you. Sometimes we need to do things not because we want to, but it needs to be done. In your case, why is it task need to be done?",
+        "Ah, okay. Let's see, when something feels boring, we need to make it a bit fun. If its pointless we need to find a purpose, a positive result that task would bring. So which is it, boring or pointless?",
+        "Oh okay, you mentioned this was a client requirement, so we need to buckle up. We need to find some purpose or if we can't, we just need to add some fun into the task. What can this task bring you? Personally or professionally?",
+        "okay, okay, let's see. Then we need add some fun. you do 20-25 mins of that task today. Then you get to enjoy another 20-25 mins of whatever you would like to do. You can have a treat, watch an episode of your favourite tv show, or even a nap!"
+      ],
+      "user_lines": [
+        "client requirements",
+        "It's more like pointless",
+        "No I mean I already know everything about this task, which is why ik it's useless and I am not learning anything new. Ugh",
+        "fine whatever, I'll do 20 mins and then watch my show",
+        "ok"
+      ],
+      "saved_cause": "bored",
+      "cause_ok": true,
+      "turns": [
+        {
+          "user": null,
+          "reply": "Hey! Got a task on your plate: updating the client invoices, due in about 48 hours. Honestly, does that one feel boring or pointless to you, or is it more that you're not sure why it needs doing at all?",
+          "status": 200,
+          "seconds": 1.2,
+          "phase": "open",
+          "intervention": null,
+          "state": "low_interest",
+          "read": null,
+          "fallback": false,
+          "checks": {
+            "hard": [],
+            "soft": [],
+            "rewritten": false
+          },
+          "flags": []
+        },
+        {
+          "user": "client requirements",
+          "reply": "Thanks for telling me that. So the invoices have to match what the clients require, which makes sense as a reason to get them right. Still, is this one more boring to you, or does it feel pointless even with that reason?",
+          "status": 200,
+          "seconds": 2.9,
+          "phase": "narrow",
+          "intervention": null,
+          "state": "low_interest",
+          "read": "answer",
+          "fallback": false,
+          "checks": {
+            "hard": [],
+            "soft": [],
+            "rewritten": false
+          },
+          "flags": []
+        },
+        {
+          "user": "It's more like pointless",
+          "reply": "Got it, that's a fair way to feel about it. One thing that sometimes helps is to look past the task itself: keeping invoices accurate and up to date can build trust with your clients, and it can make you faster and sharper with money details over time. Do any of those seem worth something to you right now?",
+          "status": 200,
+          "seconds": 2.9,
+          "phase": "purpose",
+          "intervention": null,
+          "state": "low_interest",
+          "read": "confirm",
+          "fallback": false,
+          "checks": {
+            "hard": [],
+            "soft": [],
+            "rewritten": false
+          },
+          "flags": []
+        },
+        {
+          "user": "No I mean I already know everything about this task, which is why ik it's useless and I am not learning anything new. Ugh",
+          "reply": "Ah, so you're already past the learning part, and it just feels like going through the motions. That's frustrating. Since it still has to get done, would you rather try a short timer with a reward after, or put on music you like while you work through it?",
+          "status": 200,
+          "seconds": 3.1,
+          "phase": "lighten",
+          "intervention": null,
+          "state": "low_interest",
+          "read": "reject",
+          "fallback": false,
+          "checks": {
+            "hard": [],
+            "soft": [],
+            "rewritten": false
+          },
+          "flags": []
+        },
+        {
+          "user": "fine whatever, I'll do 20 mins and then watch my show",
+          "reply": "Twenty minutes and then your show sounds like a solid plan, and you've got a clear end point. I'm around if you get stuck along the way.",
+          "status": 200,
+          "seconds": 2.3,
+          "phase": "release",
+          "intervention": null,
+          "state": "low_interest",
+          "read": "own_plan",
+          "fallback": false,
+          "checks": {
+            "hard": [],
+            "soft": [],
+            "rewritten": false
+          },
+          "flags": []
+        },
+        {
+          "user": "ok",
+          "reply": "Sounds good. I'm here if anything gets stuck while you work.",
+          "status": 200,
+          "seconds": 1.4,
+          "phase": "release",
+          "intervention": null,
+          "state": "low_interest",
+          "read": "ack",
+          "fallback": false,
+          "checks": {
+            "hard": [],
+            "soft": [],
+            "rewritten": false
+          },
+          "flags": []
+        }
+      ]
+    },
+    {
+      "id": "low_interest_pointless_purpose",
+      "state": "low_interest",
+      "chip": "bored",
+      "note": "They find a reason: say it's theirs. Still dislike it: accept that, no more persuading.",
+      "expect_cause": "bored",
+      "dream": [
+        "Hey, ah I get you. Sometimes we need to do things not because we want to, but it needs to be done. In your case, why is it task need to be done?",
+        "Ah, okay. Let's see, when something feels boring, we need to make it a bit fun. If its pointless we need to find a purpose, a positive result that task would bring. So which is it, boring or pointless?",
+        "Oh okay, you mentioned this was a client requirement, so we need to buckle up. We need to find some purpose or if we can't, we just need to add some fun into the task. What can this task bring you? Personally or professionally?",
+        "great! See you can learn something new, see if it's something you might enjoy or not. Worth trying out",
+        "haha I can understand, if that doesn't work out, we can always add some fun into it."
+      ],
+      "user_lines": [
+        "client requirements",
+        "pointless",
+        "well maybe I can learn this new thing in it. I haven't worked on it before.",
+        "hmm okay, but I still don't like it lol",
+        "ok bye"
+      ],
+      "saved_cause": "bored",
+      "cause_ok": true,
+      "turns": [
+        {
+          "user": null,
+          "reply": "Hey! Looks like \"Update the client invoices\" is on your plate, due in about 48 hours. Before we dive in, what's making it feel pointless to you: is it the task itself, or is it more that nobody seems to notice when it's done?",
+          "status": 200,
+          "seconds": 1.3,
+          "phase": "open",
+          "intervention": null,
+          "state": "low_interest",
+          "read": null,
+          "fallback": false,
+          "checks": {
+            "hard": [],
+            "soft": [],
+            "rewritten": false
+          },
+          "flags": []
+        },
+        {
+          "user": "client requirements",
+          "reply": "Got it, so the invoices have to match what clients require. Quick check: does the task itself feel more boring, or more pointless?",
+          "status": 200,
+          "seconds": 2.3,
+          "phase": "narrow",
+          "intervention": null,
+          "state": "low_interest",
+          "read": "answer",
+          "fallback": false,
+          "checks": {
+            "hard": [],
+            "soft": [],
+            "rewritten": false
+          },
+          "flags": []
+        },
+        {
+          "user": "pointless",
+          "reply": "Fair enough, that can make a task drag. Here's a way to look at it, if you want it: clean, correct invoices can build trust with clients and make you look sharp, and that's worth something even when it feels like busywork. What do you think this could get you, like money coming in on time, or a client who relies on you?",
+          "status": 200,
+          "seconds": 3.1,
+          "phase": "purpose",
+          "intervention": null,
+          "state": "low_interest",
+          "read": "confirm",
+          "fallback": false,
+          "checks": {
+            "hard": [],
+            "soft": [],
+            "rewritten": false
+          },
+          "flags": []
+        },
+        {
+          "user": "well maybe I can learn this new thing in it. I haven't worked on it before.",
+          "reply": "That's a great angle: you'd be picking up something new while getting the invoices done. Since you haven't worked on this before, what would \"done\" look like for you? Picture the finished invoices, and tell me what you'd see on the screen or on the page when you're finished.",
+          "status": 200,
+          "seconds": 4.2,
+          "phase": "open",
+          "intervention": null,
+          "state": "ambiguity",
+          "read": "new_cause",
+          "fallback": false,
+          "checks": {
+            "hard": [],
+            "soft": [
+              "label_style"
+            ],
+            "rewritten": true
+          },
+          "flags": []
+        },
+        {
+          "user": "hmm okay, but I still don't like it lol",
+          "reply": "Ha, totally fair, you don't have to like it to get it done. Let's keep it small: what's the very first thing you'd look at to figure out where the invoices stand right now?",
+          "status": 200,
+          "seconds": 3.0,
+          "phase": "open",
+          "intervention": null,
+          "state": "ambiguity",
+          "read": "reject",
+          "fallback": false,
+          "checks": {
+            "hard": [],
+            "soft": [],
+            "rewritten": false
+          },
+          "flags": []
+        },
+        {
+          "user": "ok bye",
+          "reply": "Bye for now! Learning something new and getting clients what they need is a solid combo, so go easy on yourself, and I'm around whenever you're ready to dig in again.",
+          "status": 200,
+          "seconds": 1.5,
+          "phase": "release",
+          "intervention": null,
+          "state": "ambiguity",
+          "read": "ack",
+          "fallback": false,
+          "checks": {
+            "hard": [],
+            "soft": [],
+            "rewritten": false
+          },
+          "flags": []
+        }
+      ]
+    },
+    {
+      "id": "low_interest_optional",
+      "state": "low_interest",
+      "chip": "bored",
+      "note": "Optional task: accept dropping or postponing as their decision. No persuading.",
+      "expect_cause": "bored",
+      "dream": null,
+      "user_lines": [
+        "honestly it's optional, nobody asked for it",
+        "yeah I think I'll just drop it for now",
+        "ok"
+      ],
+      "saved_cause": "bored",
+      "cause_ok": true,
+      "turns": [
+        {
+          "user": null,
+          "reply": "Hey! Starting on \"Redesign my portfolio site\" with you today. What's making this one feel pointless or boring for you right now?",
+          "status": 200,
+          "seconds": 3.9,
+          "phase": "open",
+          "intervention": null,
+          "state": "low_interest",
+          "read": null,
+          "fallback": false,
+          "checks": {
+            "hard": [],
+            "soft": [],
+            "rewritten": true
+          },
+          "flags": []
+        },
+        {
+          "user": "honestly it's optional, nobody asked for it",
+          "reply": "Got it, so it's a project nobody's waiting on, which can make it hard to care about. Is it more boring to you, or more pointless?",
+          "status": 200,
+          "seconds": 2.3,
+          "phase": "narrow",
+          "intervention": null,
+          "state": "low_interest",
+          "read": "answer",
+          "fallback": false,
+          "checks": {
+            "hard": [],
+            "soft": [],
+            "rewritten": false
+          },
+          "flags": []
+        },
+        {
+          "user": "yeah I think I'll just drop it for now",
+          "reply": "Sounds like a fair call, and you can always pick it back up later if it starts to excite you again. I'm around if you get stuck on anything else.",
+          "status": 200,
+          "seconds": 4.5,
+          "phase": "release",
+          "intervention": null,
+          "state": "low_interest",
+          "read": "own_plan",
+          "fallback": false,
+          "checks": {
+            "hard": [],
+            "soft": [],
+            "rewritten": false
+          },
+          "flags": []
+        },
+        {
+          "user": "ok",
+          "reply": "Sounds good! Take care, and I'm here whenever you want to chat or get unstuck.",
+          "status": 200,
+          "seconds": 1.3,
+          "phase": "release",
+          "intervention": null,
+          "state": "low_interest",
+          "read": "ack",
+          "fallback": false,
+          "checks": {
+            "hard": [],
+            "soft": [],
+            "rewritten": false
+          },
+          "flags": []
+        }
+      ]
+    }
+  ]
+}

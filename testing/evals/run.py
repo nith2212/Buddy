@@ -118,7 +118,7 @@ def load_frameworks() -> tuple[str, dict[str, str]]:
 # ── Groq: patient calls + usage accounting ───────────────────────────────────────────────
 
 class Usage(logging.Handler):
-    """Counts calls and tokens from brain.llm's 'groq usage' log line, split writer vs grader."""
+    """Counts calls and tokens from brain.llm's 'llm usage' log line, split writer vs grader."""
 
     def __init__(self):
         super().__init__(logging.INFO)
@@ -126,7 +126,7 @@ class Usage(logging.Handler):
         self.totals = {r: {"calls": 0, "prompt": 0, "completion": 0} for r in ("pipeline", "grader")}
 
     def emit(self, record):
-        if record.getMessage().startswith("groq usage") and record.args:
+        if record.getMessage().startswith("llm usage") and record.args:
             t = self.totals[self.role]
             t["calls"] += 1
             t["prompt"] += int(record.args[0] or 0)
@@ -366,9 +366,10 @@ def main() -> None:
 
     from testing.evals.scenarios import SCENARIOS
 
-    if not os.getenv("GROQ_API_KEY"):
-        sys.exit("GROQ_API_KEY is not set (it is read from buddy/.env).")
     model = os.getenv("GROQ_MODEL", llm.DEFAULT_MODEL)
+    needed = "ANTHROPIC_API_KEY" if model.startswith("claude-") else "GROQ_API_KEY"
+    if not os.getenv(needed):
+        sys.exit(f"{needed} is not set (it is read from buddy/.env).")
     usage = Usage()
     logging.getLogger("brain.llm").addHandler(usage)
     logging.getLogger("brain.llm").setLevel(logging.INFO)
