@@ -118,6 +118,7 @@ READ_CASES = [
     ("perfectionism", OFFER_CHOICE, "idk, you pick", "wants_move", None),
     ("fatigue", OFFER_CHOICE, "maybe just a tiny thing", "wants_move", None),
     ("ambiguity", OFFER_CHOICE, "tiny move please", "wants_move", None),
+    ("ambiguity", OFFER_CHOICE, "maybe the swipe thing?", "answer", None),
     ("overwhelm", ASK_TINY, "can you just tell me what to do first?", "wants_move", None),
 
     # ack

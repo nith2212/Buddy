@@ -73,6 +73,14 @@ def test_unclear_reading_stays_and_two_tries_offer_the_choice():
     assert next_stage("ambiguity", "core", R("unclear"), 2).stage == "offer"
 
 
+def test_naming_a_part_after_the_offer_asks_for_their_first_step_instead_of_wrapping_up():
+    # eval 2026-11-04: "maybe the swipe thing?" after the offer was read as a plan and Buddy wrapped up
+    step = next_stage("ambiguity", "offer", R("answer", fact="the swipe thing"), 1)
+    assert (step.stage, step.note) == ("first_step", ("core", "the swipe thing"))
+    assert next_stage("ambiguity", "offer", R("wants_move"), 1).stage == "suggest"
+    assert next_stage("overwhelm", "offer", R("answer"), 1).stage == flow.FRAMEWORKS["overwhelm"].tiny
+
+
 def test_reframe_declined_without_their_own_plan_offers_the_choice():
     assert next_stage("perfectionism", "reframe", R("reject"), 1).stage == "offer"
     assert next_stage("perfectionism", "offer", R("wants_move"), 1).stage == "reframe"

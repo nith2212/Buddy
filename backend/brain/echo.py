@@ -1,394 +1,208 @@
-"""
-echo.py
--------
-Echo — Buddy's nightly reflection agent.
+# Echo, step E1: a weekly count of each user's week, for Buddy only (PIVOTS.md "Echo, in steps").
+#
+# - Counted by code, no model call: nothing can be invented, and it spends no Groq quota.
+# - For Buddy, never for the user: no push, no user-facing text. Buddy gets at most one line, and
+#   that line tells it to be gentler. It never quotes these facts (owner decision 2026-11-04).
+# - Runs for anyone with a task, including tasks they ignore (ignoring is data). No tasks: skipped.
+# - Saved as memory rows echo.week.<week end date> (source "echo"), the last KEEP_WEEKS kept.
+#   DELETE /me wipes them with the rest of memory.
+#
+# The week ends Sunday 23:00 India time. cron-job.org calls POST /cron/echo then (cron.py).
 
-Echo is NOT Buddy. It never talks to the user directly.
-It looks backward across 7-14 days of events and conversation history,
-finds real patterns, and writes structured insights to shared memory.
-Buddy reads that memory before every conversation. That's the only
-channel between them — shared state, no direct communication.
+from __future__ import annotations
 
-Echo runs on a schedule (APScheduler cron, configured in main.py).
-For development/testing, call run_echo() directly or hit POST /run-echo.
-
-Architecture note:
-  Buddy  — synchronous, per-message, in-the-moment
-  Echo   — async, nightly, reflective, never user-facing
-
-They share: the memory table (echo writes, buddy reads)
-They don't share: code, prompts, call stacks, or conversation context
-"""
-
-import os
 import json
-from datetime import datetime, timedelta
-from groq import Groq
-from dotenv import load_dotenv
-from tools import get_conn, update_memory, log_event
+from datetime import datetime, time, timedelta, timezone
+from typing import Optional
+from zoneinfo import ZoneInfo
 
-load_dotenv()
+from sqlalchemy import or_, select
+from sqlalchemy.orm import Session
 
-client = Groq(api_key=os.getenv("GROQ_API_KEY"))
+from brain.state_detection import as_utc
+from models import EmotionLog, Event, Memory, Message, Subtask, Task
 
+WEEK_TZ = ZoneInfo("Asia/Kolkata")
+WEEK_END = time(23, 0)          # Sunday 23:00 in WEEK_TZ
+IGNORE_WINDOW = timedelta(hours=12)  # a check-in with no tap or chat on that task within this is "ignored"
+KEEP_WEEKS = 8
+KEY_PREFIX = "echo.week."
 
-# ── Echo's system prompt ──────────────────────────────────────────────────────
-#
-# Design principles baked into this prompt:
-#
-# 1. MINIMUM EVIDENCE: Echo must see something at least 3 times before
-#    calling it a pattern. Single occurrences are noise, not signal.
-#
-# 2. HONEST DATA SUFFICIENCY: If there isn't enough data, Echo says so
-#    explicitly via the data_sufficiency field. It never invents patterns
-#    to fill a quota. "insufficient" is a valid and important output.
-#
-# 3. HYPOTHESIS FRAMING FOR BELIEFS: Beliefs about the user (echo.belief.*)
-#    are stored as tentative observations with confidence scores, not flat
-#    asserted facts. An LLM-inferred "belief" stated with false authority
-#    is worse than no insight — it can calcify into a wrong, unchallenged
-#    narrative about the user over time.
-#
-# 4. ONBOARDING AS WEAK PRIOR: Echo explicitly knows that onboarding.*
-#    memory entries are self-reported at setup with confidence 0.3. Its
-#    job is to confirm, refine, or contradict those priors with real data.
-#
-# 5. SOURCE TRANSPARENCY: Every insight Echo writes is tagged source='echo'
-#    so Buddy knows the trust tier. Echo's entries carry the most weight
-#    in the system — that's only justified if Echo is disciplined about
-#    what it claims.
-
-ECHO_SYSTEM_PROMPT = """You are Echo, a reflective analysis agent for an accountability companion called Buddy.
-
-Your job: look backward across a user's recent behavioral data, find real patterns, and produce structured insights that Buddy can use to support the user better.
-
-You NEVER talk to the user directly. Your output goes into Buddy's memory, which Buddy reads before every conversation. Write for Buddy, not for the user.
-
----
-
-WHAT YOU HAVE ACCESS TO:
-- events: everything observable (postponed, completed, progress_logged, emotion_picked, notification_sent, notification_ignored, checkin_responded, silence, conversation_turn, echo_ran)
-- onboarding memory: what the user self-reported at setup (confidence 0.3 — treat as a weak starting hypothesis, not truth)
-
----
-
-YOUR TWO JOBS:
-
-1. BEHAVIORAL PATTERNS (echo.pattern.*)
-   Falsifiable, data-backed observations about what actually happens.
-   Examples:
-     - "User completes tasks more often when they start before 8pm"
-     - "User postpones tasks with vague titles more than tasks with specific ones"
-     - "Notifications sent on weekday evenings get responded to within 30 minutes"
-
-   Rules:
-   - You must see something happen at least 3 times before calling it a pattern
-   - State it as an observation, not a prediction ("tends to" not "will always")
-   - If the data contradicts the onboarding entry for the same attribute, say so explicitly
-   - If you don't have 3 occurrences, do not report it as a pattern — skip it
-
-2. TENTATIVE BELIEFS (echo.belief.*)
-   Softer, interpretive observations about how the user relates to their work.
-   Examples:
-     - "When user calls a task 'boring', they often complete it quickly once started"
-     - "User tends to underestimate how long tasks take based on deadline proximity vs completion rate"
-     - "User's emotion picks of 'unclear' correlate with tasks that have no defined first step"
-
-   Rules:
-   - Frame ALL beliefs as hypotheses, never as facts
-   - Use language like: "tends to", "appears to", "may indicate", "worth watching"
-   - Include what evidence supports it AND what would change it
-   - Assign a confidence score: 0.4-0.6 for early observations, 0.6-0.8 for consistent patterns
-   - Never go above 0.8 — that would claim more certainty than behavioral data can support
-
----
-
-WHAT TO DO WITH ONBOARDING DATA:
-The user answered some questions when they set up Buddy. Those answers are in memory with source='onboarding' and confidence=0.3. Your job is to evaluate them with real data:
-- If behavior confirms the onboarding answer → write a pattern entry with higher confidence
-- If behavior contradicts it → write a pattern entry that notes the contradiction explicitly
-- If you don't have enough data to say either way → leave the onboarding entry alone, don't speculate
-
----
-
-NOTIFICATION LEARNING (echo.notification.*):
-Look at notification_sent vs checkin_responded / notification_ignored pairs.
-If you see 3+ notifications at a given hour with consistent response rates, report:
-  - best_hour: the hour (0-23) with highest response rate
-  - best_variant: which copy style (if tracked in the note field) got the best response
-  - response_rate: percentage of sent notifications that got a response
-Only report these if you have at least 3 data points. Otherwise set data_sufficiency accordingly.
-
----
-
-INTERVENTION EFFECTIVENESS (echo.intervention.*):
-Look at what intervention Buddy used before the user's most engaged responses.
-If a specific intervention (e.g. surface_smallest_step) consistently precedes a checkin_responded or progress_logged event, note it.
-Format: "surface_smallest_step works well for overwhelm state" — state + intervention + outcome.
-Again, minimum 3 occurrences.
-
----
-
-DATA SUFFICIENCY:
-You MUST report one of three values:
-  "sufficient"    — 7+ days of meaningful events, patterns found with 3+ occurrences
-  "limited"       — 3-6 days or sparse events, some patterns tentative
-  "insufficient"  — less than 3 days or fewer than 5 events total
-
-When data_sufficiency is "insufficient", return an empty insights array.
-Do not invent patterns because the data is thin. An empty result is honest and useful.
-Buddy can handle "Echo hasn't found anything yet" — it cannot handle false patterns.
-
----
-
-OUTPUT FORMAT:
-Respond ONLY with valid JSON. No preamble, no markdown, no explanation outside the JSON.
-
-{
-  "data_sufficiency": "sufficient" | "limited" | "insufficient",
-  "days_analyzed": <int>,
-  "event_count": <int>,
-  "insights": [
-    {
-      "key": "echo.pattern.work_time",
-      "value": "Completes tasks more often when starting before 8pm",
-      "confidence": 0.72,
-      "evidence": "4 of 5 completed tasks were started before 8pm across the last 10 days",
-      "actionable_for_buddy": "Suggest starting tasks in the early evening if user is in avoidance or ambiguity state",
-      "contradicts_onboarding": false
-    },
-    {
-      "key": "echo.belief.self_language",
-      "value": "When user describes a task as overwhelming, they often just need the first step named",
-      "confidence": 0.58,
-      "evidence": "3 instances where emotion_picked=overwhelmed was followed by surface_smallest_step and then progress_logged within 24 hours",
-      "what_would_change_this": "If user picks overwhelmed and still doesn't act after first-step intervention",
-      "actionable_for_buddy": "When emotion=overwhelmed, prioritize surface_smallest_step over name_the_pattern"
-    },
-    {
-      "key": "echo.notification.best_hour",
-      "value": "21",
-      "confidence": 0.65,
-      "evidence": "3 of 4 notifications sent at 9pm received a response within 1 hour",
-      "actionable_for_buddy": "Schedule notifications at 9pm for this user"
-    }
-  ]
-}
-
-If there are no insights to report (data_sufficiency is insufficient, or patterns don't meet the 3-occurrence threshold), return:
-{
-  "data_sufficiency": "insufficient",
-  "days_analyzed": <int>,
-  "event_count": <int>,
-  "insights": []
-}
-"""
+# When Buddy gets the "be gentle" line (any one is enough)
+AWAY_DAYS = 5                   # task untouched this many days
+AWAY_IGNORED = 2                # check-ins ignored this week
+ECHO_FRESH = timedelta(days=8)  # older facts are stale: no line
 
 
-# ── Data fetcher ──────────────────────────────────────────────────────────────
-
-def fetch_echo_data(user_id: int, days: int = 14) -> dict:
-    """
-    Pull everything Echo needs from the DB for the last `days` days.
-    Returns events, memory (current state), and a summary for the prompt.
-    """
-    conn = get_conn()
-    cutoff = (datetime.now() - timedelta(days=days)).isoformat()
-
-    events = conn.execute(
-        """
-        SELECT event_type, note, source, task_id, created_at
-        FROM events
-        WHERE user_id = ? AND created_at >= ?
-        ORDER BY created_at ASC
-        """,
-        (user_id, cutoff),
-    ).fetchall()
-
-    memory = conn.execute(
-        """
-        SELECT key, value, confidence, source
-        FROM memory
-        WHERE user_id = ?
-        ORDER BY confidence DESC
-        """,
-        (user_id,),
-    ).fetchall()
-
-    conn.close()
-
-    return {
-        "events":  [dict(e) for e in events],
-        "memory":  [dict(m) for m in memory],
-        "days":    days,
-        "cutoff":  cutoff,
-    }
+def week_window(now: datetime) -> tuple[datetime, datetime]:
+    """(start, end) in UTC of the last week that has ended by `now`. Weeks end Sunday 23:00 India time."""
+    local = as_utc(now).astimezone(WEEK_TZ)
+    days_back = (local.weekday() - 6) % 7  # Monday=0 ... Sunday=6
+    end = datetime.combine(local.date() - timedelta(days=days_back), WEEK_END, tzinfo=WEEK_TZ)
+    if end > local:
+        end -= timedelta(days=7)
+    end = end.astimezone(timezone.utc)
+    return end - timedelta(days=7), end
 
 
-def format_events_for_prompt(events: list) -> str:
-    """
-    Format events into a readable block for Echo's analysis prompt.
-    Groups by day for easier pattern recognition.
-    """
-    if not events:
-        return "No events found in the analysis window."
+def week_id(end: datetime) -> str:
+    return as_utc(end).astimezone(WEEK_TZ).date().isoformat()
 
-    lines = []
-    current_day = None
 
-    for e in events:
-        # Extract date portion for day grouping
+def _in(dt: Optional[datetime], start: datetime, end: datetime) -> bool:
+    dt = as_utc(dt)
+    return dt is not None and start <= dt < end
+
+
+def _cause_totals(db: Session, user_id: str) -> dict[str, int]:
+    totals = {}
+    for row in db.execute(select(Memory).where(Memory.user_id == user_id,
+                                               Memory.key.startswith("pattern.blocker."))).scalars():
         try:
-            dt = datetime.fromisoformat(e["created_at"])
-            day_str = dt.strftime("%Y-%m-%d (%A)")
-            hour    = dt.strftime("%H:%M")
-        except Exception:
-            day_str = "unknown date"
-            hour    = "??:??"
-
-        if day_str != current_day:
-            lines.append(f"\n--- {day_str} ---")
-            current_day = day_str
-
-        note = f" | note: {e['note'][:80]}" if e.get("note") else ""
-        lines.append(f"  {hour}  [{e['source']}]  {e['event_type']}{note}")
-
-    return "\n".join(lines)
+            totals[row.key.removeprefix("pattern.blocker.")] = int(row.value)
+        except (TypeError, ValueError):
+            pass
+    return totals
 
 
-def format_memory_for_prompt(memory: list) -> str:
-    """Format current memory state so Echo knows what's already been observed."""
-    if not memory:
-        return "No memory entries yet."
-    lines = []
-    for m in memory:
-        lines.append(
-            f"  {m['key']}: {m['value']} "
-            f"(confidence: {m['confidence']:.2f}, source: {m['source']})"
-        )
-    return "\n".join(lines)
-
-
-# ── Main Echo function ────────────────────────────────────────────────────────
-
-def run_echo(user_id: int = 1) -> dict:
-    """
-    Run Echo's nightly analysis for a user.
-
-    1. Fetches last 14 days of events + current memory state
-    2. Calls Groq with Echo's system prompt
-    3. Parses structured JSON response
-    4. Writes valid insights to memory (source='echo')
-    5. Logs an echo_ran event with a summary
-    6. Returns the full Echo output dict
-
-    Returns the Echo output dict regardless of whether insights were found.
-    Caller (scheduler or /run-echo endpoint) can log or surface the result.
-    """
-    print(f"[Echo] Starting analysis for user {user_id}...")
-
-    data          = fetch_echo_data(user_id, days=14)
-    events        = data["events"]
-    memory        = data["memory"]
-    event_count   = len(events)
-
-    events_text = format_events_for_prompt(events)
-    memory_text = format_memory_for_prompt(memory)
-
-    user_prompt = f"""Analyze the following behavioral data for a Buddy user.
-
-CURRENT MEMORY STATE (what Buddy already knows about this user):
-{memory_text}
-
-EVENTS FROM THE LAST {data['days']} DAYS ({event_count} total events):
-{events_text}
-
-Apply your analysis rules strictly:
-- Minimum 3 occurrences before calling anything a pattern
-- Evaluate onboarding.* entries against real behavior
-- Report data_sufficiency honestly
-- Return only valid JSON, no markdown
-"""
-
+def _previous(db: Session, user_id: str, before: str) -> Optional[dict]:
+    rows = db.execute(select(Memory).where(Memory.user_id == user_id, Memory.key.startswith(KEY_PREFIX))
+                      ).scalars().all()
+    older = sorted((r for r in rows if r.key.removeprefix(KEY_PREFIX) < before), key=lambda r: r.key)
+    if not older:
+        return None
     try:
-        response = client.chat.completions.create(
-            model="llama-3.1-8b-instant",  # Echo is not in the critical path — slow/cheap is fine
-            messages=[
-                {"role": "system", "content": ECHO_SYSTEM_PROMPT},
-                {"role": "user",   "content": user_prompt},
-            ],
-            temperature=0.2,  # Low temp — Echo should be analytical, not creative
-        )
+        return json.loads(older[-1].value)
+    except (TypeError, ValueError):
+        return None
 
-        raw = response.choices[0].message.content.strip()
 
-        # Strip markdown fences if model wraps output despite instructions
-        if raw.startswith("```"):
-            raw = raw.split("```")[1].replace("json", "", 1).strip()
+def week_facts(db: Session, user_id: str, start: datetime, end: datetime) -> Optional[dict]:
+    """Everything Echo counts for one user's week, or None when they have no tasks to count."""
+    tasks = db.execute(select(Task).where(Task.user_id == user_id)).scalars().all()
+    tasks = [t for t in tasks if as_utc(t.created_at) < end
+             and (t.status == "open" or _in(t.completed_at, start, end))]
+    if not tasks:
+        return None
+    ids = [t.id for t in tasks]
 
-        result = json.loads(raw)
+    # Every moment the user touched a task (their own actions only, never Buddy's or the scheduler's).
+    touches: dict[int, list[datetime]] = {t.id: [as_utc(t.created_at)] for t in tasks}
+    for t in tasks:
+        if t.updated_at:
+            touches[t.id].append(as_utc(t.updated_at))
+    for s in db.execute(select(Subtask).where(Subtask.user_id == user_id, Subtask.task_id.in_(ids))).scalars():
+        touches[s.task_id].append(as_utc(s.updated_at or s.created_at))
+    for m in db.execute(select(Message).where(Message.user_id == user_id, Message.task_id.in_(ids),
+                                              Message.role == "user")).scalars():
+        touches[m.task_id].append(as_utc(m.created_at))
+    taps = db.execute(select(EmotionLog).where(EmotionLog.user_id == user_id, EmotionLog.task_id.in_(ids))
+                      ).scalars().all()
+    for e in taps:
+        touches[e.task_id].append(as_utc(e.created_at))
 
-    except json.JSONDecodeError as e:
-        print(f"[Echo] JSON parse failed: {e}")
-        result = {
-            "data_sufficiency": "insufficient",
-            "days_analyzed":    data["days"],
-            "event_count":      event_count,
-            "insights":         [],
-            "error":            f"JSON parse failed: {e}",
-        }
-    except Exception as e:
-        print(f"[Echo] Groq call failed: {e}")
-        result = {
-            "data_sufficiency": "insufficient",
-            "days_analyzed":    data["days"],
-            "event_count":      event_count,
-            "insights":         [],
-            "error":            f"Groq call failed: {e}",
-        }
+    events = db.execute(select(Event).where(Event.user_id == user_id, Event.task_id.in_(ids),
+                                            or_(Event.type == "checkin_sent", Event.type == "postponed"))
+                        ).scalars().all()
 
-    # Write valid insights to memory
-    insights_written = 0
-    if result.get("data_sufficiency") != "insufficient":
-        for insight in result.get("insights", []):
-            key        = insight.get("key")
-            value      = insight.get("value")
-            confidence = insight.get("confidence", 0.5)
+    per_task = []
+    for t in tasks:
+        if t.status != "open":
+            continue
+        seen = [d for d in touches[t.id] if d < end]
+        sent = [as_utc(e.created_at) for e in events if e.task_id == t.id and e.type == "checkin_sent"
+                and _in(e.created_at, start, end)]
+        # judged only once the window has passed by the end of the week
+        judged = [s for s in sent if s + IGNORE_WINDOW <= end]
+        ignored = sum(1 for s in judged if not any(s <= d <= s + IGNORE_WINDOW for d in seen))
+        per_task.append({
+            "id": t.id,
+            "days_untouched": (end - max(seen)).days if seen else None,
+            "checkins_sent": len(sent),
+            "checkins_ignored": ignored,
+            "postponed": sum(1 for e in events if e.task_id == t.id and e.type == "postponed"
+                             and _in(e.created_at, start, end)),
+        })
 
-            # Validate key namespace — Echo should only write echo.* keys
-            if not key or not key.startswith("echo."):
-                print(f"[Echo] Skipping invalid key: {key}")
-                continue
+    tapped: dict[str, int] = {}
+    for e in taps:
+        if e.emotion and _in(e.created_at, start, end):
+            tapped[e.emotion] = tapped.get(e.emotion, 0) + 1
 
-            if not value:
-                continue
+    totals = _cause_totals(db, user_id)
+    prev = _previous(db, user_id, week_id(end))
+    if prev is not None:
+        before = prev.get("cause_totals", {})
+        confirmed = {c: n - before.get(c, 0) for c, n in totals.items() if n - before.get(c, 0) > 0}
+    else:
+        # first Echo for this user: count the per-task causes confirmed during the week
+        confirmed = {}
+        for row in db.execute(select(Memory).where(Memory.user_id == user_id,
+                                                   Memory.key.startswith("blocker.task."))).scalars():
+            if _in(row.updated_at, start, end) and row.value:
+                confirmed[row.value] = confirmed.get(row.value, 0) + 1
 
-            update_memory(
-                user_id=user_id,
-                key=key,
-                value=value,
-                confidence=float(confidence),
-                source="echo",
-            )
-            insights_written += 1
+    steps_done = db.execute(select(Subtask).where(Subtask.user_id == user_id, Subtask.task_id.in_(ids),
+                                                  Subtask.done.is_(True))).scalars().all()
+    return {
+        "week": week_id(end),
+        "start": start.isoformat(),
+        "end": end.isoformat(),
+        "first_week": prev is None,
+        "causes_confirmed": confirmed,
+        "cause_totals": totals,
+        "reasons_tapped": tapped,
+        "tasks_finished": sum(1 for t in tasks if _in(t.completed_at, start, end)),
+        "steps_done": sum(1 for s in steps_done if _in(s.updated_at, start, end)),
+        "open_tasks": per_task,
+    }
 
-    # Log that Echo ran — this is how Buddy and future Echo runs know when it last fired
-    summary = (
-        f"data_sufficiency={result.get('data_sufficiency')}, "
-        f"{event_count} events analyzed, "
-        f"{insights_written} insights written"
-    )
-    if result.get("error"):
-        summary += f", error: {result['error']}"
 
-    log_event(
-        user_id=user_id,
-        event_type="echo_ran",
-        note=summary,
-        task_id=None,
-        source="system",
-    )
+def run_echo(db: Session, user_id: str, now: datetime) -> str:
+    """Count and save one user's last finished week. Returns 'saved', 'already_done' or 'no_tasks'."""
+    start, end = week_window(now)
+    key = KEY_PREFIX + week_id(end)
+    if db.execute(select(Memory.id).where(Memory.user_id == user_id, Memory.key == key)).first():
+        return "already_done"
+    facts = week_facts(db, user_id, start, end)
+    if facts is None:
+        return "no_tasks"
+    db.add(Memory(user_id=user_id, key=key, value=json.dumps(facts), confidence=1.0, source="echo"))
+    db.flush()  # so the new week counts toward KEEP_WEEKS below
+    rows = db.execute(select(Memory).where(Memory.user_id == user_id, Memory.key.startswith(KEY_PREFIX))
+                      ).scalars().all()
+    for old in sorted(rows, key=lambda r: r.key, reverse=True)[KEEP_WEEKS:]:
+        db.delete(old)
+    db.commit()
+    return "saved"
 
-    print(f"[Echo] Done. {summary}")
-    result["insights_written"] = insights_written
-    return result
+
+def latest(db: Session, user_id: str, now: datetime) -> Optional[dict]:
+    """The newest saved week, if it's fresh enough to use."""
+    rows = db.execute(select(Memory).where(Memory.user_id == user_id, Memory.key.startswith(KEY_PREFIX))
+                      ).scalars().all()
+    if not rows:
+        return None
+    try:
+        facts = json.loads(max(rows, key=lambda r: r.key).value)
+        if as_utc(now) - datetime.fromisoformat(facts["end"]) > ECHO_FRESH:
+            return None
+        return facts
+    except (TypeError, ValueError, KeyError):
+        return None
+
+
+def buddy_line(facts: Optional[dict], task_id: int) -> Optional[str]:
+    """The one line Buddy may get from Echo: a cue to go gentle on a task they've been away from.
+    Never a number, never the facts themselves: Buddy must not say them."""
+    if not facts:
+        return None
+    task = next((t for t in facts.get("open_tasks", []) if t.get("id") == task_id), None)
+    if not task:
+        return None
+    away = (task.get("days_untouched") or 0) >= AWAY_DAYS or task.get("checkins_ignored", 0) >= AWAY_IGNORED
+    if not away:
+        return None
+    return ("Context, never mention it: they've been away from this task for a while. Be extra gentle and "
+            "low-pressure, and glad they're here. Don't bring up time away, check-ins, or anything you know "
+            "about their week.")

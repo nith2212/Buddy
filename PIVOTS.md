@@ -4,17 +4,18 @@ Flaws found and decisions made while testing Buddy on the phone (from 2026-11-01
 We are still collecting. Nothing here is built yet unless marked.
 
 ## Status
-- origin/dev is at `6e36a94` (offer step, own-plan release, due time only once, task name only in the first message).
-- HELD locally, not pushed: offer/guess shape checks + fixed offer sentence (`brain/agent.py`, `brain/reply_check.py`, `tests/test_agent.py`, 253 tests green). The frameworks below may replace the offer step, so push together.
+- origin/dev (Render, the phone) is at `6e36a94`: old Buddy.
+- Local dev: `760d696` (stage machine, frameworks, evals) plus uncommitted: the offer-stage fix and the evals moved to `testing/` (292 tests green). Not pushed.
+- Evals and grading now live in `testing/` (see `testing/README.md` and `testing/GRADING.md`). Run from the repo root.
 
 ## Build plan (approved 2026-11-04, hard stop Nov 8)
 Quality first, on Groq. Haiku only after Nov 8 and only if Groq doesn't hold up.
 
 **Step 1. Eval harness (Nov 4-5)**
-- [x] `backend/evals/run.py --model <groq model>`: runs the real `run_turn` on a throwaway SQLite DB against real Groq. Not part of pytest.
+- [x] `testing/evals/run.py --model <groq model>` (moved from backend/evals on 2026-11-04): runs the real `run_turn` on a throwaway SQLite DB against real Groq. Not part of pytest.
 - [x] ~15 conversation scenarios from state_frameworks.md: per state a main path, an "idk" path, one edge case (own plan, saying no, switching to tired mid-chat, bigger than work). Only the user's lines are scripted; the dream Buddy lines are the reference, never prompt text.
 - [x] Scoring: (1) mechanical: length, questions, banned phrases, clock times, repeated openers or replies, release has no question, saved cause matches (stage-order check gets added in step 3, once stages exist; "no step before confirm" is graded by the rubric); (2) rubric graded by gpt-oss-120b: reacts to what they said, offers not assigns, never shrinks their plan, warm without empty cheer; (3) the owner reads a side-by-side markdown report.
-- [x] Output: `evals/results/<date>_<model>.md` with a pass-rate table per state.
+- [x] Output: `testing/results/<date>_<model>.md` with a pass-rate table per state.
 - [x] ~80 labeled single messages for the read-call eval ("kinda", "the latter", "both", "yeah but...", "haan maybe", sarcasm, typos). Run once the read call exists.
 
 **Step 2. Baseline run (in the background, during step 3)**
@@ -37,13 +38,23 @@ Built 2026-11-04: `brain/flow.py` (stage table + read call), `buddy_docs/framewo
 - [ ] Conversation evals on gpt-oss-20b, gpt-oss-120b, Qwen 3 32B. If the daily limit hits, continue hours later or the next day.
 - [ ] Owner reads the transcripts and picks the model.
 
-Status 2026-11-04 afternoon: Groq's free-tier daily token caps (per model) ran out. gpt-oss-120b is also the grader, so its cap is the real bottleneck. Done so far: baseline (`evals/results/2026-11-04_1244_*`), new code on 3 chips (`..._1312_*`: framework 31% -> 89%), read eval on qwen3.8-27b (98% right route) and gpt-oss-120b (94%). Qwen 3 32B no longer exists on Groq; qwen/qwen3.8-27b replaces it.
-Resume when the caps reset (one at a time, from backend/):
-- [ ] `venv/bin/python -m evals.run --model openai/gpt-oss-20b --resume evals/results/2026-11-04_1345_openai-gpt-oss-20b.json`
-- [ ] `venv/bin/python -m evals.run --model qwen/qwen3.8-27b --resume evals/results/2026-11-04_1345_qwen-qwen3.8-27b.json`
-- [ ] `venv/bin/python -m evals.run --model openai/gpt-oss-120b --resume evals/results/2026-11-04_1345_openai-gpt-oss-120b.json`
-- [ ] `venv/bin/python -m evals.read_eval --model openai/gpt-oss-20b`
-- [ ] `venv/bin/python -m evals.run --regrade evals/results/2026-11-04_1244_openai-gpt-oss-20b.json` (baseline, same grader rules)
+Status 2026-11-04 afternoon: Groq's free-tier daily token caps (per model) ran out. gpt-oss-120b is also the grader, so its cap is the real bottleneck. Done so far: baseline (`testing/results/2026-11-04_1244_*`), new code on 3 chips (`..._1312_*`: framework 31% -> 89%), read eval on qwen3.8-27b (98% right route) and gpt-oss-120b (94%). Qwen 3 32B no longer exists on Groq; qwen/qwen3.8-27b replaces it.
+Grading moved off Groq on 2026-11-04: Claude grades in-session against the same 7 criteria (so all runs share one grader and Groq's cap goes only to the writer). Run with `--no-rubric`; graded copies are saved as `testing/results/*_graded.md/json` (rules: `testing/GRADING.md`).
+Resume when the caps reset (one at a time, from the repo root):
+- [x] Baseline graded by Claude: `testing/results/2026-11-04_1244_openai-gpt-oss-20b_graded.md` (framework 17/69 = 25%, warm voice 10/69 = 14%).
+- [x] New Buddy graded by Claude so far: don't know where to start 13/15 (`..._1549_..._graded.md`); scared + too tired 16/20 (`..._1312_..._graded.md`, slightly older code). Feels too big and boring need new runs.
+- [ ] `backend/venv/bin/python -m testing.evals.run --model openai/gpt-oss-20b --no-rubric --resume testing/results/2026-11-04_1710_openai-gpt-oss-20b.json`
+- [ ] `backend/venv/bin/python -m testing.evals.run --model openai/gpt-oss-20b --no-rubric --only ambiguity_idk` (re-run after the offer-stage fix: "maybe the swipe thing?" now asks for their first step instead of wrapping up)
+- [ ] `backend/venv/bin/python -m testing.evals.run --model qwen/qwen3.8-27b --no-rubric` (full re-run: in the 1749 run every opener was a canned fallback, because qwen refuses a request with no user message. Fixed in `brain/llm.py` `with_user_turn`; don't grade the 1749 run.)
+- [ ] `backend/venv/bin/python -m testing.evals.run --model openai/gpt-oss-120b --no-rubric --resume testing/results/2026-11-04_1756_openai-gpt-oss-120b.json`
+- [ ] `backend/venv/bin/python -m testing.evals.read_eval --model openai/gpt-oss-20b`
+- [ ] Grade each finished run by hand (`testing/GRADING.md`: export, grade, merge).
+
+**Echo, in steps (agreed 2026-11-04).** Echo is for Buddy only: no push, no user-facing text. A UI for the user is Later.
+- [x] **E1. Facts.** (built 2026-11-04, uncommitted: `brain/echo.py`, `POST /cron/echo`, postpone event in `tasks.py`, Buddy's line in `agent._context_line`, `testing/echo_report.py`, `tests/test_echo.py`. Buddy never says the facts; week ends Sunday 23:00 India time; "ignored" = no tap, chat or step on that task within 12 hours of a check-in. Owner still needs to add the cron-job.org job.) Weekly, per user, counted by code (no model call, so nothing can be invented and no Groq quota): confirmed causes and counts; ignored tasks (days untouched, check-ins ignored, postpones); what got finished. Runs for anyone with at least one task, including tasks they're ignoring (ignoring is data); skips users with no tasks. Saved as memory rows (source `echo`), wiped by DELETE /me. Buddy gets at most one line, only when it's relevant. A local text report for dev.
+- [ ] **E2. Reactions to Buddy.** Count, per user: which of Buddy's moves they took or said no to (rough first version, tiny move, lighter way), whether they bring their own plan, which notification buttons they tap or ignore, and whether progress followed a chat within a day. Counted and shown in the report only: Buddy doesn't change yet. Before Nov 8 if E1 goes smoothly.
+- [ ] **E3. Buddy adapts.** One or two hand-written rules the owner approves, only after something has shown up 3+ times (e.g. always brings their own plan: skip the offer and ask what they'll do). No automatic picking: bandit stays parked. After the phone test, maybe after Nov 8.
+- Later: Echo shaping proactive check-ins (gentler for ignored tasks, best hour); a patterns UI for the user.
 
 **Step 5. Ship (Nov 7-8)**
 - [ ] Push to dev, set the model on Render, phone test every chip.

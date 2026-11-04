@@ -30,7 +30,7 @@ from typing import Literal, Optional
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from brain import flow, llm, tools
+from brain import echo, flow, llm, tools
 from brain.flow import is_ack
 from brain.playbook import (
     PlaybookDoc, drop_sections, framework_section, get_doc, get_intervention, get_state_doc, has_framework,
@@ -89,7 +89,9 @@ CAUSE_WORDS = {
     "bored": "it feels boring or pointless",
     "tired": "being tired or drained",
 }
-_CAUSE_KEYS = ("blocker.", "pattern.")  # memory rows shown to the writer only as the one pattern line
+# memory rows never shown to the writer as rows: causes come through the one pattern line, and Echo's
+# weekly facts (echo.week.*) are for Buddy's judgment only, through _context_line
+_CAUSE_KEYS = ("blocker.", "pattern.", "echo.")
 
 # After these, a polite "okay" is more likely avoidance than agreement.
 _NO_RELEASE_STATES = {"avoidance", "commitment_drift"}
@@ -131,7 +133,7 @@ async def run_turn(
     confirmed = tools.get_memory_entry(db, user_id, f"blocker.task.{task_id}")
     if confirmed and confirmed.value in CAUSE_WORDS:
         situation += f"\nThe cause they confirmed for this task: {CAUSE_WORDS[confirmed.value]}"
-    pattern = _pattern_line(all_memory)
+    pattern = _context_line(db, user_id, task_id, all_memory)
     if pattern:
         situation += f"\n{pattern}"
 
@@ -231,7 +233,7 @@ async def _flow_turn(
 
     saved = tools.get_memory_entry(db, user_id, f"blocker.task.{task_id}")
     already_saved = bool(saved and as_utc(saved.updated_at) > as_utc(since))
-    pattern = _pattern_line(tools.get_user_memory(db, user_id))
+    pattern = _context_line(db, user_id, task_id, tools.get_user_memory(db, user_id))
     steps = _load_steps(db, task)
     open_steps = [s.title for s in steps if not s.done][:FLOW_OPEN_STEPS]
     done_steps = [s.title for s in steps if s.done][:FLOW_OPEN_STEPS]
@@ -400,6 +402,13 @@ def _fresh_emotion(db: Session, user_id: str, task_id: int) -> Optional[EmotionL
     if datetime.now(timezone.utc) - as_utc(row.created_at) > EMOTION_FRESHNESS:
         return None
     return row
+
+
+def _context_line(db: Session, user_id: str, task_id: int, memory: list[dict]) -> Optional[str]:
+    """At most one line of what Buddy knows about this person (CLAUDE.md: one capped line). Echo's
+    'go gentle, they've been away' cue wins: it changes how to talk right now. Else the cause pattern."""
+    return (echo.buddy_line(echo.latest(db, user_id, datetime.now(timezone.utc)), task_id)
+            or _pattern_line(memory))
 
 
 def _pattern_line(memory: list[dict]) -> Optional[str]:

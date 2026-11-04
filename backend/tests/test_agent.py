@@ -734,3 +734,13 @@ def test_offer_and_guess_shape_checks():
         "You said it feels risky. Want a tiny first move, or do you already know what you'll do?", phase="offer", **kw).soft
     assert "guess_shape" in check_reply("What part feels most unclear to you?", phase="guess", **kw).soft
     assert "guess_shape" not in check_reply("Is it more that the layout feels huge?", phase="guess", **kw).soft
+
+
+def test_opening_message_request_always_has_a_user_turn():
+    # qwen on Groq returns 400 "No user query found" without one (eval 2026-11-04: every opener fell back)
+    from brain import llm
+
+    system = [{"role": "system", "content": "be Buddy"}]
+    assert llm.with_user_turn(system) == [*system, llm.OPENER_TURN]
+    convo = [*system, {"role": "user", "content": "hi"}]
+    assert llm.with_user_turn(convo) == convo

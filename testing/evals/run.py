@@ -4,12 +4,12 @@
 #   2. a rubric graded by a bigger model, from state_frameworks.md
 #   3. a markdown report the owner reads, with the dream version next to each transcript
 #
-# From backend/:
-#   venv/bin/python -m evals.run                              # all scenarios, current GROQ_MODEL
-#   venv/bin/python -m evals.run --model openai/gpt-oss-120b
-#   venv/bin/python -m evals.run --only ambiguity_main,fatigue_main --no-rubric
-#   venv/bin/python -m evals.run --resume evals/results/<run>.json   # finish a run the daily limit cut short
-#   venv/bin/python -m evals.run --regrade evals/results/<run>.json  # re-score a run with the current grader
+# From the repo root (buddy/), see testing/README.md:
+#   backend/venv/bin/python -m testing.evals.run                      # all scenarios, current GROQ_MODEL
+#   backend/venv/bin/python -m testing.evals.run --model openai/gpt-oss-120b --no-rubric
+#   backend/venv/bin/python -m testing.evals.run --only ambiguity_main,fatigue_main --no-rubric
+#   backend/venv/bin/python -m testing.evals.run --resume testing/results/<run>.json  # finish a cut-short run
+#   backend/venv/bin/python -m testing.evals.run --regrade testing/results/<run>.json # re-score with Groq's grader
 #
 # Not part of pytest: it spends real Groq quota and replies vary run to run. Per-minute limits are
 # waited out (Retry-After). When the daily limit hits, the run stops cleanly: the scenario in
@@ -364,7 +364,7 @@ def main() -> None:
     from db import SessionLocal
     from main import app
 
-    from evals.scenarios import SCENARIOS
+    from testing.evals.scenarios import SCENARIOS
 
     if not os.getenv("GROQ_API_KEY"):
         sys.exit("GROQ_API_KEY is not set (it is read from buddy/.env).")
@@ -434,7 +434,7 @@ def main() -> None:
             "scenarios": prior["meta"]["scenarios"] if prior else [s["id"] for s in chosen]}
     summary = summarize(results)
 
-    results_dir = HERE / "results"
+    results_dir = HERE.parent / "results"
     results_dir.mkdir(exist_ok=True)
     stem = f"{started:%Y-%m-%d_%H%M}_{model.replace('/', '-')}"
     (results_dir / f"{stem}.json").write_text(json.dumps(
@@ -443,7 +443,7 @@ def main() -> None:
     print(f"\nReport: {results_dir / (stem + '.md')}")
     if unfinished:
         print(f"Unfinished ({len(unfinished)}): {', '.join(unfinished)}. "
-              f"Resume: venv/bin/python -m evals.run --model {model} --resume {results_dir / (stem + '.json')}")
+              f"Resume: backend/venv/bin/python -m testing.evals.run --model {model}{' --no-rubric' if args.no_rubric else ''} --resume {results_dir / (stem + '.json')}")
 
 
 def regrade(path: Path, llm, usage, grader, shared, frameworks, by_id) -> None:

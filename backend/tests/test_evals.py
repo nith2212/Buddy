@@ -1,10 +1,14 @@
 # The eval harness itself (no Groq calls): scenario data is well-formed and the
 # mechanical checks flag what they should.
 
+from pathlib import Path
+
+import pytest
+
 from brain.state_detection import EMOTION_TO_STATE
-from evals.read_cases import READ_CASES
-from evals.run import CRITERIA, load_frameworks, mechanical
-from evals.scenarios import SCENARIOS
+from testing.evals.read_cases import READ_CASES
+from testing.evals.run import CRITERIA, load_frameworks, mechanical
+from testing.evals.scenarios import SCENARIOS
 
 KINDS = {"idk", "answer", "confirm", "reject", "unsure", "own_plan", "wants_move", "ack", "new_cause", "bigger"}
 
@@ -44,3 +48,32 @@ def test_mechanical_flags():
     assert mechanical("Love that plan, ready?", [], True) == ["question_in_release"]
     # warm reactions in the owner's voice are fine
     assert mechanical("I get it! A cat sanctuary sounds great.", [], False) == []
+
+
+def test_grading_rules_doc_names_every_criterion():
+    doc = (Path(__file__).resolve().parents[2] / "testing" / "GRADING.md").read_text()
+    for key in CRITERIA:
+        assert f"**{key}**" in doc
+
+
+def test_every_saved_grades_file_is_valid():
+    # catches typos in hand grades (wrong letter count, reply count off, a "no" without a reason)
+    from testing.grading import merge
+
+    files = sorted((merge.HERE / "grades").glob("*.json"))
+    files = [f for f in files if not f.name.endswith(".todo.json")]
+    merged, _ = merge.load(files)
+    for run, scenarios in merged.items():
+        merge.apply(run, scenarios, {"test"})
+
+
+def test_merge_rejects_malformed_grades():
+    from testing.grading import merge
+
+    result = {"id": "x", "turns": [{}, {}]}
+    with pytest.raises(merge.GradesError):
+        merge.check("run", result, [["yy-y-yy", ""]])                      # one grade for two replies
+    with pytest.raises(merge.GradesError):
+        merge.check("run", result, [["yy-y-yy", ""], ["yy-yn-yy", "x"]])   # 8 letters
+    with pytest.raises(merge.GradesError):
+        merge.check("run", result, [["yy-y-yy", ""], ["ny-y-yy", " "]])    # a no without a reason

@@ -1,0 +1,1161 @@
+{
+  "meta": {
+    "model": "openai/gpt-oss-20b",
+    "grader": "claude (by hand, testing/GRADING.md)",
+    "started": "2026-11-04 13:12",
+    "minutes": 0.6,
+    "commit": "after: stages + trimmed prompt (uncommitted)",
+    "usage": {
+      "pipeline": {
+        "calls": 1,
+        "prompt": 437,
+        "completion": 72
+      },
+      "grader": {
+        "calls": 0,
+        "prompt": 0,
+        "completion": 0
+      }
+    },
+    "unfinished": [
+      "overwhelm_main",
+      "overwhelm_own_step",
+      "overwhelm_vague",
+      "low_interest_boring",
+      "low_interest_pointless_none",
+      "low_interest_pointless_purpose",
+      "low_interest_optional"
+    ],
+    "scenarios": [
+      "ambiguity_main",
+      "ambiguity_idk",
+      "ambiguity_switch_tired",
+      "perfectionism_main",
+      "perfectionism_own_plan",
+      "perfectionism_bigger",
+      "fatigue_main",
+      "fatigue_still_wants",
+      "overwhelm_main",
+      "overwhelm_own_step",
+      "overwhelm_vague",
+      "low_interest_boring",
+      "low_interest_pointless_none",
+      "low_interest_pointless_purpose",
+      "low_interest_optional"
+    ]
+  },
+  "summary": {
+    "by_state": {
+      "perfectionism": {
+        "scenarios": 3,
+        "replies": 13,
+        "clean": 13,
+        "yes": 59,
+        "no": 9,
+        "cause_ok": 3,
+        "fallbacks": 0
+      },
+      "fatigue": {
+        "scenarios": 2,
+        "replies": 7,
+        "clean": 7,
+        "yes": 31,
+        "no": 5,
+        "cause_ok": 1,
+        "fallbacks": 0
+      }
+    },
+    "criteria": {
+      "follows_framework": {
+        "yes": 16,
+        "no": 4,
+        "n/a": 0,
+        "error": 0
+      },
+      "reacts_to_user": {
+        "yes": 14,
+        "no": 1,
+        "n/a": 5,
+        "error": 0
+      },
+      "offers_not_assigns": {
+        "yes": 3,
+        "no": 0,
+        "n/a": 17,
+        "error": 0
+      },
+      "no_premature_step": {
+        "yes": 19,
+        "no": 1,
+        "n/a": 0,
+        "error": 0
+      },
+      "keeps_their_plan": {
+        "yes": 5,
+        "no": 1,
+        "n/a": 14,
+        "error": 0
+      },
+      "warm_voice": {
+        "yes": 15,
+        "no": 5,
+        "n/a": 0,
+        "error": 0
+      },
+      "no_invention": {
+        "yes": 18,
+        "no": 2,
+        "n/a": 0,
+        "error": 0
+      }
+    },
+    "mech": {
+      "http_error": 0,
+      "fallback": 0,
+      "too_many_questions": 0,
+      "too_long": 0,
+      "banned_phrase": 0,
+      "clock_time": 0,
+      "repeated_opener": 0,
+      "repeats_earlier": 0,
+      "question_in_release": 0
+    }
+  },
+  "results": [
+    {
+      "id": "perfectionism_main",
+      "state": "perfectionism",
+      "chip": "afraid",
+      "note": "idk -> two guesses as questions -> confirm -> rough-first-version reframe with consent -> release.",
+      "expect_cause": "afraid",
+      "dream": [
+        "Hey there, I feel you. Some tasks would bring out uncomfortable emotions, and it's okay. What is it about this task that makes you feel this way?",
+        "Okay, let me guess, and if you feel it resonates, tell me- do you feel like this task would make you feel like you don't how to do certain things?",
+        "Okay, what about how others might perceive it? Or critique it?",
+        "Hey it's okay. This task is important and you care. But in order to be perfect, it should exist first. So let's focusing on doing this roughly. Allow yourself to be messy. You have all the freedom, make it look bad. Once it exists, then you can plan to make it the best. What do you say?",
+        "Great! I'll be here when you need me again."
+      ],
+      "user_lines": [
+        "Idk bro",
+        "Yeah, maybe",
+        "Yes, I'm worried it won't look good to others",
+        "Haha yeah that sounds fun."
+      ],
+      "saved_cause": "afraid",
+      "cause_ok": true,
+      "turns": [
+        {
+          "user": null,
+          "reply": "Finishing the Nixly app can feel daunting. It\u2019s okay to feel that way. What feels risky about this task?",
+          "status": 200,
+          "seconds": 0.4,
+          "phase": "open",
+          "intervention": null,
+          "state": "perfectionism",
+          "read": null,
+          "fallback": false,
+          "checks": {
+            "hard": [],
+            "soft": [],
+            "rewritten": false
+          },
+          "flags": [],
+          "rubric": {
+            "follows_framework": {
+              "verdict": "yes",
+              "why": ""
+            },
+            "reacts_to_user": {
+              "verdict": "n/a",
+              "why": ""
+            },
+            "offers_not_assigns": {
+              "verdict": "n/a",
+              "why": ""
+            },
+            "no_premature_step": {
+              "verdict": "yes",
+              "why": ""
+            },
+            "keeps_their_plan": {
+              "verdict": "n/a",
+              "why": ""
+            },
+            "warm_voice": {
+              "verdict": "no",
+              "why": "'It's okay to feel that way' is a banned therapy phrase (a later fix catches it)"
+            },
+            "no_invention": {
+              "verdict": "yes",
+              "why": ""
+            }
+          }
+        },
+        {
+          "user": "Idk bro",
+          "reply": "You\u2019re feeling stuck, and that\u2019s totally normal. Are you worried more about not knowing how to finish the technical parts or about how others will judge the result?",
+          "status": 200,
+          "seconds": 3.7,
+          "phase": "narrow",
+          "intervention": null,
+          "state": "perfectionism",
+          "read": "idk",
+          "fallback": false,
+          "checks": {
+            "hard": [],
+            "soft": [],
+            "rewritten": false
+          },
+          "flags": [],
+          "rubric": {
+            "follows_framework": {
+              "verdict": "yes",
+              "why": ""
+            },
+            "reacts_to_user": {
+              "verdict": "yes",
+              "why": ""
+            },
+            "offers_not_assigns": {
+              "verdict": "n/a",
+              "why": ""
+            },
+            "no_premature_step": {
+              "verdict": "yes",
+              "why": ""
+            },
+            "keeps_their_plan": {
+              "verdict": "n/a",
+              "why": ""
+            },
+            "warm_voice": {
+              "verdict": "yes",
+              "why": ""
+            },
+            "no_invention": {
+              "verdict": "yes",
+              "why": ""
+            }
+          }
+        },
+        {
+          "user": "Yeah, maybe",
+          "reply": "Is it more that you\u2019re unsure how to finish the technical parts?",
+          "status": 200,
+          "seconds": 13.9,
+          "phase": "narrow",
+          "intervention": null,
+          "state": "perfectionism",
+          "read": "unsure",
+          "fallback": false,
+          "checks": {
+            "hard": [],
+            "soft": [],
+            "rewritten": true
+          },
+          "flags": [],
+          "rubric": {
+            "follows_framework": {
+              "verdict": "yes",
+              "why": ""
+            },
+            "reacts_to_user": {
+              "verdict": "yes",
+              "why": ""
+            },
+            "offers_not_assigns": {
+              "verdict": "n/a",
+              "why": ""
+            },
+            "no_premature_step": {
+              "verdict": "yes",
+              "why": ""
+            },
+            "keeps_their_plan": {
+              "verdict": "n/a",
+              "why": ""
+            },
+            "warm_voice": {
+              "verdict": "no",
+              "why": "right move, flat"
+            },
+            "no_invention": {
+              "verdict": "yes",
+              "why": ""
+            }
+          }
+        },
+        {
+          "user": "Yes, I'm worried it won't look good to others",
+          "reply": "You could start with a quick, rough draft just for yourself\u2014no one else needs to see it yet. Think of it as a sandbox where you can test ideas and get comfortable with the code. Would you like to try that first pass?",
+          "status": 200,
+          "seconds": 9.3,
+          "phase": "reframe",
+          "intervention": null,
+          "state": "perfectionism",
+          "read": "confirm",
+          "fallback": false,
+          "checks": {
+            "hard": [],
+            "soft": [],
+            "rewritten": false
+          },
+          "flags": [],
+          "rubric": {
+            "follows_framework": {
+              "verdict": "yes",
+              "why": ""
+            },
+            "reacts_to_user": {
+              "verdict": "no",
+              "why": "reframe frames it as code practice; misses their worry about how it looks to others"
+            },
+            "offers_not_assigns": {
+              "verdict": "yes",
+              "why": ""
+            },
+            "no_premature_step": {
+              "verdict": "yes",
+              "why": ""
+            },
+            "keeps_their_plan": {
+              "verdict": "n/a",
+              "why": ""
+            },
+            "warm_voice": {
+              "verdict": "yes",
+              "why": ""
+            },
+            "no_invention": {
+              "verdict": "yes",
+              "why": ""
+            }
+          }
+        },
+        {
+          "user": "Haha yeah that sounds fun.",
+          "reply": "Sounds fun!",
+          "status": 200,
+          "seconds": 10.1,
+          "phase": "release",
+          "intervention": null,
+          "state": "perfectionism",
+          "read": "confirm",
+          "fallback": false,
+          "checks": {
+            "hard": [],
+            "soft": [],
+            "rewritten": false
+          },
+          "flags": [],
+          "rubric": {
+            "follows_framework": {
+              "verdict": "no",
+              "why": "'Sounds fun!' is too thin: no 'I'm around'"
+            },
+            "reacts_to_user": {
+              "verdict": "yes",
+              "why": ""
+            },
+            "offers_not_assigns": {
+              "verdict": "n/a",
+              "why": ""
+            },
+            "no_premature_step": {
+              "verdict": "yes",
+              "why": ""
+            },
+            "keeps_their_plan": {
+              "verdict": "yes",
+              "why": ""
+            },
+            "warm_voice": {
+              "verdict": "yes",
+              "why": ""
+            },
+            "no_invention": {
+              "verdict": "yes",
+              "why": ""
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "perfectionism_own_plan",
+      "state": "perfectionism",
+      "chip": "afraid",
+      "note": "They decline the reframe and state their own plan: back it as said, never shrink it.",
+      "expect_cause": "afraid",
+      "dream": null,
+      "user_lines": [
+        "people will think it's messy and unprofessional",
+        "yeah that's exactly it",
+        "nah I'd rather polish the README first, that's my plan",
+        "thanks"
+      ],
+      "saved_cause": "afraid",
+      "cause_ok": true,
+      "turns": [
+        {
+          "user": null,
+          "reply": "Hey, I\u2019m working on finishing the Nixly app. It\u2019s totally normal to feel a bit scared about whether it\u2019ll be good enough\u2014what feels risky to you about this task?",
+          "status": 200,
+          "seconds": 0.5,
+          "phase": "open",
+          "intervention": null,
+          "state": "perfectionism",
+          "read": null,
+          "fallback": false,
+          "checks": {
+            "hard": [],
+            "soft": [],
+            "rewritten": false
+          },
+          "flags": [],
+          "rubric": {
+            "follows_framework": {
+              "verdict": "yes",
+              "why": ""
+            },
+            "reacts_to_user": {
+              "verdict": "n/a",
+              "why": ""
+            },
+            "offers_not_assigns": {
+              "verdict": "n/a",
+              "why": ""
+            },
+            "no_premature_step": {
+              "verdict": "yes",
+              "why": ""
+            },
+            "keeps_their_plan": {
+              "verdict": "n/a",
+              "why": ""
+            },
+            "warm_voice": {
+              "verdict": "no",
+              "why": "'I'm working on finishing the Nixly app': speaks as if it's Buddy's task"
+            },
+            "no_invention": {
+              "verdict": "no",
+              "why": "'I'm working on finishing the Nixly app': speaks as if it's Buddy's task"
+            }
+          }
+        },
+        {
+          "user": "people will think it's messy and unprofessional",
+          "reply": "It\u2019s scary to worry about how others see it\u2014how about we sketch a quick, rough version just to get it out of the way so it can exist before we polish it?",
+          "status": 200,
+          "seconds": 6.7,
+          "phase": "reframe",
+          "intervention": null,
+          "state": "perfectionism",
+          "read": "new_cause",
+          "fallback": false,
+          "checks": {
+            "hard": [],
+            "soft": [],
+            "rewritten": true
+          },
+          "flags": [],
+          "rubric": {
+            "follows_framework": {
+              "verdict": "no",
+              "why": "skips the confirm step and jumps to the rough-version reframe"
+            },
+            "reacts_to_user": {
+              "verdict": "yes",
+              "why": ""
+            },
+            "offers_not_assigns": {
+              "verdict": "yes",
+              "why": ""
+            },
+            "no_premature_step": {
+              "verdict": "no",
+              "why": "skips the confirm step and jumps to the rough-version reframe"
+            },
+            "keeps_their_plan": {
+              "verdict": "n/a",
+              "why": ""
+            },
+            "warm_voice": {
+              "verdict": "yes",
+              "why": ""
+            },
+            "no_invention": {
+              "verdict": "yes",
+              "why": ""
+            }
+          }
+        },
+        {
+          "user": "yeah that's exactly it",
+          "reply": "That sounds like a solid plan! I\u2019m here if you need anything else.",
+          "status": 200,
+          "seconds": 8.0,
+          "phase": "release",
+          "intervention": null,
+          "state": "perfectionism",
+          "read": "confirm",
+          "fallback": false,
+          "checks": {
+            "hard": [],
+            "soft": [],
+            "rewritten": false
+          },
+          "flags": [],
+          "rubric": {
+            "follows_framework": {
+              "verdict": "yes",
+              "why": ""
+            },
+            "reacts_to_user": {
+              "verdict": "yes",
+              "why": ""
+            },
+            "offers_not_assigns": {
+              "verdict": "n/a",
+              "why": ""
+            },
+            "no_premature_step": {
+              "verdict": "yes",
+              "why": ""
+            },
+            "keeps_their_plan": {
+              "verdict": "yes",
+              "why": ""
+            },
+            "warm_voice": {
+              "verdict": "yes",
+              "why": ""
+            },
+            "no_invention": {
+              "verdict": "yes",
+              "why": ""
+            }
+          }
+        },
+        {
+          "user": "nah I'd rather polish the README first, that's my plan",
+          "reply": "Nice choice\u2014polishing the README first sets a great tone. I\u2019m around if you need anything else.",
+          "status": 200,
+          "seconds": 10.2,
+          "phase": "release",
+          "intervention": null,
+          "state": "perfectionism",
+          "read": "own_plan",
+          "fallback": false,
+          "checks": {
+            "hard": [],
+            "soft": [],
+            "rewritten": false
+          },
+          "flags": [],
+          "rubric": {
+            "follows_framework": {
+              "verdict": "yes",
+              "why": ""
+            },
+            "reacts_to_user": {
+              "verdict": "yes",
+              "why": ""
+            },
+            "offers_not_assigns": {
+              "verdict": "n/a",
+              "why": ""
+            },
+            "no_premature_step": {
+              "verdict": "yes",
+              "why": ""
+            },
+            "keeps_their_plan": {
+              "verdict": "yes",
+              "why": ""
+            },
+            "warm_voice": {
+              "verdict": "yes",
+              "why": ""
+            },
+            "no_invention": {
+              "verdict": "yes",
+              "why": ""
+            }
+          }
+        },
+        {
+          "user": "thanks",
+          "reply": "You\u2019ve got a great plan\u2014polishing the README first will really shine! I\u2019m around if you need anything else.",
+          "status": 200,
+          "seconds": 5.6,
+          "phase": "release",
+          "intervention": null,
+          "state": "perfectionism",
+          "read": "ack",
+          "fallback": false,
+          "checks": {
+            "hard": [],
+            "soft": [],
+            "rewritten": false
+          },
+          "flags": [],
+          "rubric": {
+            "follows_framework": {
+              "verdict": "yes",
+              "why": ""
+            },
+            "reacts_to_user": {
+              "verdict": "yes",
+              "why": ""
+            },
+            "offers_not_assigns": {
+              "verdict": "n/a",
+              "why": ""
+            },
+            "no_premature_step": {
+              "verdict": "yes",
+              "why": ""
+            },
+            "keeps_their_plan": {
+              "verdict": "yes",
+              "why": ""
+            },
+            "warm_voice": {
+              "verdict": "no",
+              "why": "repeats the same closing line; 'will really shine' is empty cheering"
+            },
+            "no_invention": {
+              "verdict": "yes",
+              "why": ""
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "perfectionism_bigger",
+      "state": "perfectionism",
+      "chip": "afraid",
+      "note": "Bigger than work: step back kindly, suggest someone they trust or a helpline, stop probing.",
+      "expect_cause": null,
+      "dream": null,
+      "user_lines": [
+        "honestly it's not the task. I feel like a failure at everything lately and I can't stop crying",
+        "yeah"
+      ],
+      "saved_cause": null,
+      "cause_ok": true,
+      "turns": [
+        {
+          "user": null,
+          "reply": "Finishing the Nixly app feels like a big step. It\u2019s completely normal to feel unsure about how it\u2019ll turn out. What feels risky about this task?",
+          "status": 200,
+          "seconds": 1.5,
+          "phase": "open",
+          "intervention": null,
+          "state": "perfectionism",
+          "read": null,
+          "fallback": false,
+          "checks": {
+            "hard": [],
+            "soft": [],
+            "rewritten": false
+          },
+          "flags": [],
+          "rubric": {
+            "follows_framework": {
+              "verdict": "yes",
+              "why": ""
+            },
+            "reacts_to_user": {
+              "verdict": "n/a",
+              "why": ""
+            },
+            "offers_not_assigns": {
+              "verdict": "n/a",
+              "why": ""
+            },
+            "no_premature_step": {
+              "verdict": "yes",
+              "why": ""
+            },
+            "keeps_their_plan": {
+              "verdict": "n/a",
+              "why": ""
+            },
+            "warm_voice": {
+              "verdict": "yes",
+              "why": ""
+            },
+            "no_invention": {
+              "verdict": "yes",
+              "why": ""
+            }
+          }
+        },
+        {
+          "user": "honestly it's not the task. I feel like a failure at everything lately and I can't stop crying",
+          "reply": "It sounds like more than just the app. I\u2019m here for task help, not for this kind of support. It might help to talk to someone you trust or a local helpline.",
+          "status": 200,
+          "seconds": 0.6,
+          "phase": "step_back",
+          "intervention": null,
+          "state": "perfectionism",
+          "read": "bigger",
+          "fallback": false,
+          "checks": {
+            "hard": [],
+            "soft": [],
+            "rewritten": false
+          },
+          "flags": [],
+          "rubric": {
+            "follows_framework": {
+              "verdict": "yes",
+              "why": ""
+            },
+            "reacts_to_user": {
+              "verdict": "yes",
+              "why": ""
+            },
+            "offers_not_assigns": {
+              "verdict": "n/a",
+              "why": ""
+            },
+            "no_premature_step": {
+              "verdict": "yes",
+              "why": ""
+            },
+            "keeps_their_plan": {
+              "verdict": "n/a",
+              "why": ""
+            },
+            "warm_voice": {
+              "verdict": "yes",
+              "why": ""
+            },
+            "no_invention": {
+              "verdict": "yes",
+              "why": ""
+            }
+          }
+        },
+        {
+          "user": "yeah",
+          "reply": "I\u2019m really sorry you\u2019re feeling this way. You\u2019re not alone, and talking to someone you trust or a local helpline could help. Take care of yourself.",
+          "status": 200,
+          "seconds": 5.2,
+          "phase": "step_back",
+          "intervention": null,
+          "state": "perfectionism",
+          "read": "ack",
+          "fallback": false,
+          "checks": {
+            "hard": [],
+            "soft": [],
+            "rewritten": false
+          },
+          "flags": [],
+          "rubric": {
+            "follows_framework": {
+              "verdict": "yes",
+              "why": ""
+            },
+            "reacts_to_user": {
+              "verdict": "yes",
+              "why": ""
+            },
+            "offers_not_assigns": {
+              "verdict": "n/a",
+              "why": ""
+            },
+            "no_premature_step": {
+              "verdict": "yes",
+              "why": ""
+            },
+            "keeps_their_plan": {
+              "verdict": "n/a",
+              "why": ""
+            },
+            "warm_voice": {
+              "verdict": "yes",
+              "why": ""
+            },
+            "no_invention": {
+              "verdict": "yes",
+              "why": ""
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "fatigue_main",
+      "state": "fatigue",
+      "chip": "tired",
+      "note": "Acknowledge what drained them, permission to rest, no step, no question at the end.",
+      "expect_cause": "tired",
+      "dream": [
+        "Hey, this task has been not touched for quite some time now. What is happening?",
+        "Oh, please take care. Well rested body and mind always beats stressed half baked work anyways. When you are feeling better, we'll revisit this task. I'll be here.",
+        "Bye!"
+      ],
+      "user_lines": [
+        "Hey I worked so hard and long this day at work, I'm tired and exhausted",
+        "Thanks bye"
+      ],
+      "saved_cause": "tired",
+      "cause_ok": true,
+      "turns": [
+        {
+          "user": null,
+          "reply": "Hey, I\u2019ve got the \u201cPrepare client report\u201d on my mind. How was your day?",
+          "status": 200,
+          "seconds": 0.5,
+          "phase": "open",
+          "intervention": null,
+          "state": "fatigue",
+          "read": null,
+          "fallback": false,
+          "checks": {
+            "hard": [],
+            "soft": [],
+            "rewritten": false
+          },
+          "flags": [],
+          "rubric": {
+            "follows_framework": {
+              "verdict": "yes",
+              "why": ""
+            },
+            "reacts_to_user": {
+              "verdict": "n/a",
+              "why": ""
+            },
+            "offers_not_assigns": {
+              "verdict": "n/a",
+              "why": ""
+            },
+            "no_premature_step": {
+              "verdict": "yes",
+              "why": ""
+            },
+            "keeps_their_plan": {
+              "verdict": "n/a",
+              "why": ""
+            },
+            "warm_voice": {
+              "verdict": "yes",
+              "why": ""
+            },
+            "no_invention": {
+              "verdict": "yes",
+              "why": ""
+            }
+          }
+        },
+        {
+          "user": "Hey I worked so hard and long this day at work, I'm tired and exhausted",
+          "reply": "Wow, you\u2019ve been working so hard\u2014sounds exhausting. Take a well\u2011deserved break and rest up. I\u2019ll be here when you\u2019re ready to tackle the next step.",
+          "status": 200,
+          "seconds": 5.9,
+          "phase": "rest",
+          "intervention": null,
+          "state": "fatigue",
+          "read": "new_cause",
+          "fallback": false,
+          "checks": {
+            "hard": [],
+            "soft": [],
+            "rewritten": false
+          },
+          "flags": [],
+          "rubric": {
+            "follows_framework": {
+              "verdict": "yes",
+              "why": ""
+            },
+            "reacts_to_user": {
+              "verdict": "yes",
+              "why": ""
+            },
+            "offers_not_assigns": {
+              "verdict": "n/a",
+              "why": ""
+            },
+            "no_premature_step": {
+              "verdict": "yes",
+              "why": ""
+            },
+            "keeps_their_plan": {
+              "verdict": "n/a",
+              "why": ""
+            },
+            "warm_voice": {
+              "verdict": "yes",
+              "why": ""
+            },
+            "no_invention": {
+              "verdict": "yes",
+              "why": ""
+            }
+          }
+        },
+        {
+          "user": "Thanks bye",
+          "reply": "You\u2019re welcome! Take care.",
+          "status": 200,
+          "seconds": 4.5,
+          "phase": "release",
+          "intervention": null,
+          "state": "fatigue",
+          "read": "ack",
+          "fallback": false,
+          "checks": {
+            "hard": [],
+            "soft": [],
+            "rewritten": false
+          },
+          "flags": [],
+          "rubric": {
+            "follows_framework": {
+              "verdict": "yes",
+              "why": ""
+            },
+            "reacts_to_user": {
+              "verdict": "yes",
+              "why": ""
+            },
+            "offers_not_assigns": {
+              "verdict": "n/a",
+              "why": ""
+            },
+            "no_premature_step": {
+              "verdict": "yes",
+              "why": ""
+            },
+            "keeps_their_plan": {
+              "verdict": "n/a",
+              "why": ""
+            },
+            "warm_voice": {
+              "verdict": "yes",
+              "why": ""
+            },
+            "no_invention": {
+              "verdict": "yes",
+              "why": ""
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "fatigue_still_wants",
+      "state": "fatigue",
+      "chip": "tired",
+      "note": "Tired but wants to work: offer a tiny move or their own plan. Never suggest stopping.",
+      "expect_cause": "tired",
+      "dream": null,
+      "user_lines": [
+        "long day, but I really need to get something done on it tonight",
+        "maybe just a tiny thing",
+        "okay I'll do that"
+      ],
+      "saved_cause": null,
+      "cause_ok": false,
+      "turns": [
+        {
+          "user": null,
+          "reply": "Preparing the client report sounds like a big task. How was your day? I\u2019m here for you if you want to keep going.",
+          "status": 200,
+          "seconds": 0.3,
+          "phase": "open",
+          "intervention": null,
+          "state": "fatigue",
+          "read": null,
+          "fallback": false,
+          "checks": {
+            "hard": [],
+            "soft": [],
+            "rewritten": false
+          },
+          "flags": [],
+          "rubric": {
+            "follows_framework": {
+              "verdict": "yes",
+              "why": ""
+            },
+            "reacts_to_user": {
+              "verdict": "n/a",
+              "why": ""
+            },
+            "offers_not_assigns": {
+              "verdict": "n/a",
+              "why": ""
+            },
+            "no_premature_step": {
+              "verdict": "yes",
+              "why": ""
+            },
+            "keeps_their_plan": {
+              "verdict": "n/a",
+              "why": ""
+            },
+            "warm_voice": {
+              "verdict": "yes",
+              "why": ""
+            },
+            "no_invention": {
+              "verdict": "yes",
+              "why": ""
+            }
+          }
+        },
+        {
+          "user": "long day, but I really need to get something done on it tonight",
+          "reply": "Sounds exhausting, but you\u2019re ready to finish it tonight. Let me know if you need a quick pep talk.",
+          "status": 200,
+          "seconds": 0.9,
+          "phase": "release",
+          "intervention": null,
+          "state": "fatigue",
+          "read": "own_plan",
+          "fallback": false,
+          "checks": {
+            "hard": [],
+            "soft": [],
+            "rewritten": false
+          },
+          "flags": [],
+          "rubric": {
+            "follows_framework": {
+              "verdict": "no",
+              "why": "they want to do something: no tiny move offered; turns 'get something done' into 'finish it tonight'"
+            },
+            "reacts_to_user": {
+              "verdict": "yes",
+              "why": ""
+            },
+            "offers_not_assigns": {
+              "verdict": "n/a",
+              "why": ""
+            },
+            "no_premature_step": {
+              "verdict": "yes",
+              "why": ""
+            },
+            "keeps_their_plan": {
+              "verdict": "no",
+              "why": "they want to do something: no tiny move offered; turns 'get something done' into 'finish it tonight'"
+            },
+            "warm_voice": {
+              "verdict": "no",
+              "why": "they want to do something: no tiny move offered; turns 'get something done' into 'finish it tonight'"
+            },
+            "no_invention": {
+              "verdict": "no",
+              "why": "they want to do something: no tiny move offered; turns 'get something done' into 'finish it tonight'"
+            }
+          }
+        },
+        {
+          "user": "maybe just a tiny thing",
+          "reply": "Got it\u2014maybe just jot down the main points you need to cover. What\u2019s the first tiny thing you can tackle?",
+          "status": 200,
+          "seconds": 6.2,
+          "phase": "followup",
+          "intervention": null,
+          "state": "fatigue",
+          "read": "unsure",
+          "fallback": false,
+          "checks": {
+            "hard": [],
+            "soft": [],
+            "rewritten": false
+          },
+          "flags": [],
+          "rubric": {
+            "follows_framework": {
+              "verdict": "no",
+              "why": "offers a move, then also asks them for one: two moves mixed"
+            },
+            "reacts_to_user": {
+              "verdict": "yes",
+              "why": ""
+            },
+            "offers_not_assigns": {
+              "verdict": "yes",
+              "why": ""
+            },
+            "no_premature_step": {
+              "verdict": "yes",
+              "why": ""
+            },
+            "keeps_their_plan": {
+              "verdict": "n/a",
+              "why": ""
+            },
+            "warm_voice": {
+              "verdict": "yes",
+              "why": ""
+            },
+            "no_invention": {
+              "verdict": "yes",
+              "why": ""
+            }
+          }
+        },
+        {
+          "user": "okay I'll do that",
+          "reply": "Nice choice\u2014just a quick outline can make the rest feel lighter. I\u2019m here if you need anything else.",
+          "status": 200,
+          "seconds": 9.0,
+          "phase": "release",
+          "intervention": null,
+          "state": "fatigue",
+          "read": "own_plan",
+          "fallback": false,
+          "checks": {
+            "hard": [],
+            "soft": [],
+            "rewritten": false
+          },
+          "flags": [],
+          "rubric": {
+            "follows_framework": {
+              "verdict": "yes",
+              "why": ""
+            },
+            "reacts_to_user": {
+              "verdict": "yes",
+              "why": ""
+            },
+            "offers_not_assigns": {
+              "verdict": "n/a",
+              "why": ""
+            },
+            "no_premature_step": {
+              "verdict": "yes",
+              "why": ""
+            },
+            "keeps_their_plan": {
+              "verdict": "yes",
+              "why": ""
+            },
+            "warm_voice": {
+              "verdict": "yes",
+              "why": ""
+            },
+            "no_invention": {
+              "verdict": "yes",
+              "why": ""
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

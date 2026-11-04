@@ -15,6 +15,13 @@ GROQ_URL = "https://api.groq.com/openai/v1/chat/completions"
 # gpt-oss-20b is the fast/small replacement; override with GROQ_MODEL.
 DEFAULT_MODEL = "openai/gpt-oss-20b"
 RETRYABLE_STATUS = {429, 500, 502, 503, 504}
+# Some models (qwen on Groq) refuse a request with no user message: "No user query found". Buddy's
+# opening message has none, so it gets this stand-in turn (found by the eval, 2026-11-04).
+OPENER_TURN = {"role": "user", "content": "(No message from them yet: you speak first.)"}
+
+
+def with_user_turn(messages: list[dict]) -> list[dict]:
+    return messages if any(m.get("role") == "user" for m in messages) else [*messages, OPENER_TURN]
 
 logger = logging.getLogger(__name__)
 
@@ -40,7 +47,7 @@ async def complete(
     model = os.getenv("GROQ_MODEL", DEFAULT_MODEL)
     body = {
         "model": model,
-        "messages": messages,
+        "messages": with_user_turn(messages),
         "temperature": temperature,
         "max_tokens": max_tokens,
     }

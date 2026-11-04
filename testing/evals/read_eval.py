@@ -4,8 +4,9 @@
 #   route  - whether the reading sends the conversation to the same next stage as the label would
 #            (what matters for the user: "own_plan" vs "confirm" after Buddy's offer both release)
 #
-# From backend/:
-#   venv/bin/python -m evals.read_eval --model openai/gpt-oss-20b
+# From the repo root (buddy/), see testing/README.md:
+#   backend/venv/bin/python -m testing.evals.read_eval --model openai/gpt-oss-20b
+#   backend/venv/bin/python -m testing.evals.read_eval --rescore testing/results/<run>_read_<model>.json
 # Not part of pytest: it spends real Groq quota.
 
 from __future__ import annotations
@@ -41,8 +42,8 @@ def stage_for(state: str, buddy: str, read_cases) -> str:
 
 async def run(model: str) -> dict:
     from brain import flow, llm
-    from evals import read_cases
-    from evals.run import make_patient
+    from testing.evals import read_cases
+    from testing.evals.run import make_patient
 
     llm.complete = make_patient(llm)
     rows = []
@@ -95,9 +96,13 @@ def report(result: dict, path: Path) -> None:
 def rescore(path: Path) -> None:
     """Re-score a saved run with the current stage table (no Groq calls)."""
     from brain import flow
-    from evals import read_cases
+    from testing.evals import read_cases
     result = json.loads(path.read_text())
-    for r, (state, buddy, user, kind, cause) in zip(result["rows"], read_cases.READ_CASES):
+    # match by the case itself, not its position: cases get added over time
+    cases = {(c[0], c[1], c[2]): c for c in read_cases.READ_CASES}
+    result["rows"] = [r for r in result["rows"] if (r["state"], r["buddy"], r["user"]) in cases]
+    for r in result["rows"]:
+        state, buddy, user, kind, cause = cases[(r["state"], r["buddy"], r["user"])]
         stage = stage_for(state, buddy, read_cases)
         got = flow.Reading(r["got"] if r["got"] in flow.KINDS else "unclear", r["got_cause"], r.get("got_flavor"))
         want = flow.Reading(kind, cause, got.flavor)  # the saved run may not have kept flavors: don't count them
@@ -126,7 +131,7 @@ def main() -> None:
         sys.exit("GROQ_API_KEY is not set (it is read from buddy/.env).")
     model = os.getenv("GROQ_MODEL", llm.DEFAULT_MODEL)
     result = asyncio.run(run(model))
-    out_dir = HERE / "results"
+    out_dir = HERE.parent / "results"
     out_dir.mkdir(exist_ok=True)
     stem = f"{datetime.now():%Y-%m-%d_%H%M}_read_{model.replace('/', '-')}"
     (out_dir / f"{stem}.json").write_text(json.dumps(result, indent=2))

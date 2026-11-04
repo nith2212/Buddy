@@ -57,3 +57,7 @@ google-services.json
 
 # Personal interview-prep notes — not project documentation, not for the repo
 INTERVIEW_NOTES.md
+
+# Echo dev reports (hold task titles)
+testing/echo_reports/
+testing/grading/packets/

@@ -46,7 +46,7 @@ Steps, each shippable alone, tested and committed before the next:
 - B. Reasons become states: extend EMOTION_TO_STATE; accept the new reason values in the notification route and log_emotion_pick; add an optional explicit `reason` field to ChatRequest (never an in-band control string).
 - C. Diagnose behavior in run_turn: tapped reason with few chat turns forces find_the_cause; after the answer, pick the matched first move; short acknowledgments force affirm_and_release and skip the decide call (Groq is capped at about 8k tokens/min). Write memory in _learn.
 - D. Mobile: reason chips when the chat is empty (src/app/task/[id].tsx, src/lib/api.ts). Notification buttons stay at 3 because of the Android limit: tired / too much / don't know where to start. Fear and boredom are in-app chips only.
-- E. Finish weekly Echo: per user, minimum-events threshold, manual trigger, summarizes pattern.* memory. It runs from cron, protected by X-Cron-Secret.
+- E. Weekly Echo, for Buddy only (never shown or said to the user; a user UI is Later). In steps, see PIVOTS.md: E1 facts counted by code (causes, ignored tasks, postpones, finished), E2 how they react to Buddy's moves (counted only), E3 a few owner-approved rules once something shows up 3+ times. Runs for anyone with a task, ignored ones included. POST /cron/echo, protected by X-Cron-Secret, Sunday 23:00 India time. Dev report: testing/echo_report.py.
 
 ## Parked (do NOT build or propose; add to a "later" list instead)
 Sprint timer, check-back commitments, firmness levels, escalation, a patterns endpoint or patterns UI, onboarding, UI polish or Figma work, a date picker, bandit, notes UI, multi-agent split, monthly reflections, accounts or passwords, web frontend, Play Store, second deployment.

@@ -13,6 +13,7 @@
 # detection's "task marked done -> recovery" rule depends on status, not just
 # task_state, so the two must never drift apart.
 
+import json
 from datetime import datetime, timezone
 from typing import Literal, Optional
 
@@ -127,7 +128,13 @@ def update_task(
     if payload.title is not None:
         task.title = payload.title.strip()
     if "due_date" in payload.model_fields_set:
-        task.due_date = _normalize_due(payload.due_date)
+        new_due = _normalize_due(payload.due_date)
+        old_due = _normalize_due(task.due_date)  # SQLite hands it back naive
+        if old_due and new_due and new_due > old_due:
+            # a postpone: Echo counts these (brain/echo.py)
+            db.add(Event(user_id=task.user_id, task_id=task.id, type="postponed", source="user",
+                         payload=json.dumps({"from": old_due.isoformat(), "to": new_due.isoformat()})))
+        task.due_date = new_due
     if payload.status == "done":
         _mark_done(task, db)
     elif payload.status == "open":

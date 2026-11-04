@@ -1,6 +1,6 @@
 # Read-call eval: openai/gpt-oss-120b
 
-- When: 2026-11-04 13:21
+- When: 2026-11-04 17:06
 - Exact kind: **72/84 (86%)**
 - Same next stage (what the user feels): **79/84 (94%)**
 - Caught by patterns, no model call: 17

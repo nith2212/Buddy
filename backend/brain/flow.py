@@ -53,10 +53,12 @@ FRAMEWORKS: dict[str, Framework] = {
         first="open",
         on={("open", "answer"): "core", ("open", "confirm"): "core", ("open", "unsure"): "core",
             ("core", "answer"): "first_step", ("core", "confirm"): "first_step", ("core", "unsure"): "first_step",
-            ("suggest", "answer"): "suggest"},
+            ("suggest", "answer"): "suggest",
+            # naming a part after the offer ("maybe the swipe thing?") is their core: they still author the step
+            ("offer", "answer"): "first_step"},
         switch_entry="open", tiny="suggest",
         save_on=frozenset({("*", "own_plan")}),
-        notes={"open": "goal", "core": "core", "first_step": "first step"},
+        notes={"open": "goal", "core": "core", "offer": "core", "first_step": "first step"},
     ),
     "perfectionism": Framework(
         first="open",
@@ -146,7 +148,9 @@ def next_stage(state: str, stage: str, reading: Reading, tries: int) -> Step:
     if kind in ("ack", "own_plan"):
         return Step(state, "release", save_cause=_save(fw, stage, kind), note=_plan_note(reading) or note)
     if stage == "offer":
-        # Anything but a no means "go on, give me one".
+        if (stage, kind) in fw.on:
+            return Step(state, fw.on[(stage, kind)], note=note)
+        # Anything else but a no means "go on, give me one".
         if kind == "reject":
             return Step(state, "offer", modifier="reject", note=note)
         return Step(state, fw.tiny, note=note)
@@ -237,12 +241,13 @@ _READ_SYSTEM = (
     "out why they're stuck. Classify the message as a reply to what Buddy just said.\n"
     "kind, pick exactly one:\n"
     "- idk: they don't know / have no answer\n"
-    "- answer: answers Buddy's question with content, without agreeing to a cause Buddy offered\n"
+    "- answer: answers Buddy's question with content, without agreeing to a cause Buddy offered. Naming a part "
+    "or area of the task without saying what they'll do (\"maybe the swipe thing?\") is answer, not own_plan\n"
     "- confirm: clearly agrees with the cause or option Buddy offered, or clearly names that cause themselves "
     "(picking one side of Buddy's either/or question counts)\n"
     "- reject: says Buddy's read is wrong, or declines Buddy's idea without giving their own\n"
     "- unsure: half-agrees, hedges (\"maybe\", \"kinda\"), or picks both sides\n"
-    "- own_plan: names a specific thing THEY will do (deciding to drop or postpone the task counts), or accepts "
+    "- own_plan: names a specific action THEY will do (deciding to drop or postpone the task counts), or accepts "
     "the step Buddy offered (\"okay I can do that\")\n"
     "- wants_move: asks Buddy for a step or for help choosing, or wants to do something without saying what "
     "(\"I need to get something done\")\n"

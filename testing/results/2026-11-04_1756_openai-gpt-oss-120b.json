@@ -1,0 +1,437 @@
+{
+  "meta": {
+    "model": "openai/gpt-oss-120b",
+    "grader": null,
+    "started": "2026-11-04 17:56",
+    "minutes": 1.3,
+    "commit": "after: stages + trimmed prompt + read fixes (uncommitted)",
+    "usage": {
+      "pipeline": {
+        "calls": 27,
+        "prompt": 15479,
+        "completion": 2347
+      },
+      "grader": {
+        "calls": 0,
+        "prompt": 0,
+        "completion": 0
+      }
+    },
+    "unfinished": [
+      "perfectionism_main",
+      "perfectionism_own_plan",
+      "perfectionism_bigger",
+      "fatigue_main",
+      "fatigue_still_wants",
+      "overwhelm_main",
+      "overwhelm_own_step",
+      "overwhelm_vague",
+      "low_interest_boring",
+      "low_interest_pointless_none",
+      "low_interest_pointless_purpose",
+      "low_interest_optional"
+    ],
+    "scenarios": [
+      "ambiguity_main",
+      "ambiguity_idk",
+      "ambiguity_switch_tired",
+      "perfectionism_main",
+      "perfectionism_own_plan",
+      "perfectionism_bigger",
+      "fatigue_main",
+      "fatigue_still_wants",
+      "overwhelm_main",
+      "overwhelm_own_step",
+      "overwhelm_vague",
+      "low_interest_boring",
+      "low_interest_pointless_none",
+      "low_interest_pointless_purpose",
+      "low_interest_optional"
+    ]
+  },
+  "summary": {
+    "by_state": {
+      "ambiguity": {
+        "scenarios": 3,
+        "replies": 15,
+        "clean": 15,
+        "yes": 0,
+        "no": 0,
+        "cause_ok": 3,
+        "fallbacks": 0
+      }
+    },
+    "criteria": {
+      "follows_framework": {
+        "yes": 0,
+        "no": 0,
+        "n/a": 0,
+        "error": 0
+      },
+      "reacts_to_user": {
+        "yes": 0,
+        "no": 0,
+        "n/a": 0,
+        "error": 0
+      },
+      "offers_not_assigns": {
+        "yes": 0,
+        "no": 0,
+        "n/a": 0,
+        "error": 0
+      },
+      "no_premature_step": {
+        "yes": 0,
+        "no": 0,
+        "n/a": 0,
+        "error": 0
+      },
+      "keeps_their_plan": {
+        "yes": 0,
+        "no": 0,
+        "n/a": 0,
+        "error": 0
+      },
+      "warm_voice": {
+        "yes": 0,
+        "no": 0,
+        "n/a": 0,
+        "error": 0
+      },
+      "no_invention": {
+        "yes": 0,
+        "no": 0,
+        "n/a": 0,
+        "error": 0
+      }
+    },
+    "mech": {
+      "http_error": 0,
+      "fallback": 0,
+      "too_many_questions": 0,
+      "too_long": 0,
+      "banned_phrase": 0,
+      "clock_time": 0,
+      "repeated_opener": 0,
+      "repeats_earlier": 0,
+      "question_in_release": 0
+    }
+  },
+  "results": [
+    {
+      "id": "ambiguity_main",
+      "state": "ambiguity",
+      "chip": "unclear",
+      "note": "Goal -> core -> their own first step -> release. Buddy never supplies the content.",
+      "expect_cause": "unclear",
+      "dream": [
+        "Hey, I can understand. Some tasks might feel huge. do u have an end goal for this task? What will that look like?",
+        "That sounds great! Every task has a simple core working/design. what would that be for this task?",
+        "Good! You've narrowed it down. Now what would be the first ever step? Even as simple as opening your laptop is valid.",
+        "Yes, that sounds like a plan. I'll be here if you wanna plan more. Now go on you.",
+        "(release)"
+      ],
+      "user_lines": [
+        "This app will help me declutter my gallery while swiping. And each save gives me points. With those points I can build a cat sanctuary!",
+        "Hmmm for this, I need the swipe mechanism. Once that's built, others are additions.",
+        "Hmmm I can start setting up expo on my phone and laptop.",
+        "okay thanks!"
+      ],
+      "saved_cause": "unclear",
+      "cause_ok": true,
+      "turns": [
+        {
+          "user": null,
+          "reply": "Finishing the Nixly app sounds like a big step. It\u2019s totally normal to feel a bit stuck at the start. What would the finished version look like for you?",
+          "status": 200,
+          "seconds": 0.5,
+          "phase": "open",
+          "intervention": null,
+          "state": "ambiguity",
+          "read": null,
+          "fallback": false,
+          "checks": {
+            "hard": [],
+            "soft": [],
+            "rewritten": false
+          },
+          "flags": []
+        },
+        {
+          "user": "This app will help me declutter my gallery while swiping. And each save gives me points. With those points I can build a cat sanctuary!",
+          "reply": "That sounds like a fun way to tidy up photos and earn points for a cat sanctuary! What\u2019s the single core feature that everything else will hinge on?",
+          "status": 200,
+          "seconds": 1.0,
+          "phase": "core",
+          "intervention": null,
+          "state": "ambiguity",
+          "read": "answer",
+          "fallback": false,
+          "checks": {
+            "hard": [],
+            "soft": [],
+            "rewritten": false
+          },
+          "flags": []
+        },
+        {
+          "user": "Hmmm for this, I need the swipe mechanism. Once that's built, others are additions.",
+          "reply": "Got it, the swipe mechanism is the heart of it. What\u2019s the tiniest first action you could take right now to start building that swipe feature?",
+          "status": 200,
+          "seconds": 1.1,
+          "phase": "first_step",
+          "intervention": null,
+          "state": "ambiguity",
+          "read": "answer",
+          "fallback": false,
+          "checks": {
+            "hard": [],
+            "soft": [],
+            "rewritten": false
+          },
+          "flags": []
+        },
+        {
+          "user": "Hmmm I can start setting up expo on my phone and laptop.",
+          "reply": "Nice, setting up Expo on your phone and laptop is a solid first move. I\u2019m here if you run into anything.",
+          "status": 200,
+          "seconds": 1.0,
+          "phase": "release",
+          "intervention": null,
+          "state": "ambiguity",
+          "read": "own_plan",
+          "fallback": false,
+          "checks": {
+            "hard": [],
+            "soft": [],
+            "rewritten": false
+          },
+          "flags": []
+        },
+        {
+          "user": "okay thanks!",
+          "reply": "You\u2019re off to a great start! I\u2019m around if you get stuck.",
+          "status": 200,
+          "seconds": 0.6,
+          "phase": "release",
+          "intervention": null,
+          "state": "ambiguity",
+          "read": "ack",
+          "fallback": false,
+          "checks": {
+            "hard": [],
+            "soft": [],
+            "rewritten": false
+          },
+          "flags": []
+        }
+      ]
+    },
+    {
+      "id": "ambiguity_idk",
+      "state": "ambiguity",
+      "chip": "unclear",
+      "note": "Repeated idk: Buddy must narrow with two concrete options, never repeat the question.",
+      "expect_cause": "unclear",
+      "dream": null,
+      "user_lines": [
+        "idk honestly",
+        "idk, all of it I guess",
+        "maybe the swipe thing?",
+        "I'll set up expo then",
+        "thanks bye"
+      ],
+      "saved_cause": "unclear",
+      "cause_ok": true,
+      "turns": [
+        {
+          "user": null,
+          "reply": "Finishing the Nixly app is a big step! It can feel tricky when you\u2019re not sure where to begin. What would the finished app look like for you?",
+          "status": 200,
+          "seconds": 0.8,
+          "phase": "open",
+          "intervention": null,
+          "state": "ambiguity",
+          "read": null,
+          "fallback": false,
+          "checks": {
+            "hard": [],
+            "soft": [],
+            "rewritten": false
+          },
+          "flags": []
+        },
+        {
+          "user": "idk honestly",
+          "reply": "That\u2019s totally fine, many start there. Would you picture the app ready to launch with all core features working, or having a basic prototype you can test with friends?",
+          "status": 200,
+          "seconds": 1.0,
+          "phase": "open",
+          "intervention": null,
+          "state": "ambiguity",
+          "read": "idk",
+          "fallback": false,
+          "checks": {
+            "hard": [],
+            "soft": [],
+            "rewritten": false
+          },
+          "flags": []
+        },
+        {
+          "user": "idk, all of it I guess",
+          "reply": "Got it! Would you like me to suggest a tiny first move, or do you already have an idea of what you\u2019ll tackle first?",
+          "status": 200,
+          "seconds": 1.4,
+          "phase": "offer",
+          "intervention": null,
+          "state": "ambiguity",
+          "read": "idk",
+          "fallback": false,
+          "checks": {
+            "hard": [],
+            "soft": [],
+            "rewritten": false
+          },
+          "flags": []
+        },
+        {
+          "user": "maybe the swipe thing?",
+          "reply": "Great, the swipe thing sounds like a solid start. What\u2019s the smallest thing you could do right now to begin working on that swipe feature?",
+          "status": 200,
+          "seconds": 3.3,
+          "phase": "first_step",
+          "intervention": null,
+          "state": "ambiguity",
+          "read": "answer",
+          "fallback": false,
+          "checks": {
+            "hard": [],
+            "soft": [],
+            "rewritten": false
+          },
+          "flags": []
+        },
+        {
+          "user": "I'll set up expo then",
+          "reply": "Setting up Expo sounds perfect\u2014good call! I\u2019m here whenever you need a hand.",
+          "status": 200,
+          "seconds": 11.4,
+          "phase": "release",
+          "intervention": null,
+          "state": "ambiguity",
+          "read": "own_plan",
+          "fallback": false,
+          "checks": {
+            "hard": [],
+            "soft": [],
+            "rewritten": false
+          },
+          "flags": []
+        },
+        {
+          "user": "thanks bye",
+          "reply": "You\u2019re welcome! Good luck with the setup, and I\u2019m around if you need anything.",
+          "status": 200,
+          "seconds": 4.7,
+          "phase": "release",
+          "intervention": null,
+          "state": "ambiguity",
+          "read": "ack",
+          "fallback": false,
+          "checks": {
+            "hard": [],
+            "soft": [],
+            "rewritten": false
+          },
+          "flags": []
+        }
+      ]
+    },
+    {
+      "id": "ambiguity_switch_tired",
+      "state": "ambiguity",
+      "chip": "unclear",
+      "note": "Tapped unclear, reveals tiredness: switch to tired. No task step after that.",
+      "expect_cause": "tired",
+      "dream": null,
+      "user_lines": [
+        "honestly I'm just exhausted today, I worked all day",
+        "yeah I just want to sleep",
+        "bye"
+      ],
+      "saved_cause": "tired",
+      "cause_ok": true,
+      "turns": [
+        {
+          "user": null,
+          "reply": "Finishing the Nixly app in the next few days is a solid goal. It can feel a bit fuzzy when you\u2019re not sure where to begin. What would the finished Nixly app look like for you?",
+          "status": 200,
+          "seconds": 4.0,
+          "phase": "open",
+          "intervention": null,
+          "state": "ambiguity",
+          "read": null,
+          "fallback": false,
+          "checks": {
+            "hard": [],
+            "soft": [],
+            "rewritten": false
+          },
+          "flags": []
+        },
+        {
+          "user": "honestly I'm just exhausted today, I worked all day",
+          "reply": "Sounds like you\u2019re really drained after a long day. Take the rest you need, and I\u2019ll be here whenever you feel ready to dive back in.",
+          "status": 200,
+          "seconds": 5.7,
+          "phase": "rest",
+          "intervention": null,
+          "state": "fatigue",
+          "read": "new_cause",
+          "fallback": false,
+          "checks": {
+            "hard": [],
+            "soft": [],
+            "rewritten": false
+          },
+          "flags": []
+        },
+        {
+          "user": "yeah I just want to sleep",
+          "reply": "I just want to sleep. Rest well, and I\u2019m around if you need anything later.",
+          "status": 200,
+          "seconds": 9.3,
+          "phase": "release",
+          "intervention": null,
+          "state": "fatigue",
+          "read": "own_plan",
+          "fallback": false,
+          "checks": {
+            "hard": [],
+            "soft": [],
+            "rewritten": false
+          },
+          "flags": []
+        },
+        {
+          "user": "bye",
+          "reply": "Take care, and I\u2019m here if you need anything later.",
+          "status": 200,
+          "seconds": 5.5,
+          "phase": "release",
+          "intervention": null,
+          "state": "fatigue",
+          "read": "ack",
+          "fallback": false,
+          "checks": {
+            "hard": [],
+            "soft": [],
+            "rewritten": false
+          },
+          "flags": []
+        }
+      ]
+    }
+  ]
+}

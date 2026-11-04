@@ -3,6 +3,8 @@
 #
 #   POST /cron/checkins — gated by X-Cron-Secret; sends the daily check-in push to users with a
 #                          due-soon/overdue task or an untouched one, skipping tasks nudged recently.
+#   POST /cron/echo     — gated by X-Cron-Secret; weekly (Sunday 23:00 India time): Echo counts each
+#                          user's finished week for Buddy (brain/echo.py). Safe to call twice.
 
 import hmac
 import logging
@@ -14,8 +16,9 @@ from fastapi import APIRouter, Depends, Header, HTTPException
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from brain import echo
 from db import SessionLocal
-from models import Event, Task
+from models import Event, Task, User
 from notifications.service import send_daily_checkin
 
 router = APIRouter(prefix="/cron", tags=["cron"])
@@ -83,3 +86,23 @@ async def cron_checkins(_: None = Depends(require_cron_secret)):
         db.close()
 
     return {"attempted": len(sent) + len(skipped) + len(failed), "sent": len(sent), "skipped": len(skipped), "failed": len(failed)}
+
+
+@router.post("/echo")
+def cron_echo(_: None = Depends(require_cron_secret)):
+    # Plain code, no model call, so it's quick and holds no session across an LLM call.
+    db = SessionLocal()
+    counts = {"saved": 0, "already_done": 0, "no_tasks": 0, "failed": 0}
+    now = datetime.now(timezone.utc)
+    try:
+        for user_id in db.execute(select(User.id)).scalars().all():
+            try:
+                counts[echo.run_echo(db, user_id, now)] += 1
+            except Exception:
+                db.rollback()
+                logger.exception("cron echo failed for user_id=%s", user_id)
+                counts["failed"] += 1
+    finally:
+        db.close()
+    _, end = echo.week_window(now)
+    return {"week": echo.week_id(end), **counts}
