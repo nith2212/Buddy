@@ -4,8 +4,8 @@ Flaws found and decisions made while testing Buddy on the phone (from 2026-11-01
 We are still collecting. Nothing here is built yet unless marked.
 
 ## Status
-- origin/dev (Render, the phone) is at `6e36a94`: old Buddy.
-- Local dev: `760d696` (stage machine, frameworks, evals) plus uncommitted: the offer-stage fix and the evals moved to `testing/` (292 tests green). Not pushed.
+- origin/dev (Render, the phone) is at `d74b719`: frameworks + Echo E1 + Haiku (`GROQ_MODEL=claude-haiku-5-5` on Render). Owner phone-tested every chip on 2026-11-04: replies under 5s, no fallbacks, 6 of 8 chats clean.
+- Local, uncommitted: the two phone-test fixes and the named check-in (see section 6), 327 tests green.
 - Evals and grading now live in `testing/` (see `testing/README.md` and `testing/GRADING.md`). Run from the repo root.
 
 ## Build plan (approved 2026-11-04, hard stop Nov 8)
@@ -55,7 +55,7 @@ Resume when the caps reset (one at a time, from the repo root):
 **Echo, in steps (agreed 2026-11-04).** Echo is for Buddy only: no push, no user-facing text. A UI for the user is Later.
 - [x] **E1. Facts.** (built 2026-11-04, uncommitted: `brain/echo.py`, `POST /cron/echo`, postpone event in `tasks.py`, Buddy's line in `agent._context_line`, `testing/echo_report.py`, `tests/test_echo.py`. Buddy never says the facts; week ends Sunday 23:00 India time; "ignored" = no tap, chat or step on that task within 12 hours of a check-in. Owner still needs to add the cron-job.org job.) Weekly, per user, counted by code (no model call, so nothing can be invented and no Groq quota): confirmed causes and counts; ignored tasks (days untouched, check-ins ignored, postpones); what got finished. Runs for anyone with at least one task, including tasks they're ignoring (ignoring is data); skips users with no tasks. Saved as memory rows (source `echo`), wiped by DELETE /me. Buddy gets at most one line, only when it's relevant. A local text report for dev.
 - [ ] **E2. Reactions to Buddy.** Count, per user: which of Buddy's moves they took or said no to (rough first version, tiny move, lighter way), whether they bring their own plan, which notification buttons they tap or ignore, and whether progress followed a chat within a day. Counted and shown in the report only: Buddy doesn't change yet. Before Nov 8 if E1 goes smoothly.
-- [ ] **E3. Buddy adapts.** One or two hand-written rules the owner approves, only after something has shown up 3+ times (e.g. always brings their own plan: skip the offer and ask what they'll do). No automatic picking: bandit stays parked. After the phone test, maybe after Nov 8.
+- [ ] **E3. Buddy adapts.** One or two hand-written rules the owner approves, only after something has shown up 3+ times (e.g. always brings their own plan: skip the offer and ask what they'll do). No automatic picking: bandit stays parked. Owner moved it into this week (2026-11-04 night): build it right after E2, Nov 5.
 - Later: Echo shaping proactive check-ins (gentler for ignored tasks, best hour); a patterns UI for the user.
 
 **Step 5. Ship (Nov 7-8)**
@@ -128,3 +128,15 @@ Quality first, before Echo. Backend and frontend work as intended; the prompt an
 - Model ignored the offer step and handed out a step anyway; first move was a list ("three layout options"). Fixed locally, HELD.
 - After "idk", asked another open question instead of a guess. Fixed locally (soft check), HELD.
 - State never changes from what the user types. See section 2.
+- Phone test 2026-11-04 (Haiku), fixed locally the same night, replayed live on Haiku (`testing/results/2026-11-04_2240..2242_*`), new eval scenarios `phone_overwhelm_took_buddys_step` and `phone_low_interest_must_do`:
+  - "Okie I can do that" to Buddy's micro-step got "you picked it yourself!", and Buddy argued when corrected. Cause: the reader called accepting Buddy's step `own_plan`, so the wrap-up was told "their plan". Fix: a new reading `accept` (wraps up with "If they took your move": never credit them), and the Followup card agrees with a correction in a few words, no new step.
+  - Boring chip persuaded: "you don't have to like it to get through it", "a report like this can build your manager's trust". Causes: "I HAVE to do it" read as a no, so the "try a different option" wording kicked in; "I don't like it" stayed on narrow with the no wording; the purpose card listed what it could give, and the model stated it. Fix: open+no and narrow+confirm route on, purpose+no goes to lighten, the cards say ask-never-tell, lighten offers "the bare minimum", and reply_check hard-bans "don't have to like it", "still has to get done" and "totally valid".
+  - The daily check-in never said which task it was about. Now: "How's “<title>” going today?" (title capped at 60 chars; goes through Expo/Google push, owner OK).
+
+## Echo page for the user (proposal, 2026-11-04 night; owner to pick)
+A friend telling you what they noticed, never a report card. Code templates only (no free model text).
+- Must: (1) wins this week (tasks finished, steps ticked, "started N times when it felt hard"); (2) gentle streak: 7 dots, one per day you touched a task, quiet reset every Sunday, optional up-only total ("shown up 23 days"); (4) one Buddy line from the week's numbers.
+- Should (needs E2): (3) what got in the way + what helped, only causes confirmed 3+ times ("fear came up 3 times; a rough first version helped twice").
+- Stretch: (5) "Talk about my week" chat (new short framework: open, reflect, one gentle intention, release).
+- Never: ignored check-ins, days untouched, postpones, comparisons, percentages, empty praise. Quiet week: "Quiet week. That's okay."
+- Backend: read-only `GET /echo/week` (scoped to the caller), added with E2. Weekly only: monthly reflections stay parked.

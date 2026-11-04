@@ -204,7 +204,8 @@ FLOW_HISTORY = 8          # messages of this session the writer sees
 FLOW_OPEN_STEPS = 5
 _GENERIC_HEADINGS = {"release": "Release", "step_back": "Step back", "offer": "Offer", "followup": "Followup"}
 _MODIFIER_HEADINGS = {"idk": "If they said idk", "unsure": "If they were unsure", "reject": "If they said no",
-                      "unclear": "If it was unclear", "stay": "If they answered but you stay here"}
+                      "unclear": "If it was unclear", "stay": "If they answered but you stay here",
+                      "accepted": "If they took your move"}
 _FRAMEWORK_TITLES = {"ambiguity": "Don't know where to start", "perfectionism": "Scared it won't be good enough",
                      "fatigue": "Too tired", "overwhelm": "Feels too big", "low_interest": "Boring or pointless"}
 OFFER_FALLBACK = "Want a tiny first move from me, or do you already know what you'll do?"

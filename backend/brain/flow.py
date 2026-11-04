@@ -18,7 +18,9 @@ from typing import Optional
 
 from brain import llm
 
-KINDS = ("idk", "answer", "confirm", "reject", "unsure", "own_plan", "wants_move", "ack", "new_cause", "bigger")
+KINDS = ("idk", "answer", "confirm", "reject", "unsure", "own_plan", "accept", "wants_move", "ack", "new_cause",
+         "bigger")
+DONE_KINDS = ("ack", "own_plan", "accept")  # the user is set: wrap up
 CAUSES = {
     "unclear": "not knowing where to start",
     "too_much": "the task feels too big",
@@ -92,7 +94,9 @@ FRAMEWORKS: dict[str, Framework] = {
     "low_interest": Framework(
         first="open",
         on={("open", "answer"): "narrow", ("open", "idk"): "narrow", ("open", "unsure"): "narrow",
-            ("purpose", "idk"): "lighten", ("own_reason", "answer"): "release", ("own_reason", "unsure"): "release",
+            ("open", "reject"): "narrow",       # "no, I HAVE to do it": it can't be dropped, so on to why it drags
+            ("narrow", "confirm"): "lighten",   # "I just don't like it": boring, accept that and make it lighter
+            ("purpose", "idk"): "lighten", ("purpose", "reject"): "lighten", ("own_reason", "answer"): "release", ("own_reason", "unsure"): "release",
             ("own_reason", "reject"): "release", ("lighten", "answer"): "lighten"},
         switch_entry="open", tiny="lighten",
         save_on=frozenset({("narrow", "confirm"), ("narrow", "answer"), ("*", "own_plan")}),
@@ -144,7 +148,11 @@ def next_stage(state: str, stage: str, reading: Reading, tries: int) -> Step:
         kind = "answer" if stage == fw.first else "confirm"
 
     if stage in ("release", "followup"):
-        return Step(state, "release" if kind in ("ack", "own_plan") else "followup", note=note)
+        return Step(state, "release" if kind in DONE_KINDS else "followup", note=note)
+    if kind == "accept" and stage != "offer":  # "sure" to "a move from me, or yours?" means "give me one"
+        # They took Buddy's move: it counts like their own plan for the cause, but the idea was Buddy's,
+        # so the wrap-up must never credit them with it.
+        return Step(state, "release", modifier="accepted", save_cause=_save(fw, stage, "own_plan"), note=note)
     if kind in ("ack", "own_plan"):
         return Step(state, "release", save_cause=_save(fw, stage, kind), note=_plan_note(reading) or note)
     if stage == "offer":
@@ -247,15 +255,17 @@ _READ_SYSTEM = (
     "(picking one side of Buddy's either/or question counts)\n"
     "- reject: says Buddy's read is wrong, or declines Buddy's idea without giving their own\n"
     "- unsure: half-agrees, hedges (\"maybe\", \"kinda\"), or picks both sides\n"
-    "- own_plan: names a specific action THEY will do (deciding to drop or postpone the task counts), or accepts "
-    "the step Buddy offered (\"okay I can do that\")\n"
+    "- own_plan: names a specific action THEY came up with, different from any step Buddy offered (deciding to "
+    "drop or postpone the task counts)\n"
+    "- accept: agrees to the step or move Buddy just offered (\"okay I can do that\", \"haha sounds fun\")\n"
     "- wants_move: asks Buddy for a step or for help choosing, or wants to do something without saying what "
     "(\"I need to get something done\")\n"
     "- ack: only thanks or a sign-off\n"
     "- new_cause: reveals a DIFFERENT reason they're stuck than the one being discussed\n"
     "- bigger: distress beyond work (health, safety, grief, crisis, feeling worthless)\n"
     "cause (only for confirm or new_cause, else null): one of " + ", ".join(f"{k} ({v})" for k, v in CAUSES.items())
-    + "\nflavor: only when the options below list some, else null.\n"
+    + "\nflavor: only when the options below list some, else null. boring = dull, tedious, they dislike doing "
+    "it; pointless = they see no use or point in it.\n"
     "fact: their key point in at most 12 words, in their own words, or null.\n"
     'Reply with JSON only: {"kind": "...", "cause": null, "flavor": null, "fact": null}'
 )

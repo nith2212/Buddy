@@ -108,7 +108,8 @@ def test_every_stage_has_wording_in_the_docs():
             assert framework_section(state, stage), f"{state}: no '## {stage}' section"
         assert framework_section(state, "Never")
     for heading in ("Voice", "Release", "Step back", "Offer", "Followup", "If they said idk", "If they were unsure",
-                    "If they said no", "If it was unclear", "If they answered but you stay here"):
+                    "If they said no", "If it was unclear", "If they answered but you stay here",
+                    "If they took your move"):
         assert framework_section("shared", heading), heading
 
 
@@ -121,3 +122,34 @@ def test_clear_tiredness_switches_without_a_model_but_not_inside_the_tired_frame
 def test_describing_the_cause_unprompted_is_an_answer_not_a_confirmation():
     step = next_stage("perfectionism", "open", R("new_cause", "afraid"), 1)
     assert (step.stage, step.save_cause) == ("confirm", None)
+
+
+# ── phone test, 2026-11-04 ────────────────────────────────────────────────────────
+
+def test_taking_buddys_move_wraps_up_without_crediting_them():
+    # "Hmm okie I can do that" to Buddy's micro-step: release, cause saved, but no "their plan" note
+    # (that note made Buddy say "you picked it yourself!")
+    step = next_stage("overwhelm", "micro", R("accept", fact="I can open the 3D file"), 1)
+    assert (step.stage, step.modifier, step.save_cause, step.note) == ("release", "accepted", "too_much", None)
+    own = next_stage("overwhelm", "micro", R("own_plan", fact="I'll sketch one shape"), 1)
+    assert own.note == ("their plan", "I'll sketch one shape") and own.modifier is None
+
+
+def test_sure_to_the_offer_means_give_me_one_not_goodbye():
+    for state in flow.FRAMEWORKS:
+        step = next_stage(state, "offer", R("accept"), 1)
+        assert step.stage != "release", state
+
+
+def test_correcting_buddy_after_the_wrap_up_is_a_followup():
+    assert next_stage("overwhelm", "release", R("reject"), 1).stage == "followup"
+    assert next_stage("overwhelm", "followup", R("accept"), 1).stage == "release"
+
+
+def test_the_manager_report_chat_never_lands_on_a_persuading_stage():
+    # "I HAVE to do it" (a no to "could it be dropped?") -> "I don't like it" -> "it's pointless"
+    # -> "just the maintenance report" (a no to "what could it give you?")
+    stages, saved = walk("low_interest", [R("reject"), R("confirm", "bored"), R("answer")])
+    assert stages == ["narrow", "lighten", "lighten"] and saved == ["bored"]
+    stages, _ = walk("low_interest", [R("reject"), R("answer", flavor="pointless"), R("reject")])
+    assert stages == ["narrow", "purpose", "lighten"]

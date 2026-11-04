@@ -15,14 +15,17 @@ from dataclasses import dataclass
 from typing import Iterable
 
 # Buddy speaks in the owner's voice (CLAUDE.md "Tone"): warm reactions like "I get it" or "that sounds
-# great" are welcome. Still banned: therapy phrases, promises it can't keep, and pressure.
+# great" are welcome. Still banned: therapy phrases, promises it can't keep, pressure and moralizing.
 _STOCK = re.compile(
     r"(?:\bi hear you\b"
     r"|\bit['’]?s (?:totally |completely |perfectly )?(?:okay|ok) to feel\b"
-    r"|\b(?:totally|completely) understandable\b"
+    r"|\b(?:totally|completely) (?:understandable|valid)\b"
     r"|\bit['’]?s understandable\b"
     r"|\btrust me\b|\beasily fixed\b"
-    r"|\brelax\b|\bbuckle up\b|\bcalm down\b)",
+    r"|\brelax\b|\bbuckle up\b|\bcalm down\b"
+    # moralizing at someone who finds the task boring (phone test, 2026-11-04)
+    r"|\b(?:don['’]?t|do not) (?:have|need) to (?:like|love|enjoy)\b"
+    r"|\bstill (?:has|needs|have|need) to (?:get |be )?done\b)",
     re.IGNORECASE,
 )
 

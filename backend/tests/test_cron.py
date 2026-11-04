@@ -102,3 +102,25 @@ def test_cron_isolates_failure_per_user(api, db, monkeypatch):
     body = r.json()
     assert body["attempted"] == 2
     assert body["sent"] == 1 and body["failed"] == 1
+
+
+def test_checkin_names_its_task_and_only_the_callers_task(api, db, monkeypatch):
+    import asyncio
+    from notifications import service
+
+    uid, h = register(api)
+    other, oh = register(api)
+    mine = api.post("/tasks", json={"title": "Finish writing report for manager"}, headers=h).json()["id"]
+    theirs = api.post("/tasks", json={"title": "Someone else's secret"}, headers=oh).json()["id"]
+    sent = []
+
+    async def fake_push(*, body, **kw):
+        sent.append(body)
+        return {"status": "ok"}
+
+    monkeypatch.setattr(service, "send_push", fake_push)
+    asyncio.run(service.send_daily_checkin(db, uid, mine))
+    asyncio.run(service.send_daily_checkin(db, uid, theirs))   # not this user's task: no title leaks
+    assert sent == ["How's “Finish writing report for manager” going today?", "How's your task going today?"]
+    assert service.checkin_body("x" * 100).endswith("…” going today?")
+    assert len(service.checkin_body("x" * 100)) < 90

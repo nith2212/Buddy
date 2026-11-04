@@ -10,7 +10,7 @@ from typing import Any
 import httpx
 from sqlalchemy.orm import Session
 
-from models import DeviceToken
+from models import DeviceToken, Task
 
 EXPO_PUSH_URL = "https://exp.host/--/api/v2/push/send"
 
@@ -68,16 +68,31 @@ async def send_push(
     return ticket
 
 
+TITLE_IN_BODY = 60  # characters of the task title shown in a check-in
+
+
+def checkin_body(title: str | None) -> str:
+    """Name the task: a check-in that doesn't say which task gets ignored (and Echo counts it as ignored).
+    The title leaves our server via Expo's and Google's push services (owner OK, 2026-11-04)."""
+    title = " ".join((title or "").split())
+    if not title:
+        return "How's your task going today?"
+    if len(title) > TITLE_IN_BODY:
+        title = title[:TITLE_IN_BODY - 1].rstrip() + "…"
+    return f"How's “{title}” going today?"
+
+
 async def send_daily_checkin(db: Session, user_id: str, task_id: int) -> dict | None:
     """
     Scheduler entry point. Sends the initial task-state check-in notification.
     Wire bandit logic here to choose the optimal time/content before calling send_push.
     """
+    task = db.query(Task).filter(Task.id == task_id, Task.user_id == user_id).first()
     return await send_push(
         db=db,
         user_id=user_id,
         title="Daily Check-in 🌟",
-        body="How's your task going today?",
+        body=checkin_body(task.title if task else None),
         data={
             "stage": "task_state",
             "task_id": task_id,

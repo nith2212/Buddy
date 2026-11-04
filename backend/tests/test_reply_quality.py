@@ -30,6 +30,9 @@ def check(reply, *, mode="chat", user_message=None, anchors=ANCHORS):
     "Trust me, the figma design will be easy.",
     "Relax, the figma design can wait a minute.",
     "Time to buckle up and open figma.",
+    "Fair enough, you don't have to like it to get through the figma design.",   # moralizing (phone test)
+    "You don’t need to enjoy figma, it still has to get done.",
+    "Fair enough, not liking figma is totally valid.",
 ])
 def test_therapy_phrases_promises_and_pressure_are_hard_violations(reply):
     assert "stock_phrase" in check(reply).hard
@@ -39,6 +42,7 @@ def test_therapy_phrases_promises_and_pressure_are_hard_violations(reply):
     "That sounds great! What's the one figma screen everything depends on?",
     "Hey there! How's the figma design going?",
     "I get it, the figma design is a lot. What's the smallest piece?",
+    "That's fair, you don't like the figma design. Want to try 20 minutes then a reward?",
 ])
 def test_warm_reactions_in_the_owners_voice_are_allowed(reply):
     assert "stock_phrase" not in check(reply).hard

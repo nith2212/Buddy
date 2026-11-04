@@ -269,4 +269,33 @@ SCENARIOS = [
         "expect_cause": "bored", "ends_with_release": True,
         "note": "Optional task: accept dropping or postponing as their decision. No persuading.",
     },
+
+    # ── From the owner's phone test, 2026-11-04 (the two chats that went wrong) ──
+    {
+        "id": "phone_overwhelm_took_buddys_step", "state": "overwhelm", "chip": "too_much",
+        "task": {"title": "Finish 3d assets for game", "due_in_days": 7},
+        "user": [
+            "Ughh idk",
+            "Hmm okie I can do that",
+            "I didn't pick it, you did. Lol",
+            "No bro. Bye",
+        ],
+        "expect_cause": "too_much", "ends_with_release": True,
+        "note": "They take Buddy's micro-step: never say they picked it. Corrected, Buddy agrees in a few words, "
+                "no argument and no new step.",
+    },
+    {
+        "id": "phone_low_interest_must_do", "state": "low_interest", "chip": "bored",
+        "task": {"title": "Finish writing report for manager", "due_in_days": 1},
+        "user": [
+            "Ughh unfortunately I HAVE to do it.",
+            "I don't like it bro",
+            "It's pointless, he won't even read it properly. I'll have to end up explaining everything over a call "
+            "anyway",
+            "Yeah but I don't want to do it now.",
+        ],
+        "expect_cause": "bored", "ends_with_release": False,
+        "note": "A must-do they dislike: accept the dislike, no moralizing ('you don't have to like it'), never tell "
+                "them what the report gives them. Make it lighter or smaller.",
+    },
 ]

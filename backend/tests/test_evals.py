@@ -10,7 +10,7 @@ from testing.evals.read_cases import READ_CASES
 from testing.evals.run import CRITERIA, load_frameworks, mechanical
 from testing.evals.scenarios import SCENARIOS
 
-KINDS = {"idk", "answer", "confirm", "reject", "unsure", "own_plan", "wants_move", "ack", "new_cause", "bigger"}
+from brain.flow import KINDS  # the reader's labels
 
 
 def test_scenarios_are_well_formed():

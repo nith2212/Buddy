@@ -9,7 +9,8 @@
 #   confirm    agrees with the cause Buddy offered, or clearly names it (cause = the key)
 #   reject     says Buddy's read is wrong
 #   unsure     half-agrees, "maybe", "kinda", picks both, or hedges
-#   own_plan   states what THEY will do (accepting Buddy's offered step counts too)
+#   own_plan   states what THEY will do, their own idea
+#   accept     agrees to the step Buddy just offered ("okay I can do that")
 #   wants_move asks Buddy for a step / help choosing
 #   ack        a bare thanks / sign-off, nothing to answer
 #   new_cause  reveals a different cause than the one being discussed (cause = the key)
@@ -103,14 +104,17 @@ READ_CASES = [
     ("perfectionism", OFFER_CHOICE, "nah I'd rather polish the README first, that's my plan", "own_plan", None),
     ("perfectionism", OFFER_CHOICE, "I'll just work on the RAG documents", "own_plan", None),
     ("overwhelm", ASK_TINY, "I could just open the repo and read my old notes", "own_plan", None),
-    ("overwhelm", OFFER_TINY, "Okay, I can do that", "own_plan", None),
+    ("overwhelm", OFFER_TINY, "Okay, I can do that", "accept", None),
+    ("overwhelm", OFFER_TINY, "Hmm okie I can do that", "accept", None),
     ("overwhelm", OFFER_TINY, "fine, I'll make the folder", "own_plan", None),
     ("perfectionism", "Want to try a deliberately rough version no one sees? What do you say?",
-     "Haha yeah that sounds fun.", "own_plan", None),
+     "Haha yeah that sounds fun.", "accept", None),
     ("low_interest", OFFER_LIGHTEN, "Hmm okay I've been meaning to catch up on the TV show I've been watching.",
      "own_plan", None),
     ("low_interest", OFFER_LIGHTEN, "fine whatever, I'll do 20 mins and then watch my show", "own_plan", None),
     ("low_interest", ASK_WHY, "honestly it's optional, I'll just drop it for now", "own_plan", None),
+    ("low_interest", ASK_WHY, "Ughh unfortunately I HAVE to do it.", "reject", None),          # phone test
+    ("low_interest", ASK_BORING, "I don't like it bro", "confirm", "bored"),
     ("fatigue", OFFER_CHOICE, "I'll just rename the file tonight, that's it", "own_plan", None),
 
     # wants_move

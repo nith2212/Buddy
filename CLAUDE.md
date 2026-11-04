@@ -39,17 +39,18 @@ If a request conflicts with this section, STOP and ask.
 - Mention a pattern only when a cause has been confirmed 3+ times, softly ("this has come up a few times"). Never invent counts.
 - Inject at most one capped line of top pattern into the situation text.
 
-## Build plan (hard stop: Nov 8, then testing and study)
+## Build plan (hard stop: Nov 11, then interview prep; Nov 7-8 are off for the festival)
 Already shipped: auth, tasks and steps, chat, push notifications with 3 buttons, deploy on Render + Neon. Unfinished: weekly Echo.
 Steps, each shippable alone, tested and committed before the next:
 - A. Playbook docs in backend/brain/buddy_docs/: state_perfectionism.md, state_low_interest.md, intervention_find_the_cause.md, intervention_affirm_and_release.md, plus a cause-to-first-move mapping in intervention_surface_smallest_step.md. The OWNER reviews the wording. Do not finalize it without her.
 - B. Reasons become states: extend EMOTION_TO_STATE; accept the new reason values in the notification route and log_emotion_pick; add an optional explicit `reason` field to ChatRequest (never an in-band control string).
 - C. Diagnose behavior in run_turn: tapped reason with few chat turns forces find_the_cause; after the answer, pick the matched first move; short acknowledgments force affirm_and_release and skip the decide call (Groq is capped at about 8k tokens/min). Write memory in _learn.
 - D. Mobile: reason chips when the chat is empty (src/app/task/[id].tsx, src/lib/api.ts). Notification buttons stay at 3 because of the Android limit: tired / too much / don't know where to start. Fear and boredom are in-app chips only.
-- E. Weekly Echo, for Buddy only (never shown or said to the user; a user UI is Later). In steps, see PIVOTS.md: E1 facts counted by code (causes, ignored tasks, postpones, finished), E2 how they react to Buddy's moves (counted only), E3 a few owner-approved rules once something shows up 3+ times. Runs for anyone with a task, ignored ones included. POST /cron/echo, protected by X-Cron-Secret, Sunday 23:00 India time. Dev report: testing/echo_report.py.
+- E. Weekly Echo, for Buddy only (never shown or said to the user; a user UI is Later). In steps, see PIVOTS.md: E1 facts counted by code (causes, ignored tasks, postpones, finished), E2 how they react to Buddy's moves (counted only), E3 a few owner-approved rules once something shows up 3+ times. Runs for anyone with a task, ignored ones included. POST /cron/echo, protected by X-Cron-Secret, Sunday 23:00 India time. Dev report: testing/echo_report.py. E3 is in this week too (owner, 2026-11-04 night), built after E2; its rules only fire after 3+ occurrences, so they're tested with seeded data.
+- F. UI: a new design for the app (the owner isn't happy with the current one) plus an Echo page for the user. The owner approves the design before it's built. What the Echo page may show is decided first (it must never shame: Buddy itself never states ignore counts).
 
 ## Parked (do NOT build or propose; add to a "later" list instead)
-Sprint timer, check-back commitments, firmness levels, escalation, a patterns endpoint or patterns UI, onboarding, UI polish or Figma work, a date picker, bandit, notes UI, multi-agent split, monthly reflections, accounts or passwords, web frontend, Play Store, second deployment.
+Sprint timer, check-back commitments, firmness levels, escalation, onboarding, a date picker, bandit, notes UI, multi-agent split, monthly reflections, accounts or passwords, web frontend, Play Store, second deployment.
 
 ## Later (ideas parked on purpose; not for now)
 - Precise references: every "Grounding theory" section in buddy_docs/ (old and new) cites authors from memory. Replace each with an exact, checkable source (authors, year, title, venue) and trim any claim the source does not support. Ethical reason: the playbook shapes how Buddy talks to people.
