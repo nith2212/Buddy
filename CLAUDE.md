@@ -6,7 +6,7 @@
 Buddy helps you START by finding out WHY you're stuck.
 Other apps track the task. Buddy tracks the human. When someone is avoiding a task, Buddy doesn't say "just start". It finds the real cause (not knowing where to start, it feels too big, fear of doing it badly, boredom, tiredness), helps with that specific cause, and remembers it so it can show the pattern over time ("this is the third time fear of doing it badly stopped you").
 
-Tone: Baymax. Calm, short, warm, non-judgmental. Never shames, lectures, optimizes or cheerleads.
+Tone: the owner's own voice. A sweet, peppy, kind friend who gets genuinely excited about your goals and progress. Short, warm, non-judgmental. Never shames, lectures or optimizes. Excitement only for something real the user said or did, never empty cheerleading, and not in every reply (too much gets annoying).
 
 If a request conflicts with this section, STOP and ask.
 
@@ -26,7 +26,7 @@ If a request conflicts with this section, STOP and ask.
 
 ## Reply rules (enforced by reply_check, do not weaken)
 - 2-3 short sentences. At most one question. One concrete next move.
-- No stock empathy ("That sounds exhausting", "It's totally understandable").
+- No filler or therapy phrases ("It's totally understandable", "I hear you", "It's okay to feel..."), no promises ("trust me, it's easily fixed"), no pressure ("relax", "buckle up"). A short warm reaction ("I get it", "Ooh, love that", "Yes!") is welcome when it reacts to something the user said: at most one per reply, never the same opener twice.
 - Name the task or a step in Buddy's first message of a conversation. Later replies respond to what the user said and needn't restate it.
 - Praise only for something the person actually did.
 - Never invent deadlines or clock times. Only the task's real due_date.
@@ -54,6 +54,7 @@ Sprint timer, check-back commitments, firmness levels, escalation, a patterns en
 ## Later (ideas parked on purpose; not for now)
 - Precise references: every "Grounding theory" section in buddy_docs/ (old and new) cites authors from memory. Replace each with an exact, checkable source (authors, year, title, venue) and trim any claim the source does not support. Ethical reason: the playbook shapes how Buddy talks to people.
 - Eval system: scripted conversations per reason and state, scored for reply rules (reply_check) and for the cause-then-move order, run against the real model before changing prompts or docs. Also track whether confirmed causes match what the user said.
+- Fine-tuning: LoRA-tune a small open model (about 8B) on Buddy's own conversations (the owner's dream scripts plus consented real chats) so a cheap model holds the voice. Not on public therapy/counseling datasets: they push toward therapy-speak and raise consent issues. Only after the eval system exists, so the gain can be measured against prompt-only.
 
 ## Data and privacy (non-negotiable)
 - user_id on every table. No hardcoded users.

@@ -20,31 +20,37 @@ def make_task(api, h, **extra):
     return api.post("/tasks", json={"title": "write report", **extra}, headers=h).json()["id"]
 
 
+READ_MARK = "You read one message from a user"
+
+
 class FakeLLM:
-    """Records every call; returns a decide-JSON for json_mode calls, prose otherwise."""
+    """
+    Records every call. Read calls (the framework's "read their message") return the next of
+    `reads` (the last one repeats); other JSON calls return a decide choice; the rest is prose.
+    """
 
     def __init__(self, choice="surface_smallest_step", reply="Let's find one tiny first step on your report.",
-                 fail=False, judge=("not_yet", None)):
-        self.calls, self.choice, self.reply, self.fail, self.judge = [], choice, reply, fail, judge
+                 fail=False, reads=None):
+        self.calls, self.choice, self.reply, self.fail = [], choice, reply, fail
+        self.reads = list(reads or [{"kind": "answer"}])
 
     async def __call__(self, messages, **kw):
         self.calls.append({"messages": messages, **kw})
         if self.fail:
             raise llm.LLMError("groq is down")
         if kw.get("json_mode"):
-            if "CONFIRMS a specific cause" in messages[0]["content"]:
-                verdict, cause = self.judge
-                return json.dumps({"confirmed": verdict, "cause": cause})
+            if READ_MARK in messages[0]["content"]:
+                return json.dumps(self.reads.pop(0) if len(self.reads) > 1 else self.reads[0])
             return json.dumps({"intervention": self.choice, "reason": "fits"})
         return self.reply
 
     @property
-    def judge_calls(self):
-        return [c for c in self.calls if c.get("json_mode") and "CONFIRMS a specific cause" in c["messages"][0]["content"]]
+    def read_calls(self):
+        return [c for c in self.calls if c.get("json_mode") and READ_MARK in c["messages"][0]["content"]]
 
     @property
     def decide_calls(self):
-        return [c for c in self.calls if c.get("json_mode") and c not in self.judge_calls]
+        return [c for c in self.calls if c.get("json_mode") and c not in self.read_calls]
 
     @property
     def write_calls(self):
@@ -83,16 +89,16 @@ def test_chat_happy_path_saves_turns_and_memory(api, db, fake_llm):
     assert memory["buddy.recent_interventions"] == "surface_smallest_step"
 
 
-def test_emotion_tap_drives_state_and_forces_finding_the_cause(api, fake_llm):
+def test_emotion_tap_runs_that_states_framework(api, fake_llm):
+    fake_llm.reply = "A long day on your report, so rest is fine. I'm here when you're ready."
     _, h = register(api)
     t = make_task(api, h)
     tap_emotion(api, h, t, "tired")  # -> fatigue
 
-    body = api.post("/chat", json={"task_id": t, "message": "ugh"}, headers=h).json()
-    assert body["state"] == "fatigue"
-    assert body["intervention"] == "find_the_cause"
-    assert fake_llm.decide_calls == []  # diagnosing is forced, no wasted choice
-    assert len(fake_llm.write_calls) == 1
+    body = api.post("/chat", json={"task_id": t, "message": "ugh, long day"}, headers=h).json()
+    assert body["state"] == "fatigue" and body["intervention"] == "fatigue:rest"
+    assert fake_llm.decide_calls == []  # the framework picks the stage: no decide call
+    assert len(fake_llm.read_calls) == 1 and len(fake_llm.write_calls) == 1
 
 
 def test_recently_used_interventions_are_excluded(api, db, fake_llm):
@@ -356,155 +362,221 @@ def memory_of(db, user_id):
     return {m.key: m.value for m in db.query(models.Memory).filter_by(user_id=user_id)}
 
 
-def reach_guess(api, h, t, reason, answer="it's for my manager"):
-    """Tap a reason, answer Buddy's question: Buddy's latest turn is now a guess waiting on a yes/no."""
-    api.post("/chat", json={"task_id": t, "reason": reason}, headers=h)
-    return api.post("/chat", json={"task_id": t, "message": answer}, headers=h).json()
+def start(api, h, t, reason):
+    """Tap a reason: Buddy speaks first, on the framework's opening stage."""
+    return api.post("/chat", json={"task_id": t, "reason": reason}, headers=h).json()
 
 
-def test_reason_tap_opens_with_one_question_and_no_advice(api, db, fake_llm):
+def say(api, h, t, message):
+    return api.post("/chat", json={"task_id": t, "message": message}, headers=h).json()
+
+
+def flow_of(db, t):
+    return reasoning_of(db, t)["flow"]
+
+
+def causes_of(db, user_id):
+    return {k: v for k, v in memory_of(db, user_id).items() if k.startswith(("blocker.", "pattern."))}
+
+
+def test_reason_tap_opens_on_the_frameworks_first_stage(api, db, fake_llm):
     user_id, h = register(api)
     t = make_task(api, h)
+    body = start(api, h, t, "afraid")
+    assert body["state"] == "perfectionism" and body["intervention"] == "perfectionism:open"
+    assert fake_llm.decide_calls == [] and fake_llm.read_calls == []  # nothing to read yet
+    system = " ".join(system_of(fake_llm.write_calls[0]).split())
+    assert "ask what feels risky about this task" in system and "sweet, peppy, kind friend" in system
+    assert "First move by cause" not in system and "core_buddy_philosophy" not in system  # old docs not sent
+    assert causes_of(db, user_id) == {}
 
-    body = api.post("/chat", json={"task_id": t, "reason": "afraid"}, headers=h).json()
-    assert body["intervention"] == "find_the_cause" and body["state"] == "perfectionism"
-    assert reasoning_of(db, t)["phase"] == "ask"
-    assert fake_llm.decide_calls == [] and fake_llm.judge_calls == []  # nothing to judge yet
-    assert "do NOT suggest any step" in " ".join(system_of(fake_llm.write_calls[0]).split())
-    assert not any(k.startswith(("blocker.", "pattern.")) for k in memory_of(db, user_id))
 
-
-def test_answering_the_question_makes_buddy_guess_and_is_never_a_confirmation(api, db, monkeypatch):
-    user_id, h = register(api)
-    t = make_task(api, h)
-    fake = FakeLLM(judge=("yes", "afraid"))  # even a judge that would say yes must not be asked yet
+def test_the_reading_moves_the_stage_and_notes_their_words(api, db, monkeypatch):
+    fake = FakeLLM(reads=[{"kind": "answer", "fact": "others will judge it"}])
     monkeypatch.setattr(llm, "complete", fake)
-
-    body = reach_guess(api, h, t, "afraid", "my manager will read it")
-    assert fake.judge_calls == []
-    assert body["intervention"] == "find_the_cause" and reasoning_of(db, t)["phase"] == "guess"
-    assert not any(k.startswith(("blocker.", "pattern.")) for k in memory_of(db, user_id))
-
-
-def test_unconfirmed_reply_to_a_guess_is_judged_and_not_saved(api, db, fake_llm):
     user_id, h = register(api)
     t = make_task(api, h)
-    reach_guess(api, h, t, "afraid")
-    body = api.post("/chat", json={"task_id": t, "message": "hmm maybe"}, headers=h).json()
-    assert len(fake_llm.judge_calls) == 1  # default fake verdict: not_yet
-    assert body["intervention"] == "find_the_cause" and reasoning_of(db, t)["phase"] == "guess"
-    assert not any(k.startswith(("blocker.", "pattern.")) for k in memory_of(db, user_id))
+    start(api, h, t, "afraid")
+    assert say(api, h, t, "people will think it's messy")["intervention"] == "perfectionism:confirm"
+    assert flow_of(db, t)["notes"] == {"worry": "others will judge it"}
+    assert "- worry: others will judge it" in system_of(fake.write_calls[-1])
+    assert causes_of(db, user_id) == {}  # an answer is not a confirmation
 
 
-def test_confirmed_cause_gets_an_offer_and_is_saved_once(api, db, monkeypatch):
-    user_id, h = register(api)
-    t = make_task(api, h)
-    fake = FakeLLM(judge=("yes", "afraid"))
+def test_confirming_saves_the_cause_once(api, db, monkeypatch):
+    fake = FakeLLM(reads=[{"kind": "answer"}, {"kind": "confirm", "cause": "afraid"}, {"kind": "confirm"}])
     monkeypatch.setattr(llm, "complete", fake)
-    reach_guess(api, h, t, "afraid")
+    user_id, h = register(api)
+    t = make_task(api, h)
+    start(api, h, t, "afraid")
+    say(api, h, t, "people will think it's messy")
+    assert say(api, h, t, "yeah that's it")["intervention"] == "perfectionism:reframe"
+    assert causes_of(db, user_id) == {f"blocker.task.{t}": "afraid", "pattern.blocker.afraid": "1"}
+    assert say(api, h, t, "haha okay")["intervention"] == "perfectionism:release"
+    assert causes_of(db, user_id)["pattern.blocker.afraid"] == "1"  # not counted twice
 
-    body = api.post("/chat", json={"task_id": t, "message": "yes, exactly that"}, headers=h).json()
-    assert body["intervention"] == "find_the_cause"
-    assert reasoning_of(db, t)["phase"] == "offer"
+
+def test_their_own_plan_is_released_and_backed_as_said(api, db, monkeypatch):
+    fake = FakeLLM(reads=[{"kind": "own_plan", "fact": "polish the README first"}])
+    monkeypatch.setattr(llm, "complete", fake)
+    _, h = register(api)
+    t = make_task(api, h)
+    start(api, h, t, "afraid")
+    assert say(api, h, t, "nah I'd rather polish the README first")["intervention"] == "perfectionism:release"
     system = " ".join(system_of(fake.write_calls[-1]).split())
-    assert "do they want a tiny first move" in system and "just confirmed what is in the way: fear that it won't" in system
-    mem = memory_of(db, user_id)
-    assert mem[f"blocker.task.{t}"] == "afraid" and mem["pattern.blocker.afraid"] == "1"
-
-    # asking for the move gets it; the cause is not counted again
-    body = api.post("/chat", json={"task_id": t, "message": "yeah give me a tiny one"}, headers=h).json()
-    assert body["intervention"] == "surface_smallest_step"
-    assert reasoning_of(db, t)["phase"] == "first_move"
-    assert "First move by cause" in system_of(fake.write_calls[-1])
-    assert memory_of(db, user_id)["pattern.blocker.afraid"] == "1"
-
-    # still stuck after the move: a normal turn, not a release
-    api.post("/chat", json={"task_id": t, "message": "but I still don't know how"}, headers=h)
-    assert reasoning_of(db, t)["phase"] == "normal"
+    assert "never shrink, change or add to it" in system and "their plan: polish the README first" in system
+    assert "no question" in system
 
 
-def test_own_plan_after_the_offer_is_backed_not_shrunk(api, db, monkeypatch):
-    user_id, h = register(api)
+def test_idk_is_caught_without_a_model_call_and_narrows(api, db, fake_llm):
+    _, h = register(api)
     t = make_task(api, h)
-    fake = FakeLLM(judge=("yes", "afraid"))
+    start(api, h, t, "unclear")
+    say(api, h, t, "idk honestly")
+    assert fake_llm.read_calls == []
+    assert flow_of(db, t)["stage"] == "open" and flow_of(db, t)["modifier"] == "idk"
+    assert "Don't ask the same question again" in system_of(fake_llm.write_calls[-1])
+
+
+def test_unsure_stays_on_the_stage_and_says_it_differently(api, db, monkeypatch):
+    fake = FakeLLM(reads=[{"kind": "unsure"}])
     monkeypatch.setattr(llm, "complete", fake)
-    reach_guess(api, h, t, "afraid")
-    api.post("/chat", json={"task_id": t, "message": "yes, exactly that"}, headers=h)
-
-    body = api.post("/chat", json={"task_id": t, "message": "I'll work on the RAG documents"}, headers=h).json()
-    assert body["intervention"] == "affirm_and_release"
-    assert reasoning_of(db, t)["phase"] == "release"
-    assert "never shrink" in system_of(fake.write_calls[-1])
-
-    # a sign-off after that is a release too, not a repeat of the last move
-    api.post("/chat", json={"task_id": t, "message": "Fine bro I'll do that. Bye"}, headers=h)
-    assert reasoning_of(db, t)["phase"] == "release"
-
-
-def test_yes_without_a_named_cause_uses_the_tapped_reason(api, db, monkeypatch):
-    user_id, h = register(api)
+    _, h = register(api)
     t = make_task(api, h)
-    monkeypatch.setattr(llm, "complete", FakeLLM(judge=("yes", None)))
-    reach_guess(api, h, t, "bored")
-    api.post("/chat", json={"task_id": t, "message": "yeah it's just dull"}, headers=h)
-    assert memory_of(db, user_id)[f"blocker.task.{t}"] == "bored"
+    start(api, h, t, "afraid")
+    say(api, h, t, "idk bro")  # -> narrow
+    say(api, h, t, "yeah, maybe")
+    assert flow_of(db, t)["stage"] == "narrow" and flow_of(db, t)["modifier"] == "unsure"
+    assert "They half-agreed or hedged" in system_of(fake.write_calls[-1])
 
 
-def test_rejected_read_is_not_counted_and_next_read_must_differ(api, db, monkeypatch):
-    user_id, h = register(api)
-    t = make_task(api, h)
-    fake = FakeLLM(judge=("no", None))
-    monkeypatch.setattr(llm, "complete", fake)
-    reach_guess(api, h, t, "afraid")
-    api.post("/chat", json={"task_id": t, "message": "no, not really"}, headers=h)
-    assert "was not right" in system_of(fake.write_calls[-1])
-    assert not any(k.startswith(("blocker.", "pattern.")) for k in memory_of(db, user_id))
-
-
-@pytest.mark.parametrize("bad", ["not json", json.dumps({"confirmed": "definitely"}), json.dumps(["yes"])])
-def test_garbled_judge_output_never_saves_a_cause(api, db, monkeypatch, bad):
-    user_id, h = register(api)
-    t = make_task(api, h)
-
+@pytest.mark.parametrize("bad", ["not json", json.dumps({"kind": "definitely"}), json.dumps(["yes"])])
+def test_a_garbled_read_stays_on_the_stage_and_saves_nothing(api, db, monkeypatch, bad):
     class Garbled(FakeLLM):
         async def __call__(self, messages, **kw):
             out = await super().__call__(messages, **kw)
             return bad if kw.get("json_mode") else out
 
     monkeypatch.setattr(llm, "complete", Garbled())
-    reach_guess(api, h, t, "afraid")
-    r = api.post("/chat", json={"task_id": t, "message": "yes"}, headers=h)
-    assert r.status_code == 200 and r.json()["intervention"] == "find_the_cause"
-    assert not any(k.startswith("blocker.") for k in memory_of(db, user_id))
-
-
-def test_judge_failure_does_not_save_and_still_replies(api, db, monkeypatch):
     user_id, h = register(api)
     t = make_task(api, h)
+    start(api, h, t, "afraid")
+    r = api.post("/chat", json={"task_id": t, "message": "yes exactly"}, headers=h)
+    assert r.status_code == 200 and r.json()["intervention"] == "perfectionism:open"
+    assert flow_of(db, t)["modifier"] == "unclear" and causes_of(db, user_id) == {}
 
-    class JudgeDown(FakeLLM):
+
+def test_a_failed_read_still_replies(api, db, monkeypatch):
+    class ReadDown(FakeLLM):
         async def __call__(self, messages, **kw):
             if kw.get("json_mode"):
                 raise llm.LLMError("rate limited")
             return await super().__call__(messages, **kw)
 
-    monkeypatch.setattr(llm, "complete", JudgeDown())
-    reach_guess(api, h, t, "afraid")
-    r = api.post("/chat", json={"task_id": t, "message": "yes"}, headers=h)
-    assert r.status_code == 200 and not r.json()["reply"] == agent.FALLBACK_REPLY["chat"]
-    assert not any(k.startswith("blocker.") for k in memory_of(db, user_id))
+    monkeypatch.setattr(llm, "complete", ReadDown())
+    user_id, h = register(api)
+    t = make_task(api, h)
+    start(api, h, t, "afraid")
+    r = say(api, h, t, "yes exactly")
+    assert r["reply"] != agent.FALLBACK_REPLY["chat"] and causes_of(db, user_id) == {}
 
 
-def test_probing_stops_after_a_few_unconfirmed_turns(api, db, fake_llm):
+def test_after_two_tries_on_a_stage_buddy_offers_the_choice(api, db, fake_llm):
     _, h = register(api)
     t = make_task(api, h)
-    api.post("/chat", json={"task_id": t, "reason": "unclear"}, headers=h)
-    for _ in range(agent.DIAGNOSE_MAX_BUDDY_TURNS):
-        api.post("/chat", json={"task_id": t, "message": "dunno"}, headers=h)
-    r = api.post("/chat", json={"task_id": t, "message": "still dunno"}, headers=h)
-    assert r.status_code == 200
-    assert reasoning_of(db, t)["phase"] == "normal"
-    assert "Do not ask why again" in system_of(fake_llm.write_calls[-1])
+    start(api, h, t, "unclear")
+    say(api, h, t, "dunno")
+    assert flow_of(db, t)["stage"] == "open"
+    say(api, h, t, "dunno")
+    assert flow_of(db, t)["stage"] == "offer"
+
+
+def test_offer_that_hands_out_a_step_is_replaced_by_the_fixed_offer(api, db, fake_llm):
+    _, h = register(api)
+    t = make_task(api, h)
+    start(api, h, t, "unclear")
+    say(api, h, t, "dunno")
+    body = say(api, h, t, "dunno")  # the fake writer hands out a step, not the choice
+    assert body["reply"] == agent.OFFER_FALLBACK and reasoning_of(db, t)["checks"]["offer_template"] is True
+
+
+def test_a_different_cause_switches_the_framework_and_is_saved(api, db, monkeypatch):
+    fake = FakeLLM(reads=[{"kind": "new_cause", "cause": "tired"}])
+    monkeypatch.setattr(llm, "complete", fake)
+    user_id, h = register(api)
+    t = make_task(api, h)
+    start(api, h, t, "unclear")
+    body = say(api, h, t, "honestly I'm just exhausted today")
+    assert body["state"] == "fatigue" and body["intervention"] == "fatigue:rest"
+    assert causes_of(db, user_id)[f"blocker.task.{t}"] == "tired"
+    assert "They since said what's really in the way: being tired" in system_of(fake.write_calls[-1])
+
+
+def test_something_bigger_than_work_steps_back_and_stays_back(api, db, fake_llm):
+    user_id, h = register(api)
+    t = make_task(api, h)
+    start(api, h, t, "afraid")
+    assert say(api, h, t, "it's not the task, I can't stop crying lately")["intervention"] == "perfectionism:step_back"
+    assert fake_llm.read_calls == []  # caught by pattern, no waiting on a model
+    assert "you're a task companion and not the right support" in system_of(fake_llm.write_calls[-1])
+    assert say(api, h, t, "yeah")["intervention"] == "perfectionism:step_back"
+    assert causes_of(db, user_id) == {}
+
+
+def test_a_flavor_picks_the_branch(api, db, monkeypatch):
+    fake = FakeLLM(reads=[{"kind": "answer"}, {"kind": "confirm", "cause": "bored", "flavor": "pointless"}])
+    monkeypatch.setattr(llm, "complete", fake)
+    user_id, h = register(api)
+    t = make_task(api, h)
+    start(api, h, t, "bored")
+    assert say(api, h, t, "client requirements")["intervention"] == "low_interest:narrow"
+    assert say(api, h, t, "pointless")["intervention"] == "low_interest:purpose"
+    assert causes_of(db, user_id)[f"blocker.task.{t}"] == "bored"
+
+
+def test_still_talking_after_the_release_gets_a_followup(api, db, monkeypatch):
+    fake = FakeLLM(reads=[{"kind": "own_plan"}, {"kind": "answer"}])
+    monkeypatch.setattr(llm, "complete", fake)
+    _, h = register(api)
+    t = make_task(api, h)
+    start(api, h, t, "too_much")
+    say(api, h, t, "I'll open the repo")
+    assert say(api, h, t, "but I still don't know how")["intervention"] == "overwhelm:followup"
+    assert say(api, h, t, "thanks bye")["intervention"] == "overwhelm:release"
+
+
+def test_a_bare_okay_to_a_question_is_read_not_released(api, db, fake_llm):
+    fake_llm.reply = "What feels risky about the report?"
+    _, h = register(api)
+    t = make_task(api, h)
+    start(api, h, t, "afraid")  # Buddy asked a question
+    say(api, h, t, "okay")
+    assert len(fake_llm.read_calls) == 1 and flow_of(db, t)["stage"] != "release"
+
+
+def test_due_time_and_task_name_only_on_the_first_buddy_turn(api, db, fake_llm):
+    _, h = register(api)
+    t = make_task(api, h, due_date=(datetime.now(timezone.utc) + timedelta(days=3)).isoformat())
+    start(api, h, t, "afraid")
+    say(api, h, t, "people will see it")
+    first, last = system_of(fake_llm.write_calls[0]), system_of(fake_llm.write_calls[-1])
+    assert "due in about 3 days" in first and "name the task naturally" in first
+    assert "due in" not in last and "Don't restate the task's name" in last
+    assert "no_task_reference" not in reasoning_of(db, t)["checks"]["soft"]
+
+
+def test_a_new_tap_starts_a_new_session_that_remembers_last_time(api, db, monkeypatch):
+    fake = FakeLLM(reads=[{"kind": "answer", "fact": "a gallery app"}])
+    monkeypatch.setattr(llm, "complete", fake)
+    _, h = register(api)
+    t = make_task(api, h)
+    start(api, h, t, "unclear")
+    say(api, h, t, "a gallery app")
+    start(api, h, t, "unclear")  # new tap = new session, back to the opener
+    assert flow_of(db, t)["stage"] == "open" and flow_of(db, t)["notes"] == {}
+    assert "Last time on this task: goal: a gallery app" in system_of(fake.write_calls[-1])
+    sent = [m["content"] for m in fake.write_calls[-1]["messages"][1:]]
+    assert "a gallery app" not in sent  # the old session's messages are not replayed
 
 
 @pytest.mark.parametrize("message", ["Okie, thanks", "ok thanks!", "got it", "will do 👍", "Thank you so much"])
@@ -513,7 +585,7 @@ def test_short_acknowledgment_gets_affirm_and_release(api, db, fake_llm, message
     t = make_task(api, h)
     body = api.post("/chat", json={"task_id": t, "message": message}, headers=h).json()
     assert body["intervention"] == "affirm_and_release"
-    assert fake_llm.decide_calls == [] and fake_llm.judge_calls == []  # no extra Groq calls
+    assert fake_llm.decide_calls == [] and fake_llm.read_calls == []  # no extra Groq calls
     assert reasoning_of(db, t)["phase"] == "release"
     assert "no step, no tip, no question" in " ".join(system_of(fake_llm.write_calls[0]).split())
 
@@ -525,14 +597,6 @@ def test_real_messages_are_not_mistaken_for_acknowledgments(api, db, fake_llm, m
     t = make_task(api, h)
     api.post("/chat", json={"task_id": t, "message": message}, headers=h)
     assert reasoning_of(db, t)["phase"] != "release"
-
-
-def test_okay_in_the_middle_of_diagnosing_is_judged_not_released(api, db, fake_llm):
-    _, h = register(api)
-    t = make_task(api, h)
-    reach_guess(api, h, t, "afraid")
-    api.post("/chat", json={"task_id": t, "message": "okay"}, headers=h)
-    assert len(fake_llm.judge_calls) == 1 and reasoning_of(db, t)["phase"] == "guess"
 
 
 def test_polite_okay_after_ignored_checkins_is_not_released(api, db, fake_llm):
@@ -577,9 +641,9 @@ def test_one_users_pattern_never_reaches_another_users_prompt(api, db, fake_llm)
 def test_confirmed_causes_are_wiped_by_delete_me(api, db, monkeypatch):
     user_id, h = register(api)
     t = make_task(api, h)
-    monkeypatch.setattr(llm, "complete", FakeLLM(judge=("yes", "unclear")))
-    reach_guess(api, h, t, "unclear")
-    api.post("/chat", json={"task_id": t, "message": "yes that's it"}, headers=h)
+    monkeypatch.setattr(llm, "complete", FakeLLM(reads=[{"kind": "own_plan"}]))
+    start(api, h, t, "unclear")
+    say(api, h, t, "I'll set up expo")
     assert any(k.startswith("blocker.") for k in memory_of(db, user_id))
 
     assert api.delete("/me", headers=h).status_code == 204
@@ -614,19 +678,6 @@ def test_chat_text_is_never_logged(api, monkeypatch, caplog):
     monkeypatch.setattr(llm, "complete", FakeLLM(choice="nonsense"))  # unusable decide choice logs too
     api.post("/chat", json={"task_id": t, "message": secret}, headers=h)
     assert secret not in caplog.text
-
-
-def test_after_a_cause_is_confirmed_buddy_does_not_ask_why_again(api, db, monkeypatch):
-    _, h = register(api)
-    t = make_task(api, h)
-    fake = FakeLLM(judge=("yes", "afraid"), choice="find_the_cause")  # a decide call that tries to pick it
-    monkeypatch.setattr(llm, "complete", fake)
-    reach_guess(api, h, t, "afraid")
-    api.post("/chat", json={"task_id": t, "message": "yes"}, headers=h)
-
-    api.post("/chat", json={"task_id": t, "message": "ok so what about the intro"}, headers=h)
-    assert reasoning_of(db, t)["intervention"] != "find_the_cause"
-    assert all("id: find_the_cause" not in c["messages"][-1]["content"] for c in fake.decide_calls)
 
 
 # ── a reply must not repeat the one before it ───────────────────────────────
@@ -667,16 +718,6 @@ def test_glued_sentences_get_a_space(api, monkeypatch):
     assert "line. Got it." in reply
 
 
-def test_an_unsure_answer_to_a_guess_tells_the_writer_not_to_repeat_it(api, monkeypatch):
-    fake = FakeLLM(judge=("not_yet", None))
-    monkeypatch.setattr(llm, "complete", fake)
-    _, h = register(api)
-    t = make_task(api, h)
-    reach_guess(api, h, t, "unclear")
-    api.post("/chat", json={"task_id": t, "message": "hmm yeah maybe"}, headers=h)
-    assert "They were unsure about your last read" in fake.write_calls[-1]["messages"][0]["content"]
-
-
 def test_reply_opening_the_same_way_is_flagged():
     from brain.reply_check import check_reply
     kw = dict(max_sentences=3, max_questions=1, user_message=None, anchor_words=set())
@@ -685,22 +726,11 @@ def test_reply_opening_the_same_way_is_flagged():
     assert "repeats_opening" not in check_reply("Open the doc for Buddy and jot one line.", previous_reply=prev, **kw).soft
 
 
-def test_due_time_is_only_given_to_the_writer_on_the_first_buddy_turn(api, db, monkeypatch):
-    user_id, h = register(api)
-    t = make_task(api, h)
-    fake = FakeLLM(judge=("not_yet", None))
-    monkeypatch.setattr(llm, "complete", fake)
-    reach_guess(api, h, t, "afraid")
-    first, last = system_of(fake.write_calls[0]), system_of(fake.write_calls[-1])
-    assert "Timing: already told them" not in first
-    assert "Timing: already told them" in last
-
-
-def test_later_replies_need_not_name_the_task(api, db, monkeypatch):
-    user_id, h = register(api)
-    t = make_task(api, h)
-    fake = FakeLLM(judge=("not_yet", None))
-    monkeypatch.setattr(llm, "complete", fake)
-    reach_guess(api, h, t, "afraid")
-    assert "do not restate the task" in " ".join(system_of(fake.write_calls[-1]).split())
-    assert "no_task_reference" not in reasoning_of(db, t)["checks"]["soft"]
+def test_offer_and_guess_shape_checks():
+    from brain.reply_check import check_reply
+    kw = dict(max_sentences=3, max_questions=1, user_message=None, anchor_words=set())
+    assert "offer_shape" in check_reply("Open a blank file and write one line.", phase="offer", **kw).soft
+    assert "offer_shape" not in check_reply(
+        "You said it feels risky. Want a tiny first move, or do you already know what you'll do?", phase="offer", **kw).soft
+    assert "guess_shape" in check_reply("What part feels most unclear to you?", phase="guess", **kw).soft
+    assert "guess_shape" not in check_reply("Is it more that the layout feels huge?", phase="guess", **kw).soft

@@ -1,8 +1,8 @@
 # Mechanical checks on Buddy's drafted reply. Prompt rules alone aren't reliable on a
 # small model, and these failures are detectable without another LLM call.
 #
-# "hard" violations must never reach the user: stock sympathy filler (the generic
-# therapy-speak Buddy exists to avoid) and clock times the user never mentioned
+# "hard" violations must never reach the user: therapy phrases, promises and pressure (the
+# generic lines Buddy exists to avoid) and clock times the user never mentioned
 # (the model copying or inventing a deadline). "soft" violations (too long, too many
 # questions, ignores the task) are worth one rewrite but are acceptable if the
 # rewrite doesn't fix them.
@@ -14,14 +14,15 @@ from difflib import SequenceMatcher
 from dataclasses import dataclass
 from typing import Iterable
 
-# Banning "That sounds…" alone just moves the model to "It sounds like…" / "Sounds like you're…",
-# so the whole family is covered.
+# Buddy speaks in the owner's voice (CLAUDE.md "Tone"): warm reactions like "I get it" or "that sounds
+# great" are welcome. Still banned: therapy phrases, promises it can't keep, and pressure.
 _STOCK = re.compile(
-    r"(?:(?:^|[.!?]\s+)(?:that sounds|it sounds|sounds|i hear you|i understand|hey there)\b"
-    r"|\bsounds like\b"
-    r"|\bit'?s (?:totally |completely |perfectly )?(?:okay|ok) to feel\b"
+    r"(?:\bi hear you\b"
+    r"|\bit['’]?s (?:totally |completely |perfectly )?(?:okay|ok) to feel\b"
     r"|\b(?:totally|completely) understandable\b"
-    r"|\bit'?s understandable\b)",
+    r"|\bit['’]?s understandable\b"
+    r"|\btrust me\b|\beasily fixed\b"
+    r"|\brelax\b|\bbuckle up\b|\bcalm down\b)",
     re.IGNORECASE,
 )
 
@@ -36,6 +37,10 @@ _CLOCK = re.compile(
     r"\b(?:(?:1[0-2]|0?[1-9])(?::[0-5]\d)?\s*[ap]\.?\s?m\.?|(?:[01]?\d|2[0-3]):[0-5]\d)(?!\w)",
     re.IGNORECASE,
 )
+
+# The offer must ask whether they want a tiny move or already have a plan; a guess must be a closed question.
+_OFFER_WORDS = re.compile(r"\b(?:first move|tiny|already|plan|what you'?ll do|know what)\b", re.IGNORECASE)
+_OPEN_QUESTION = re.compile(r"(?:^|[.!]\s+)(?:what|which|how|where|when|who|why)\b[^?]*\?\s*$", re.IGNORECASE)
 
 _SENTENCE_END = re.compile(r"[.!?]+(?:\s+|$)")
 
@@ -62,8 +67,13 @@ _MESSAGES = {
                         "told you, and do not reuse your earlier wording or open the same way.",
     "repeats_opening": "You opened with the same words as your last message. Start differently, from what "
                        "they just said.",
-    "stock_phrase": 'Do not use sympathy filler. Never open with or use "That sounds…", '
-                    '"It\'s okay to feel…", "It\'s totally understandable", "I hear you", "I understand" or "Hey there".',
+    "offer_shape": "Do not give a step. Say back what they told you, then ask ONE question: do they want a "
+                   "tiny first move, or do they already know what they'll do?",
+    "guess_shape": "Do not ask an open question. Offer ONE specific cause built from what they said and ask "
+                   "whether that is it (\"is it more that...?\").",
+    "stock_phrase": 'No therapy phrases ("I hear you", "It\'s okay to feel…", "It\'s totally understandable"), '
+                    'no promises ("trust me"), no pressure ("relax", "buckle up").',
+    "missing_question": "This reply must ask them exactly one question.",
     "clock_time": "Do not mention any clock time or date. Say things like \"today\" or \"tonight\" instead.",
     "too_many_questions": "Ask at most one question (none in a closing notification).",
     "too_long": "Make it shorter.",
@@ -110,6 +120,8 @@ def check_reply(
     anchor_words: Iterable[str],
     max_chars: int | None = None,
     previous_reply: str | None = None,
+    phase: str = "normal",
+    require_question: bool = False,
 ) -> Violations:
     hard: list[str] = []
     soft: list[str] = []
@@ -123,6 +135,8 @@ def check_reply(
 
     if reply.count("?") > max_questions:
         soft.append("too_many_questions")
+    elif require_question and "?" not in reply:
+        soft.append("missing_question")
 
     sentences = [s for s in _SENTENCE_END.split(reply.strip()) if s.strip()]
     if len(sentences) > max_sentences or (max_chars is not None and len(reply) > max_chars):
@@ -138,6 +152,11 @@ def check_reply(
     if previous_reply and _normalize(reply).split()[:4] == _normalize(previous_reply).split()[:4] \
             and len(_normalize(reply).split()) >= 4:
         soft.append("repeats_opening")
+
+    if phase == "offer" and not ("?" in reply and _OFFER_WORDS.search(reply)):
+        soft.append("offer_shape")
+    if phase == "guess" and ("?" not in reply or _OPEN_QUESTION.search(reply.strip())):
+        soft.append("guess_shape")
 
     if _LABEL_START.match(reply):
         soft.append("label_style")

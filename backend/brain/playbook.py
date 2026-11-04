@@ -141,3 +141,16 @@ def get_playbook(state: str) -> str:
         selected = core + state_doc + interventions
 
     return "\n\n---\n\n".join(d.body for d in selected)
+
+
+def framework_section(state: str, heading: str) -> str | None:
+    """One stage's (or shared part's) text from a framework doc (buddy_docs/framework_<state>.md)."""
+    doc = next((d for d in _load_docs() if d.category == "framework" and d.state == state), None)
+    if doc is None:
+        return None
+    text = next((t for h, t in _sections(doc.body) if h.strip() == heading), None)
+    return text.strip() if text else None
+
+
+def has_framework(state: str | None) -> bool:
+    return any(d.category == "framework" and d.state == state for d in _load_docs())

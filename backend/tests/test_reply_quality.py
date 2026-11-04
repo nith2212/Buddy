@@ -23,24 +23,25 @@ def check(reply, *, mode="chat", user_message=None, anchors=ANCHORS):
 # ── check_reply: hard violations ────────────────────────────────────────────
 
 @pytest.mark.parametrize("reply", [
-    "That sounds genuinely draining. Pick one small piece of figma.",
-    "Okay. That sounds exhausting, so try the figma basics.",          # mid-reply sentence start
     "It's totally understandable. Open figma and look at one frame.",
     "It's okay to feel stuck. Start with the figma basics.",
+    "It’s okay to feel that way. What feels risky about figma?",   # curly apostrophe
     "I hear you. Try one figma tutorial.",
-    "Hey there! How's the figma design going?",
+    "Trust me, the figma design will be easy.",
+    "Relax, the figma design can wait a minute.",
+    "Time to buckle up and open figma.",
 ])
-def test_stock_sympathy_filler_is_a_hard_violation(reply):
+def test_therapy_phrases_promises_and_pressure_are_hard_violations(reply):
     assert "stock_phrase" in check(reply).hard
 
 
 @pytest.mark.parametrize("reply", [
-    "It sounds like you're feeling a bit overwhelmed. Open figma and add one frame.",
-    "Sounds like you're ready to dive in. Open the figma design.",
-    "You're juggling a lot, and it sounds like the figma design is the heavy part.",
+    "That sounds great! What's the one figma screen everything depends on?",
+    "Hey there! How's the figma design going?",
+    "I get it, the figma design is a lot. What's the smallest piece?",
 ])
-def test_the_whole_sounds_like_family_is_blocked_not_just_that_sounds(reply):
-    assert "stock_phrase" in check(reply).hard
+def test_warm_reactions_in_the_owners_voice_are_allowed(reply):
+    assert "stock_phrase" not in check(reply).hard
 
 
 @pytest.mark.parametrize("reply", [
@@ -165,7 +166,7 @@ def test_situation_with_no_progress_says_none_so_the_model_has_nothing_to_praise
 def test_system_prompt_carries_every_rule_and_the_task():
     chosen = agent.interventions_for("overwhelm")[0]
     prompt = agent._system_prompt("chat", chosen, "Task: \"Finish UI DESIGN in figma\"", [])
-    for needle in ["Finish UI DESIGN in figma", "Never use or open with", "Never state a clock time",
+    for needle in ["Finish UI DESIGN in figma", "No therapy phrases", "Never state a clock time",
                    "Praise only something listed", "never suggest stopping", "do NOT push",
                    "Never invent tools"]:
         assert needle in prompt
@@ -217,12 +218,12 @@ GOOD = "Open the figma design and rough out one frame. Which one is easiest?"
 
 
 def test_hard_violation_is_rewritten_once_and_the_rewrite_is_used(api, monkeypatch):
-    body, fake = chat(api, monkeypatch, "That sounds draining. Do some figma design before 9pm.", GOOD)
+    body, fake = chat(api, monkeypatch, "I hear you. Do some figma design before 9pm.", GOOD)
     assert body["reply"] == GOOD
     assert len(fake.write_calls) == 2
     retry = fake.write_calls[1]
-    assert retry[-2] == {"role": "assistant", "content": "That sounds draining. Do some figma design before 9pm."}
-    assert "sympathy filler" in retry[-1]["content"] and "clock time" in retry[-1]["content"]
+    assert retry[-2] == {"role": "assistant", "content": "I hear you. Do some figma design before 9pm."}
+    assert "therapy phrases" in retry[-1]["content"] and "clock time" in retry[-1]["content"]
 
 
 def test_a_reply_that_stays_bad_falls_back_to_the_safe_message(api, monkeypatch, db):
@@ -254,7 +255,7 @@ def test_closing_note_never_retries_and_swaps_a_bad_one_for_the_neutral_line(api
     _, h = register(api)
     t = api.post("/tasks", json={"title": "Finish UI design in figma"}, headers=h).json()["id"]
     api.post("/checkin/action", json={"task_id": t, "stage": "emotion", "value": "tired"}, headers=h)
-    fake = ScriptedLLM("That sounds exhausting. Rest, then do the figma design tomorrow.")
+    fake = ScriptedLLM("I hear you. Rest, then do the figma design tomorrow.")
     monkeypatch.setattr(llm, "complete", fake)
 
     r = api.post("/checkin/action", json={"task_id": t, "stage": "chat_opt_in", "value": "no"}, headers=h)
