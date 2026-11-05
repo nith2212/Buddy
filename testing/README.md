@@ -11,7 +11,7 @@ testing/
   GRADING.md         the grading rules: how to score each reply by hand
   evals/
     run.py           conversation eval: scripted chats through the real app, mechanical checks, report
-    scenarios.py     the scripted conversations (3 per chip), with the owner's dream lines
+    scenarios.py     the scripted conversations (3 per chip), with the developer's dream lines
     read_eval.py     read-call eval: does Buddy read each user message right? (idk / answer / own_plan ...)
     read_cases.py    the labeled messages for the read eval
   grading/
@@ -88,4 +88,4 @@ It shows what Echo counts per user and the one line Buddy would get per task. It
 | `2026-11-04_1549_openai-gpt-oss-20b_graded.md` | new Buddy, don't know where to start | 13/15 (87%) |
 | `2026-11-04_1312_openai-gpt-oss-20b_graded.md` | new Buddy, scared + too tired (slightly older code) | 16/20 (80%) |
 
-The plan and its status live in `PIVOTS.md` (repo root).
+The plan and its status live in `docs/PIVOTS.md`.

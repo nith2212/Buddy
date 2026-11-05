@@ -1,4 +1,4 @@
-# Labeled single messages for the "read their message" call (PIVOTS.md build plan, step 4).
+# Labeled single messages for the "read their message" call (docs/PIVOTS.md build plan, step 4).
 # The read call does not exist yet; these are written first so its accuracy can be measured the
 # moment it does, per field and per model. Each case is what Buddy just said, what the user said
 # back, and the one right reading.

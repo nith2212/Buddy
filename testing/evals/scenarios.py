@@ -1,8 +1,8 @@
-# Scripted conversations for the eval run (PIVOTS.md, build plan step 1).
+# Scripted conversations for the eval run (docs/PIVOTS.md, build plan step 1).
 #
 # Each scenario taps a chip, then sends the user's lines in order. The user lines are fixed:
 # they don't adapt to what Buddy says, so a reply that goes off-script is judged in the context
-# it actually got. `dream` is the owner's reference version (state_frameworks.md) for the report
+# it actually got. `dream` is the developer's reference version (docs/state_frameworks.md) for the report
 # only. It is never sent to the model.
 #
 # Fields:
@@ -12,7 +12,7 @@
 #   expect_cause              the cause that should be saved (blocker.task.<id>), or None
 #   ends_with_release         the last user line is a sign-off: Buddy's last reply must not ask anything
 #   note                      what the scenario is testing
-#   dream                     optional: the owner's Buddy lines (opener first, then one per user line)
+#   dream                     optional: the developer's Buddy lines (opener first, then one per user line)
 
 NIXLY = {"title": "Finish Nixly app", "due_in_days": 3}
 
@@ -270,7 +270,7 @@ SCENARIOS = [
         "note": "Optional task: accept dropping or postponing as their decision. No persuading.",
     },
 
-    # ── From the owner's phone test, 2026-11-04 (the two chats that went wrong) ──
+    # ── From the developer's phone test, 2026-11-04 (the two chats that went wrong) ──
     {
         "id": "phone_overwhelm_took_buddys_step", "state": "overwhelm", "chip": "too_much",
         "task": {"title": "Finish 3d assets for game", "due_in_days": 7},

@@ -1,5 +1,5 @@
-# The stage machine (brain/flow.py) walked through the owner's dream conversations
-# (state_frameworks.md), with the reading each user line should get. No model calls.
+# The stage machine (brain/flow.py) walked through the developer's dream conversations
+# (docs/state_frameworks.md), with the reading each user line should get. No model calls.
 
 import pytest
 
@@ -109,7 +109,7 @@ def test_every_stage_has_wording_in_the_docs():
         assert framework_section(state, "Never")
     for heading in ("Voice", "Release", "Step back", "Offer", "Followup", "If they said idk", "If they were unsure",
                     "If they said no", "If it was unclear", "If they answered but you stay here",
-                    "If they took your move"):
+                    "If they took your move", "Ask the reason"):
         assert framework_section("shared", heading), heading
 
 

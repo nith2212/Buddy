@@ -1,12 +1,15 @@
 # Deterministic playbook retrieval — no embeddings, no vector search.
 #
-# By the time get_playbook() is called, the state has already been classified
+# By the time a doc is looked up, the state has already been classified
 # (a fixed label like "avoidance"), so "retrieval" is just: open the matching
 # state doc, pull in the intervention docs tagged for that state, and always
-# include the core philosophy docs. A real similarity search would be solving
-# a problem we don't have — the corpus is 12 files and the query is a label,
-# not free text. See CLAUDE.md for the Qdrant/embedding fallback kept behind
-# USE_QDRANT for when the corpus grows past "a dozen hand-labeled docs".
+# include the core philosophy docs. A similarity search would be solving a
+# problem we don't have: the corpus is a couple of dozen hand-labeled files and
+# the query is a label, not free text.
+#
+# Two kinds of docs: framework_*.md drive tapped-reason chats (brain/flow.py);
+# core_*, state_* and intervention_*.md drive the generic path in agent.py
+# (closing notifications and chats with no recent reason tap).
 
 from __future__ import annotations
 
@@ -120,27 +123,6 @@ def interventions_for(state: str | None) -> list[PlaybookDoc]:
     all_interventions = [d for d in _load_docs() if d.category == "intervention"]
     tagged = [d for d in all_interventions if state in d.designed_for_states]
     return tagged or all_interventions
-
-
-def get_playbook(state: str) -> str:
-    """
-    Return the playbook text for a detected work state: core principles +
-    the state's definition doc (if any) + every intervention doc tagged for
-    that state. Joined as one text blob, ready for direct LLM prompt injection.
-    """
-    docs = _load_docs()
-    core = [d for d in docs if d.category == "core_principle"]
-    state_doc = [d for d in docs if d.category == "state_definition" and d.state == state]
-    interventions = [d for d in docs if d.category == "intervention" and state in d.designed_for_states]
-
-    if not state_doc:
-        # Unknown/unmapped state — still return core principles so the LLM has
-        # something grounded, rather than an empty playbook.
-        selected = core
-    else:
-        selected = core + state_doc + interventions
-
-    return "\n\n---\n\n".join(d.body for d in selected)
 
 
 def framework_section(state: str, heading: str) -> str | None:

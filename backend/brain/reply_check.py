@@ -14,7 +14,7 @@ from difflib import SequenceMatcher
 from dataclasses import dataclass
 from typing import Iterable
 
-# Buddy speaks in the owner's voice (CLAUDE.md "Tone"): warm reactions like "I get it" or "that sounds
+# Buddy speaks in the developer's voice (CLAUDE.md "Tone"): warm reactions like "I get it" or "that sounds
 # great" are welcome. Still banned: therapy phrases, promises it can't keep, pressure and moralizing.
 _STOCK = re.compile(
     r"(?:\bi hear you\b"

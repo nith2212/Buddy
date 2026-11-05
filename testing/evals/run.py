@@ -1,8 +1,8 @@
-# Eval run (PIVOTS.md build plan, step 1): scripted conversations through Buddy's real pipeline
+# Eval run (docs/PIVOTS.md build plan, step 1): scripted conversations through Buddy's real pipeline
 # (the FastAPI app on a throwaway SQLite DB) against real Groq, scored three ways:
 #   1. mechanical checks on every reply (the target rules, independent of how the code is built)
-#   2. a rubric graded by a bigger model, from state_frameworks.md
-#   3. a markdown report the owner reads, with the dream version next to each transcript
+#   2. a rubric graded by a bigger model, from docs/state_frameworks.md
+#   3. a markdown report the developer reads, with the dream version next to each transcript
 #
 # From the repo root (buddy/), see testing/README.md:
 #   backend/venv/bin/python -m testing.evals.run                      # all scenarios, current GROQ_MODEL
@@ -32,13 +32,13 @@ from difflib import SequenceMatcher
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
-FRAMEWORKS = HERE.parent.parent / "state_frameworks.md"
+FRAMEWORKS = HERE.parent.parent / "docs" / "state_frameworks.md"
 DEFAULT_GRADER = "openai/gpt-oss-120b"
 
-# ── mechanical checks (the target rules from CLAUDE.md / state_frameworks.md) ─────────────
+# ── mechanical checks (the target rules from CLAUDE.md / docs/state_frameworks.md) ─────────────
 MAX_SENTENCES = 3
 _SENTENCE_END = re.compile(r"[.!?]+(?:\s+|$)")
-# The owner's voice allows warm reactions; these stay banned: therapy phrases, promises, pressure.
+# The developer's voice allows warm reactions; these stay banned: therapy phrases, promises, pressure.
 _BANNED = re.compile(
     r"\bi hear you\b|\bit['’]?s (?:totally |completely |perfectly )?(?:okay|ok) to feel\b|\bunderstandable\b"
     r"|\btrust me\b|\beasily fixed\b|\brelax\b|\bbuckle up\b|\bcalm down\b",
@@ -103,7 +103,7 @@ def mechanical(reply: str, earlier: list[str], is_release: bool) -> list[str]:
 # ── frameworks (rubric context) ──────────────────────────────────────────────────────────
 
 def load_frameworks() -> tuple[str, dict[str, str]]:
-    """(shared rules, {state: framework text}) from state_frameworks.md, examples excluded."""
+    """(shared rules, {state: framework text}) from docs/state_frameworks.md, examples excluded."""
     text = FRAMEWORKS.read_text().split("## Example conversations")[0]
     shared, states = "", {}
     for block in re.split(r"(?m)^## ", text)[1:]:
@@ -327,7 +327,7 @@ def write_report(path: Path, meta: dict, results: list[dict], summary: dict) -> 
                 out += [f"> - ⚠ {n}" for n in notes]
             out.append("")
         if res.get("dream"):
-            out += ["<details><summary>Dream version (the owner's reference)</summary>", ""]
+            out += ["<details><summary>Dream version (the developer's reference)</summary>", ""]
             for i, line in enumerate(res["dream"]):
                 user = res["user_lines"][i - 1] if i >= 1 and i - 1 < len(res["user_lines"]) else None
                 if user:

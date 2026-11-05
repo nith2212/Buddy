@@ -45,6 +45,7 @@ class BuddyReply(BaseModel):
     reply: str
     state: Optional[str]
     intervention: Optional[str]
+    ask_reason: bool = False  # Buddy just asked what's in the way: the app shows the reason chips
 
 
 class ChatTurn(BaseModel):

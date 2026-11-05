@@ -1,4 +1,4 @@
-# Read-call eval (PIVOTS.md build plan, step 4): how often brain.flow.read_message reads a
+# Read-call eval (docs/PIVOTS.md build plan, step 4): how often brain.flow.read_message reads a
 # user message the way it should, per model. Two scores per case:
 #   kind   - the exact label (idk / answer / confirm / ...)
 #   route  - whether the reading sends the conversation to the same next stage as the label would

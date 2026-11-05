@@ -6,7 +6,7 @@
 Buddy helps you START by finding out WHY you're stuck.
 Other apps track the task. Buddy tracks the human. When someone is avoiding a task, Buddy doesn't say "just start". It finds the real cause (not knowing where to start, it feels too big, fear of doing it badly, boredom, tiredness), helps with that specific cause, and remembers it so it can show the pattern over time ("this is the third time fear of doing it badly stopped you").
 
-Tone: the owner's own voice. A sweet, peppy, kind friend who gets genuinely excited about your goals and progress. Short, warm, non-judgmental. Never shames, lectures or optimizes. Excitement only for something real the user said or did, never empty cheerleading, and not in every reply (too much gets annoying).
+Tone: the developer's own voice. A sweet, peppy, kind friend who gets genuinely excited about your goals and progress. Short, warm, non-judgmental. Never shames, lectures or optimizes. Excitement only for something real the user said or did, never empty cheerleading, and not in every reply (too much gets annoying).
 
 If a request conflicts with this section, STOP and ask.
 
@@ -42,12 +42,12 @@ If a request conflicts with this section, STOP and ask.
 ## Build plan (hard stop: Nov 11, then interview prep; Nov 7-8 are off for the festival)
 Already shipped: auth, tasks and steps, chat, push notifications with 3 buttons, deploy on Render + Neon. Unfinished: weekly Echo.
 Steps, each shippable alone, tested and committed before the next:
-- A. Playbook docs in backend/brain/buddy_docs/: state_perfectionism.md, state_low_interest.md, intervention_find_the_cause.md, intervention_affirm_and_release.md, plus a cause-to-first-move mapping in intervention_surface_smallest_step.md. The OWNER reviews the wording. Do not finalize it without her.
+- A. Playbook docs in backend/brain/buddy_docs/: state_perfectionism.md, state_low_interest.md, intervention_find_the_cause.md, intervention_affirm_and_release.md, plus a cause-to-first-move mapping in intervention_surface_smallest_step.md. The DEVELOPER reviews the wording. Do not finalize it without her.
 - B. Reasons become states: extend EMOTION_TO_STATE; accept the new reason values in the notification route and log_emotion_pick; add an optional explicit `reason` field to ChatRequest (never an in-band control string).
 - C. Diagnose behavior in run_turn: tapped reason with few chat turns forces find_the_cause; after the answer, pick the matched first move; short acknowledgments force affirm_and_release and skip the decide call (Groq is capped at about 8k tokens/min). Write memory in _learn.
 - D. Mobile: reason chips when the chat is empty (src/app/task/[id].tsx, src/lib/api.ts). Notification buttons stay at 3 because of the Android limit: tired / too much / don't know where to start. Fear and boredom are in-app chips only.
-- E. Weekly Echo, for Buddy only (never shown or said to the user; a user UI is Later). In steps, see PIVOTS.md: E1 facts counted by code (causes, ignored tasks, postpones, finished), E2 how they react to Buddy's moves (counted only), E3 a few owner-approved rules once something shows up 3+ times. Runs for anyone with a task, ignored ones included. POST /cron/echo, protected by X-Cron-Secret, Sunday 23:00 India time. Dev report: testing/echo_report.py. E3 is in this week too (owner, 2026-11-04 night), built after E2; its rules only fire after 3+ occurrences, so they're tested with seeded data.
-- F. UI: a new design for the app (the owner isn't happy with the current one) plus an Echo page for the user. The owner approves the design before it's built. What the Echo page may show is decided first (it must never shame: Buddy itself never states ignore counts).
+- E. Weekly Echo, for Buddy only (never shown or said to the user; a user UI is Later). In steps, see docs/PIVOTS.md: E1 facts counted by code (causes, ignored tasks, postpones, finished), E2 how they react to Buddy's moves (counted only), E3 a few developer-approved rules once something shows up 3+ times. Runs for anyone with a task, ignored ones included. POST /cron/echo, protected by X-Cron-Secret, Sunday 23:00 India time. Dev report: testing/echo_report.py. E3 is in this week too (developer, 2026-11-04 night), built after E2; its rules only fire after 3+ occurrences, so they're tested with seeded data.
+- F. UI: a new design for the app (the developer isn't happy with the current one) plus an Echo page for the user. The developer approves the design before it's built. What the Echo page may show is decided first (it must never shame: Buddy itself never states ignore counts).
 
 ## Parked (do NOT build or propose; add to a "later" list instead)
 Sprint timer, check-back commitments, firmness levels, escalation, onboarding, a date picker, bandit, notes UI, multi-agent split, monthly reflections, accounts or passwords, web frontend, Play Store, second deployment.
@@ -55,7 +55,7 @@ Sprint timer, check-back commitments, firmness levels, escalation, onboarding, a
 ## Later (ideas parked on purpose; not for now)
 - Precise references: every "Grounding theory" section in buddy_docs/ (old and new) cites authors from memory. Replace each with an exact, checkable source (authors, year, title, venue) and trim any claim the source does not support. Ethical reason: the playbook shapes how Buddy talks to people.
 - Eval system: scripted conversations per reason and state, scored for reply rules (reply_check) and for the cause-then-move order, run against the real model before changing prompts or docs. Also track whether confirmed causes match what the user said.
-- Fine-tuning: LoRA-tune a small open model (about 8B) on Buddy's own conversations (the owner's dream scripts plus consented real chats) so a cheap model holds the voice. Not on public therapy/counseling datasets: they push toward therapy-speak and raise consent issues. Only after the eval system exists, so the gain can be measured against prompt-only.
+- Fine-tuning: LoRA-tune a small open model (about 8B) on Buddy's own conversations (the developer's dream scripts plus consented real chats) so a cheap model holds the voice. Not on public therapy/counseling datasets: they push toward therapy-speak and raise consent issues. Only after the eval system exists, so the gain can be measured against prompt-only.
 
 ## Data and privacy (non-negotiable)
 - user_id on every table. No hardcoded users.
@@ -63,7 +63,7 @@ Sprint timer, check-back commitments, firmness levels, escalation, onboarding, a
 - Every query is scoped to the caller. Cross-user access returns 404. Keep the isolation tests green and extend them for any new table or key.
 - DELETE /me must wipe everything, including causes and patterns.
 - Secrets only in env vars. Never commit .env or *.db.
-- Chat text goes to the model provider: Groq, or Anthropic when GROQ_MODEL is a claude- model (owner OK, 2026-11-04). Don't log message content.
+- Chat text goes to the model provider: Groq, or Anthropic when GROQ_MODEL is a claude- model (developer OK, 2026-11-04). Don't log message content.
 
 ## Hosting reality
 Render free sleeps and has an ephemeral disk. No in-process schedulers. No local data. Neon Postgres in prod, SQLite locally. cron-job.org fires /cron/* endpoints with X-Cron-Secret. LLM calls are async, with timeouts, retries and a canned fallback, and never return a 500 on a Groq failure. Never hold a DB session across an LLM call.

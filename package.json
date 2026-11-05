@@ -2,6 +2,7 @@
   "name": "buddy-app",
   "main": "expo-router/entry",
   "version": "1.0.0",
+  "license": "UNLICENSED",
   "dependencies": {
     "@expo-google-fonts/gaegu": "^0.4.1",
     "@expo-google-fonts/nunito": "^0.4.2",
@@ -39,7 +40,6 @@
   },
   "scripts": {
     "start": "expo start",
-    "reset-project": "node ./scripts/reset-project.js",
     "android": "expo start --android",
     "ios": "expo start --ios",
     "web": "expo start --web",

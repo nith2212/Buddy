@@ -382,7 +382,7 @@ def test_page_is_only_the_callers_and_works_with_no_tasks(api, db):
     assert api.get("/echo/week", headers=hb).json()["wins"]["tasks_finished"] == 1
 
 
-# ── E3: Buddy adapts (owner-approved rules) ───────────────────────────────────────
+# ── E3: Buddy adapts (developer-approved rules) ───────────────────────────────────────
 
 @pytest.mark.parametrize("prof,state,stage,tiny,want", [
     # brings their own plan (offers + "what's your step?" both count)

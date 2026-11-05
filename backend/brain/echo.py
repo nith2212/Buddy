@@ -1,14 +1,14 @@
-# Echo: a weekly count of each user's week, for Buddy only (PIVOTS.md "Echo, in steps").
+# Echo: a weekly count of each user's week, for Buddy only (docs/PIVOTS.md "Echo, in steps").
 #
 # - E1 (facts): causes, ignored tasks, postpones, what got finished.
 # - E2 (reactions): what they did with each move Buddy offered (took it, brought their own plan,
 #   said no, went quiet) and whether progress followed within a day; check-in replies; days active.
-# - E3 (adapt): four owner-approved rules (2026-11-05) that change Buddy's next move once something has
+# - E3 (adapt): four developer-approved rules (2026-11-05) that change Buddy's next move once something has
 #   happened RULE_MIN+ times. See "E3" below.
 #
 # - Counted by code, no model call: nothing can be invented, and it spends no Groq quota.
 # - For Buddy, never for the user: no push, no user-facing text. Buddy gets at most one line, and
-#   that line tells it to be gentler. It never quotes these facts (owner decision 2026-11-04).
+#   that line tells it to be gentler. It never quotes these facts (developer decision 2026-11-04).
 # - Runs for anyone with a task, including tasks they ignore (ignoring is data). No tasks: skipped.
 # - Saved as memory rows echo.week.<week end date> (source "echo"), the last KEEP_WEEKS kept.
 #   DELETE /me wipes them with the rest of memory.
@@ -336,8 +336,8 @@ def buddy_line(facts: Optional[dict], task_id: int) -> Optional[str]:
 
 # ── The user's Echo page (GET /echo/week) ─────────────────────────────────────────────────
 # Only kind, earned things: wins, the days they showed up, and what helped. Never ignored check-ins,
-# untouched days, postpones, comparisons or percentages (PIVOTS.md "Echo page"). All text is built
-# here from templates, never by a model, so nothing can be invented. Wording: owner to review.
+# untouched days, postpones, comparisons or percentages (docs/PIVOTS.md "Echo page"). All text is built
+# here from templates, never by a model, so nothing can be invented. Wording: developer to review.
 
 PATTERN_MIN = 3   # a cause must be confirmed this often before the page mentions it (same as chat)
 HELPED_WEEKS = KEEP_WEEKS
@@ -471,7 +471,7 @@ def this_week(db: Session, user_id: str, now: datetime) -> dict:
     }
 
 
-# ── E3: Buddy adapts (owner-approved rules, 2026-11-05) ──────────────────────────────────────
+# ── E3: Buddy adapts (developer-approved rules, 2026-11-05) ──────────────────────────────────────
 # Each rule switches on only after Echo has seen the pattern RULE_MIN+ times (saved weeks plus this
 # week so far). A rule either reroutes the stage or gives the writer ONE hint line. Buddy never says
 # a count. The four rules:
@@ -480,7 +480,7 @@ def this_week(db: Session, user_id: str, now: datetime) -> dict:
 #   move_first      at the offer they always ask for Buddy's move, never their own -> skip the either/or
 #                   and go straight to one tiny "what about...?" move
 #   lean_on_helped  a move helped them get going RULE_MIN+ times for this cause -> offer it first, and
-#                   Buddy may say softly that it helped before (owner: "softly say it")
+#                   Buddy may say softly that it helped before (developer: "softly say it")
 #   avoid_declined  they said no to a move RULE_MIN+ times for this cause and never took it -> offer
 #                   something different
 
