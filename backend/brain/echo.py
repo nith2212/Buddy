@@ -1,4 +1,4 @@
-# Echo: a weekly count of each user's week, for Buddy only (PIVOTS.md "Echo, in steps").
+# Echo: a weekly count of each user's week, for Buddy only (docs/PIVOTS.md "Echo, in steps").
 #
 # - E1 (facts): causes, ignored tasks, postpones, what got finished.
 # - E2 (reactions): what they did with each move Buddy offered (took it, brought their own plan,
@@ -336,7 +336,7 @@ def buddy_line(facts: Optional[dict], task_id: int) -> Optional[str]:
 
 # ── The user's Echo page (GET /echo/week) ─────────────────────────────────────────────────
 # Only kind, earned things: wins, the days they showed up, and what helped. Never ignored check-ins,
-# untouched days, postpones, comparisons or percentages (PIVOTS.md "Echo page"). All text is built
+# untouched days, postpones, comparisons or percentages (docs/PIVOTS.md "Echo page"). All text is built
 # here from templates, never by a model, so nothing can be invented. Wording: developer to review.
 
 PATTERN_MIN = 3   # a cause must be confirmed this often before the page mentions it (same as chat)

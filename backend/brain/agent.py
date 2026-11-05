@@ -216,7 +216,7 @@ async def _flow_turn(
     db: Session, user_id: str, task: Task, mode: Mode, user_message: Optional[str], emotion_row: EmotionLog,
 ) -> dict:
     """
-    One turn of a state framework (state_frameworks.md). A session starts at the reason tap: the
+    One turn of a state framework (docs/state_frameworks.md). A session starts at the reason tap: the
     stage, tries and "known so far" notes ride along in each Buddy turn's saved reasoning. Code
     picks the stage from a reading of the user's message; the model only words the reply.
     """

@@ -1,5 +1,5 @@
 # The stage machine (brain/flow.py) walked through the developer's dream conversations
-# (state_frameworks.md), with the reading each user line should get. No model calls.
+# (docs/state_frameworks.md), with the reading each user line should get. No model calls.
 
 import pytest
 

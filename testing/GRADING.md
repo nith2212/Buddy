@@ -22,7 +22,7 @@ a reply count that doesn't match, a "no" with no reason), so fix what it reports
 
 1. `backend/brain/buddy_docs/framework_shared.md` and the `framework_<state>.md` for each chip. The packet
    includes them. They say what Buddy should do at each stage.
-2. `state_frameworks.md` (repo root): the developer's dream conversations. This is the target voice.
+2. `docs/state_frameworks.md`: the developer's dream conversations. This is the target voice.
 3. The Reply rules in `CLAUDE.md`.
 
 ## Grade each reply on 7 criteria

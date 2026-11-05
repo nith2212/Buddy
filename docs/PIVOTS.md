@@ -45,7 +45,7 @@ Resume when the caps reset (one at a time, from the repo root):
 - [x] New Buddy graded by Claude so far: don't know where to start 13/15 (`..._1549_..._graded.md`); scared + too tired 16/20 (`..._1312_..._graded.md`, slightly older code). Feels too big and boring need new runs.
 - [ ] `backend/venv/bin/python -m testing.evals.run --model openai/gpt-oss-20b --no-rubric --resume testing/results/2026-11-04_1710_openai-gpt-oss-20b.json`
 - [ ] `backend/venv/bin/python -m testing.evals.run --model openai/gpt-oss-20b --no-rubric --only ambiguity_idk` (re-run after the offer-stage fix: "maybe the swipe thing?" now asks for their first step instead of wrapping up)
-- [ ] `backend/venv/bin/python -m testing.evals.run --model qwen/qwen3.8-27b --no-rubric` (full re-run: in the 1749 run every opener was a canned fallback, because qwen refuses a request with no user message. Fixed in `brain/llm.py` `with_user_turn`; don't grade the 1749 run.)
+- [ ] `backend/venv/bin/python -m testing.evals.run --model qwen/qwen3.8-27b --no-rubric` (full re-run: an earlier run had every opener fall back, because qwen refuses a request with no user message. Fixed in `brain/llm.py` `with_user_turn`; that invalid run was deleted.)
 - [ ] `backend/venv/bin/python -m testing.evals.run --model openai/gpt-oss-120b --no-rubric --resume testing/results/2026-11-04_1756_openai-gpt-oss-120b.json`
 - [ ] `backend/venv/bin/python -m testing.evals.read_eval --model openai/gpt-oss-20b`
 - [ ] Grade each finished run by hand (`testing/GRADING.md`: export, grade, merge).

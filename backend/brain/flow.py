@@ -1,4 +1,4 @@
-# The per-state conversation frameworks (state_frameworks.md) as a stage machine.
+# The per-state conversation frameworks (docs/state_frameworks.md) as a stage machine.
 #
 # Code decides the stage; the model only words it. Each user message is read once
 # (`read_message`: cheap patterns first, one small JSON call for the rest), then

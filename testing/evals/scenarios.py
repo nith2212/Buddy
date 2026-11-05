@@ -1,8 +1,8 @@
-# Scripted conversations for the eval run (PIVOTS.md, build plan step 1).
+# Scripted conversations for the eval run (docs/PIVOTS.md, build plan step 1).
 #
 # Each scenario taps a chip, then sends the user's lines in order. The user lines are fixed:
 # they don't adapt to what Buddy says, so a reply that goes off-script is judged in the context
-# it actually got. `dream` is the developer's reference version (state_frameworks.md) for the report
+# it actually got. `dream` is the developer's reference version (docs/state_frameworks.md) for the report
 # only. It is never sent to the model.
 #
 # Fields:

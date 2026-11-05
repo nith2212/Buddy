@@ -5,7 +5,7 @@ state: shared
 ---
 
 # Framework: shared parts
-From state_frameworks.md (the developer's design). The code picks the stage; each section below is
+From docs/state_frameworks.md (the developer's design). The code picks the stage; each section below is
 what the writer is told for that stage or situation. Describe the move, never script the line.
 
 ## Voice
