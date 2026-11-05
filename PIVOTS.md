@@ -154,5 +154,6 @@ blob that wobbles and blinks (moods: default, happy, worried; worried only for c
 - Menu has "Delete my data" instead of "Log out" (no accounts: DELETE /me, then a fresh anonymous identity via `restart()`).
 - New deps (owner OK): react-native-svg, @expo-google-fonts/gaegu, @expo-google-fonts/nunito. Native change: needs a new APK
   (`eas build -p android --profile preview`). Native splash background is now cream; its icon is still the old one.
-- Not done: "talk to buddy about my week" opens the task picker (the reflection chat is Later); a Buddy PNG for the native
-  splash and app icon; dark mode (the design is light-only).
+- App icon, Android adaptive + themed (monochrome) icon, splash and favicon are dumpling Buddy, drawn by
+  `scripts/make_icons.py` (stdlib + macOS QuickLook, no installs). Icon background lavender, splash cream.
+- Not done: "talk to buddy about my week" opens the task picker (the reflection chat is Later); dark mode (light-only design).
