@@ -429,8 +429,10 @@ def this_week(db: Session, user_id: str, now: datetime) -> dict:
     steps = facts["steps_done"] if facts else 0
     started = facts["started_after_tap"] if facts else 0
     shown = sum(1 for d in days if d in active)
+    saved = db.execute(select(Memory.id).where(Memory.user_id == user_id, Memory.key.startswith(KEY_PREFIX))).first()
     return {
         "week_start": start.isoformat(),
+        "first_week": saved is None,   # no weekly Echo saved yet: the page says the first one comes Monday
         "days": [{"date": d, "active": d in active} for d in days],
         "total_days": len(ever),   # only ever goes up
         "wins": {"tasks_finished": finished, "steps_done": steps, "started_when_hard": started},

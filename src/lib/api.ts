@@ -22,6 +22,7 @@ export type BuddyReply = { reply: string; state: string | null; intervention: st
 // GET /echo/week (backend brain/echo.py "The user's Echo page"): kind, earned things only.
 export type EchoWeek = {
   week_start: string;
+  first_week: boolean; // no weekly Echo saved yet: the first one comes Monday
   days: { date: string; active: boolean }[];
   total_days: number;
   wins: { tasks_finished: number; steps_done: number; started_when_hard: number };

@@ -322,6 +322,9 @@ def test_page_shows_wins_days_and_a_kind_line(api, db):
     # the tap is Monday 23:00 India time, the tick 2 hours later is Tuesday
     assert [d["active"] for d in page["days"]] == [True, True, False, False, False, False, False]
     assert page["total_days"] == 3                     # plus the day the task was made
+    assert page["first_week"] is True                  # no weekly Echo saved yet
+    echo.run_echo(db, uid, PAGE_NOW)
+    assert echo.this_week(db, uid, PAGE_NOW)["first_week"] is False
 
 
 def test_page_never_shows_ignores_untouched_days_or_postpones(api, db):

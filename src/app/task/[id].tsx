@@ -262,7 +262,7 @@ export default function TaskChatScreen() {
           renderItem={renderTurn}
           ListFooterComponent={
             sending ? (
-              <View style={[styles.turn, styles.turnTheirs]}>
+              <View style={[styles.turn, styles.turnTheirs, styles.footerGap]}>
                 <BuddyBlob width={38} animated={false} style={styles.avatar} />
                 <Bubble from="buddy">Buddy is typing…</Bubble>
               </View>
@@ -363,6 +363,7 @@ const styles = StyleSheet.create({
   turnTheirs: { justifyContent: 'flex-start' },
   avatar: { marginTop: 4 },
   askAgain: { marginTop: 14, gap: 8 },
+  footerGap: { marginTop: 12 }, // same gap as between messages (the separator only sits between items)
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   error: { color: Palette.danger, paddingHorizontal: 16, paddingBottom: 4 },
   inputArea: {

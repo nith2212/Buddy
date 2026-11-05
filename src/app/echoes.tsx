@@ -79,7 +79,7 @@ export default function EchoesScreen() {
       {week === null ? (
         <View style={styles.center}>
           <BuddyBlob width={140} mood={failed ? 'worried' : 'default'} label={failed ? 'Buddy, worried: can’t reach the server' : 'Buddy'} />
-          <Txt variant="hand">{failed ? 'Couldn’t load your week.' : 'Looking back at your week…'}</Txt>
+          <Txt variant="hand" style={styles.centerText}>{failed ? 'Couldn’t load your week. Check back in a bit!' : 'Looking back at your week…'}</Txt>
           {failed ? <SketchButton label="Try again" onPress={load} /> : null}
         </View>
       ) : (
@@ -95,6 +95,16 @@ export default function EchoesScreen() {
             </Svg>
             <Txt variant="hand" style={styles.subtitle}>{`~ this week · ${weekRange(week.days)} ~`}</Txt>
           </View>
+
+          {week.first_week ? (
+            <Card wobble="b" shadow="solid" style={styles.firstWeek}>
+              <BuddyBlob width={64} mood="happy" animated={false} />
+              <View style={styles.firstWeekText}>
+                <Txt variant="hand" style={styles.firstWeekTitle}>Your first Echo lands on Monday!</Txt>
+                <Txt variant="small">Buddy’s still getting to know you. Here’s your week so far.</Txt>
+              </View>
+            </Card>
+          ) : null}
 
           <Card wobble="a" style={styles.wins}>
             <Txt variant="heading" style={styles.underline}>Wins:</Txt>
@@ -161,6 +171,9 @@ const styles = StyleSheet.create({
   titleBlock: { alignItems: 'center' },
   bigTitle: { fontSize: 52, lineHeight: 56 },
   subtitle: { fontSize: 21, marginTop: 2 },
+  firstWeek: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 14, paddingVertical: 12, backgroundColor: Palette.soft },
+  firstWeekText: { flex: 1, gap: 2 },
+  firstWeekTitle: { fontSize: 21, lineHeight: 25 },
   wins: { paddingHorizontal: 18, paddingVertical: 14, gap: 8 },
   underline: { textDecorationLine: 'underline' },
   winRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
