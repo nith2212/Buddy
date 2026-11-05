@@ -113,6 +113,11 @@ async def run_turn(
     if mode != "closing" and emotion in EMOTION_TO_STATE and has_framework(EMOTION_TO_STATE[emotion]):
         # A reason was tapped this check-in cycle: the state's framework runs the conversation.
         return await _flow_turn(db, user_id, task, mode, user_message, emotion_row)
+    if (mode == "chat" and user_message and task.status != "done" and not is_ack(user_message)
+            and not _asked_reason_last(db, user_id, task.id)):
+        # Typed without tapping a reason: find out why first (root cause before advice) instead of
+        # guessing with the generic path. The app shows the reason chips under this reply.
+        return await _ask_reason_turn(db, user_id, task, user_message)
 
     hypotheses = detect_state(db, user_id, task_id, emotion_tap=emotion)
     top = hypotheses[0] if hypotheses else None
@@ -318,6 +323,79 @@ async def _flow_turn(
             "fallback": fallback}
 
 
+ASK_FALLBACK = "I'm here. What's making it hard to start right now?"
+
+
+def _asked_reason_last(db: Session, user_id: str, task_id: int) -> bool:
+    """Did Buddy's last message on this task already ask for the reason? Then don't ask again."""
+    last = db.execute(
+        select(Message).where(Message.user_id == user_id, Message.task_id == task_id, Message.role == "assistant")
+        .order_by(Message.id.desc()).limit(1)
+    ).scalar_one_or_none()
+    try:
+        return bool(last and json.loads(last.reasoning or "{}").get("reason") == "ask_reason")
+    except (TypeError, ValueError):
+        return False
+
+
+async def _ask_reason_turn(db: Session, user_id: str, task: Task, user_message: str) -> dict:
+    """A typed message with no recent reason tap: react to it and ask what's in the way (the app shows the
+    reason chips). Something bigger than work gets the honest step-back instead."""
+    task_id = task.id
+    history = tools.get_conversation_history(db, user_id, limit=FLOW_HISTORY, task_id=task_id)
+    previous = next((h["content"] for h in reversed(history) if h["role"] == "assistant"), None)
+    first_turn = previous is None
+    steps = _load_steps(db, task)
+    open_steps = [s.title for s in steps if not s.done][:FLOW_OPEN_STEPS]
+    done_steps = [s.title for s in steps if s.done][:FLOW_OPEN_STEPS]
+    timing = _due_phrase(task.due_date, datetime.now(timezone.utc))
+    context = _context_line(db, user_id, task_id, tools.get_user_memory(db, user_id))
+    title = task.title or "untitled"
+    anchors = salient_words(task.title, *open_steps) if first_turn else set()
+    db.rollback()  # read-only so far: give the connection back before waiting on the model
+
+    caught = flow.pattern_read(user_message, previous)
+    bigger = caught is not None and caught.kind == "bigger"
+    card = framework_section("shared", "Step back" if bigger else "Ask the reason") or ""
+    facts = [f'Task: "{title}"',
+             f"Timing: {timing}. Name the task naturally in your first sentence." if first_turn
+             else "Timing: already mentioned, don't bring it up again. Respond to what they just said.",
+             f"Open steps: {'; '.join(open_steps) or 'none'}",
+             f"Done so far (the only progress you may praise): {'; '.join(done_steps) or 'nothing yet'}"]
+    if context:
+        facts.append(context)
+    system = (f"{framework_section('shared', 'Voice')}\n\n" + "\n".join(facts)
+              + f"\n\nWhat to do now:\n{card}\n\nRules:\n" + _flow_rules(asks=not bigger))
+
+    fallback, checks = False, {}
+    try:
+        reply, checks = await _write_checked(
+            "chat", None, None, "", [], history, user_message, anchors, "ask_reason", previous_reply=previous,
+            system=system, limits=(3, 0) if bigger else (3, 1), require_question=not bigger)
+        if reply is None:
+            raise llm.LLMError(f"reply rejected by checks: {checks['hard']}")
+    except llm.LLMError as e:
+        logger.warning("Buddy ask-reason turn fell back (task_id=%s): %s", task_id, e)
+        fallback, reply = True, (FALLBACK_REPLY["chat"] if bigger else ASK_FALLBACK)
+
+    reason = "step_back" if bigger else "ask_reason"
+    reasoning = {"mode": "chat", "phase": reason, "top_state": None, "intervention": None, "reason": reason,
+                 "fallback": fallback, "checks": checks}
+    _learn(db, user_id, task_id, user_message, reply, reasoning, None, None, [], None)
+    return {"reply": reply, "state": None, "intervention": reason, "fallback": fallback, "ask_reason": not bigger}
+
+
+def _flow_rules(asks: bool) -> str:
+    return (("- At most 3 short sentences and exactly ONE question.\n" if asks
+             else "- At most 3 short sentences and no question.\n")
+            + "- Plain text, no lists or markdown.\n"
+              "- Never state a clock time or a date; use only the timing above.\n"
+              "- If they mention something bigger than work (health, safety, grief, crisis), step back: say it sounds "
+              "bigger than this task, that you're a task companion and not the right support for it, and encourage "
+              "someone they trust or a local helpline.\n"
+              "- Use only what's above and what they said. Never invent facts, tools, buttons or features.")
+
+
 def _flow_prompt(
     step: "flow.Step", *, title: str, timing: str, first_turn: bool, open_steps: list[str], done_steps: list[str],
     tapped: str, notes: dict, last_time: Optional[dict], pattern: Optional[str],
@@ -355,14 +433,7 @@ def _flow_prompt(
         + f"\n\nWhat to do now ({_FRAMEWORK_TITLES.get(step.state, step.state)}, stage: {step.stage}):\n{what}\n"
         + (f"Never: {never}\n" if never and step.stage != "step_back" else "")
         + "\nRules:\n"
-        + ("- At most 3 short sentences and exactly ONE question.\n" if asks
-           else "- At most 3 short sentences and no question.\n")
-        + "- Plain text, no lists or markdown.\n"
-          "- Never state a clock time or a date; use only the timing above.\n"
-          "- If they mention something bigger than work (health, safety, grief, crisis), step back: say it sounds "
-          "bigger than this task, that you're a task companion and not the right support for it, and encourage "
-          "someone they trust or a local helpline.\n"
-          "- Use only what's above and what they said. Never invent facts, tools, buttons or features."
+        + _flow_rules(asks)
     )
 
 

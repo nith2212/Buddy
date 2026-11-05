@@ -91,6 +91,7 @@ export default function TaskChatScreen() {
     try {
       const res = await client.chat(taskId, { message: text });
       setTurns((prev) => [...prev, { role: 'assistant', content: res.reply }]);
+      if (res.ask_reason) setAskAgain(true); // typed without a tap: Buddy asked why, so offer the reasons
     } catch {
       setTurns((prev) => prev.slice(0, -1)); // take the unsent message back out…
       setInput(text); // …and give it back to the user to resend
@@ -268,7 +269,7 @@ export default function TaskChatScreen() {
               </View>
             ) : askAgain ? (
               <View style={styles.askAgain}>
-                <Txt variant="hand">What’s in the way this time?</Txt>
+                <Txt variant="hand">What’s in the way right now?</Txt>
                 {reasonChips}
               </View>
             ) : null

@@ -230,6 +230,7 @@ def test_hard_violation_is_rewritten_once_and_the_rewrite_is_used(api, monkeypat
     assert "therapy phrases" in retry[-1]["content"] and "clock time" in retry[-1]["content"]
 
 
+@pytest.mark.usefixtures("generic_path")
 def test_a_reply_that_stays_bad_falls_back_to_the_safe_message(api, monkeypatch, db):
     bad = "It's totally understandable. Do the figma design before 9pm."
     body, fake = chat(api, monkeypatch, bad, bad)

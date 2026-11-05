@@ -17,7 +17,12 @@ export type Task = {
 };
 
 export type ChatTurn = { role: 'user' | 'assistant'; content: string };
-export type BuddyReply = { reply: string; state: string | null; intervention: string | null };
+export type BuddyReply = {
+  reply: string;
+  state: string | null;
+  intervention: string | null;
+  ask_reason?: boolean; // Buddy asked what's in the way: show the reason chips under its reply
+};
 
 // GET /echo/week (backend brain/echo.py "The user's Echo page"): kind, earned things only.
 export type EchoWeekSummary = {

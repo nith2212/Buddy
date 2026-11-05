@@ -70,6 +70,7 @@ def tap_emotion(api, h, task_id, value):
 
 # ── /chat ───────────────────────────────────────────────────────────────────
 
+@pytest.mark.usefixtures("generic_path")
 def test_chat_happy_path_saves_turns_and_memory(api, db, fake_llm):
     user_id, h = register(api)
     t = make_task(api, h)
@@ -101,6 +102,7 @@ def test_emotion_tap_runs_that_states_framework(api, fake_llm):
     assert len(fake_llm.read_calls) == 1 and len(fake_llm.write_calls) == 1
 
 
+@pytest.mark.usefixtures("generic_path")
 def test_recently_used_interventions_are_excluded(api, db, fake_llm):
     user_id, h = register(api)
     t = make_task(api, h)
@@ -115,6 +117,7 @@ def test_recently_used_interventions_are_excluded(api, db, fake_llm):
     assert "id: acknowledge_emotion" in decide_prompt
 
 
+@pytest.mark.usefixtures("generic_path")
 def test_invalid_decide_choice_falls_back_to_first_candidate(api, monkeypatch):
     _, h = register(api)
     t = make_task(api, h)
@@ -126,6 +129,7 @@ def test_invalid_decide_choice_falls_back_to_first_candidate(api, monkeypatch):
                                         "name_the_pattern", "surface_smallest_step"}
 
 
+@pytest.mark.usefixtures("generic_path")
 def test_groq_failure_returns_fallback_and_still_saves(api, db, monkeypatch):
     user_id, h = register(api)
     t = make_task(api, h)
@@ -140,6 +144,7 @@ def test_groq_failure_returns_fallback_and_still_saves(api, db, monkeypatch):
     assert "buddy.last_intervention" not in keys  # a fallback isn't a real intervention
 
 
+@pytest.mark.usefixtures("generic_path")
 def test_missing_groq_key_falls_back_instead_of_500(api):
     # conftest blanks GROQ_API_KEY and nothing is patched here: the real client raises LLMError.
     _, h = register(api)
@@ -809,3 +814,51 @@ def test_what_helped_reaches_the_writer_as_the_one_context_line(api, db, monkeyp
     assert "a rough first version has helped them get going with this before" in system
     assert "Pattern:" not in system                                    # one line only: the hint wins
     assert flow_of(db, t)["adapt"] == "lean_on_helped"
+
+
+# ── typed without tapping a reason: ask what's in the way first ──────────────────
+
+def test_typing_without_a_tap_asks_for_the_reason_and_shows_the_chips(api, db, fake_llm):
+    _, h = register(api)
+    t = make_task(api, h)
+    body = say(api, h, t, "ugh I keep putting this off")
+    assert body["intervention"] == "ask_reason" and body["ask_reason"] is True
+    assert fake_llm.decide_calls == [] and fake_llm.read_calls == []        # one call: just the reply
+    system = " ".join(system_of(fake_llm.write_calls[-1]).split())
+    assert "what's getting in the way right now" in system and "No advice and no step yet" in system
+    # tapping a chip now starts that reason's framework, as usual
+    assert start(api, h, t, "too_much")["intervention"] == "overwhelm:open"
+
+
+def test_typing_again_instead_of_tapping_gets_a_normal_reply_not_the_same_question(api, db, fake_llm):
+    _, h = register(api)
+    t = make_task(api, h)
+    say(api, h, t, "ugh I keep putting this off")
+    again = say(api, h, t, "I just don't feel like it")
+    assert again["intervention"] != "ask_reason" and again["ask_reason"] is False
+
+
+def test_thanks_and_finished_tasks_skip_the_question(api, db, fake_llm):
+    _, h = register(api)
+    t = make_task(api, h)
+    assert say(api, h, t, "ok thanks")["intervention"] != "ask_reason"
+    done = make_task(api, h)
+    api.patch(f"/tasks/{done}", json={"status": "done"}, headers=h)
+    assert say(api, h, done, "I finished it!")["intervention"] != "ask_reason"
+
+
+def test_something_bigger_than_work_gets_the_step_back_not_the_chips(api, db, fake_llm):
+    fake_llm.reply = "That sounds like more than a task thing. Please reach out to someone you trust or a local helpline."
+    _, h = register(api)
+    t = make_task(api, h)
+    body = say(api, h, t, "honestly I feel hopeless about everything")
+    assert body["intervention"] == "step_back" and body["ask_reason"] is False
+    assert "Stop working on the task" in system_of(fake_llm.write_calls[-1])
+
+
+def test_ask_reason_falls_back_to_a_gentle_question_when_the_model_fails(api, db, monkeypatch):
+    monkeypatch.setattr(llm, "complete", FakeLLM(fail=True))
+    _, h = register(api)
+    t = make_task(api, h)
+    body = say(api, h, t, "ugh I keep putting this off")
+    assert body["reply"] == agent.ASK_FALLBACK and body["ask_reason"] is True

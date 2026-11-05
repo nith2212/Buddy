@@ -109,7 +109,7 @@ def test_every_stage_has_wording_in_the_docs():
         assert framework_section(state, "Never")
     for heading in ("Voice", "Release", "Step back", "Offer", "Followup", "If they said idk", "If they were unsure",
                     "If they said no", "If it was unclear", "If they answered but you stay here",
-                    "If they took your move"):
+                    "If they took your move", "Ask the reason"):
         assert framework_section("shared", heading), heading
 
 

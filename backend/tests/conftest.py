@@ -84,3 +84,11 @@ def api():
     """Client for the real app (all routers); tables come from the autouse fresh_db fixture."""
     from main import app
     return TestClient(app)
+
+
+@pytest.fixture
+def generic_path(monkeypatch):
+    """Skip the 'what's in the way?' turn a typed, untapped message gets first, so a test reaches
+    the generic decide-and-write path directly (as if Buddy had already asked for the reason)."""
+    from brain import agent
+    monkeypatch.setattr(agent, "_asked_reason_last", lambda *args: True)
