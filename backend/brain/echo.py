@@ -3,6 +3,8 @@
 # - E1 (facts): causes, ignored tasks, postpones, what got finished.
 # - E2 (reactions): what they did with each move Buddy offered (took it, brought their own plan,
 #   said no, went quiet) and whether progress followed within a day; check-in replies; days active.
+# - E3 (adapt): four owner-approved rules (2026-11-05) that change Buddy's next move once something has
+#   happened RULE_MIN+ times. See "E3" below.
 #
 # - Counted by code, no model call: nothing can be invented, and it spends no Groq quota.
 # - For Buddy, never for the user: no push, no user-facing text. Buddy gets at most one line, and
@@ -163,6 +165,17 @@ def reactions(db: Session, user_id: str, task_ids: list[int], start: datetime, e
     return out
 
 
+def _progress(tasks: list[Task], steps_done: list[Subtask]) -> dict[int, list[datetime]]:
+    """When each task moved forward: a step ticked or the task finished (not just opening it)."""
+    progress: dict[int, list[datetime]] = {}
+    for st in steps_done:
+        progress.setdefault(st.task_id, []).append(as_utc(st.updated_at or st.created_at))
+    for t in tasks:
+        if t.completed_at:
+            progress.setdefault(t.id, []).append(as_utc(t.completed_at))
+    return progress
+
+
 def _local_day(dt: datetime) -> str:
     return as_utc(dt).astimezone(WEEK_TZ).date().isoformat()
 
@@ -241,13 +254,7 @@ def week_facts(db: Session, user_id: str, start: datetime, end: datetime) -> Opt
     steps_done = db.execute(select(Subtask).where(Subtask.user_id == user_id, Subtask.task_id.in_(ids),
                                                   Subtask.done.is_(True))).scalars().all()
 
-    # E2: progress = a step ticked or the task finished (not just opening it)
-    progress: dict[int, list[datetime]] = {}
-    for st in steps_done:
-        progress.setdefault(st.task_id, []).append(as_utc(st.updated_at or st.created_at))
-    for t in tasks:
-        if t.completed_at:
-            progress.setdefault(t.id, []).append(as_utc(t.completed_at))
+    progress = _progress(tasks, steps_done)
     week_taps = [e for e in taps if _in(e.created_at, start, end)]
     started = sum(1 for e in week_taps
                   if any(as_utc(e.created_at) < d <= as_utc(e.created_at) + PROGRESS_WINDOW
@@ -430,3 +437,85 @@ def this_week(db: Session, user_id: str, now: datetime) -> dict:
         "line": week_line(finished, steps, started, shown),
         "helped": _helped(db, user_id, facts["reactions"] if facts else {}),
     }
+
+
+# ── E3: Buddy adapts (owner-approved rules, 2026-11-05) ──────────────────────────────────────
+# Each rule switches on only after Echo has seen the pattern RULE_MIN+ times (saved weeks plus this
+# week so far). A rule either reroutes the stage or gives the writer ONE hint line. Buddy never says
+# a count. The four rules:
+#   own_plan_first  they usually bring their own plan -> at the offer, ask what they'll do first, a tiny
+#                   move from Buddy only as the backup. If they then ask Buddy, Buddy suggests as usual.
+#   move_first      at the offer they always ask for Buddy's move, never their own -> skip the either/or
+#                   and go straight to one tiny "what about...?" move
+#   lean_on_helped  a move helped them get going RULE_MIN+ times for this cause -> offer it first, and
+#                   Buddy may say softly that it helped before (owner: "softly say it")
+#   avoid_declined  they said no to a move RULE_MIN+ times for this cause and never took it -> offer
+#                   something different
+
+RULE_MIN = 3
+
+ADAPT_HINTS = {
+    "own_plan_first": "What you know about them: they usually have their own plan. Ask what they'll do first, "
+                      "and offer a tiny move from you only as the backup, all in one question.",
+    "lean_on_helped": "What you know about them: {move} has helped them get going with this before. Offer that "
+                      "first. You may say softly that it helped before, never how often or when.",
+    "avoid_declined": "What you know about them: they usually say no to {move}. Don't offer it; offer a "
+                      "different kind of small move, or ask what they'd like to do.",
+}
+
+
+def profile(db: Session, user_id: str, now: datetime) -> dict[str, dict[str, int]]:
+    """E2's reactions summed over the saved weeks and this week so far: '<cause>.<move>' -> counts."""
+    sums: dict[str, dict[str, int]] = {}
+
+    def add(reactions_: dict) -> None:
+        for key, row in (reactions_ or {}).items():
+            acc = sums.setdefault(key, {})
+            for k, v in row.items():
+                if isinstance(v, int):
+                    acc[k] = acc.get(k, 0) + v
+
+    for r in db.execute(select(Memory).where(Memory.user_id == user_id, Memory.key.startswith(KEY_PREFIX))
+                        ).scalars():
+        try:
+            add(json.loads(r.value).get("reactions"))
+        except (TypeError, ValueError, AttributeError):
+            continue
+    _, since = week_window(now)  # the saved weeks end here; count the rest live
+    tasks = db.execute(select(Task).where(Task.user_id == user_id)).scalars().all()
+    if tasks:
+        ids = [t.id for t in tasks]
+        steps = db.execute(select(Subtask).where(Subtask.user_id == user_id, Subtask.task_id.in_(ids),
+                                                 Subtask.done.is_(True))).scalars().all()
+        add(reactions(db, user_id, ids, since, as_utc(now) + timedelta(seconds=1), _progress(list(tasks), steps)))
+    return sums
+
+
+def _count(prof: dict, suffixes: tuple[str, ...], field: str) -> int:
+    return sum(row.get(field, 0) for key, row in prof.items() if key.endswith(suffixes))
+
+
+def adapt(prof: dict, state: str, stage: str, tiny: str) -> tuple[Optional[str], Optional[str], Optional[str]]:
+    """(reroute to this stage or None, hint line or None, rule name or None) for the stage Buddy is about
+    to speak on. `tiny` is the framework's tiny-move stage."""
+    cause = CAUSE_OF_STATE.get(state)
+    if not prof or not cause:
+        return None, None, None
+    if stage == "offer":
+        own = _count(prof, (".offer", ".asked_their_step"), "own_plan")
+        wanted = _count(prof, (".offer",), "wanted_move")
+        if own >= RULE_MIN and own > wanted:
+            return None, ADAPT_HINTS["own_plan_first"], "own_plan_first"
+        if wanted >= RULE_MIN and _count(prof, (".offer",), "own_plan") == 0:
+            _, hint, rule = adapt(prof, state, tiny, tiny)
+            return tiny, hint, f"move_first+{rule}" if rule else "move_first"
+        return None, None, None
+    move = MOVES.get((state, stage))
+    if move not in MOVE_TEXT or move in ("offer", "asked_their_step"):
+        return None, None, None
+    row = prof.get(f"{cause}.{move}", {})
+    if row.get("helped", 0) >= RULE_MIN:
+        return None, ADAPT_HINTS["lean_on_helped"].format(move=MOVE_TEXT[move]), "lean_on_helped"
+    if row.get("declined", 0) >= RULE_MIN and not row.get("took") and not row.get("helped"):
+        return None, ADAPT_HINTS["avoid_declined"].format(move=MOVE_TEXT[move]), "avoid_declined"
+    return None, None, None

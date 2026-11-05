@@ -21,6 +21,7 @@
 
 from __future__ import annotations
 
+import dataclasses
 import json
 import logging
 import re
@@ -235,6 +236,7 @@ async def _flow_turn(
     saved = tools.get_memory_entry(db, user_id, f"blocker.task.{task_id}")
     already_saved = bool(saved and as_utc(saved.updated_at) > as_utc(since))
     pattern = _context_line(db, user_id, task_id, tools.get_user_memory(db, user_id))
+    known = echo.profile(db, user_id, datetime.now(timezone.utc))  # E3: how they've reacted before
     steps = _load_steps(db, task)
     open_steps = [s.title for s in steps if not s.done][:FLOW_OPEN_STEPS]
     done_steps = [s.title for s in steps if s.done][:FLOW_OPEN_STEPS]
@@ -258,6 +260,15 @@ async def _flow_turn(
         step = flow.next_stage(state, stage, reading, tries)
     else:
         step = flow.Step(state, stage, modifier="stay")  # reopened without a new message
+    # E3: an owner-approved rule may reroute a fresh offer, or add one hint line (it then wins over the
+    # other context line: it's about the move Buddy is making right now).
+    reroute, hint, rule = (echo.adapt(known, step.state, step.stage, flow.FRAMEWORKS[step.state].tiny)
+                           if step.modifier is None else (None, None, None))
+    if reroute and (step.state, reroute) == (state, stage):
+        reroute, hint, rule = None, None, None  # they just turned that move down: ask, don't repeat it
+    if reroute:
+        step = dataclasses.replace(step, stage=reroute)
+    pattern = hint or pattern
     new_tries = tries + 1 if (step.state, step.stage) == (state, stage) else 1
     if step.note:
         notes[step.note[0]] = step.note[1]
@@ -283,7 +294,7 @@ async def _flow_turn(
             reply, checks["offer_template"] = OFFER_FALLBACK, True
     except llm.LLMError as e:
         logger.warning("Buddy flow turn fell back (task_id=%s): %s", task_id, e)
-        fallback, reply, save_cause = True, FALLBACK_REPLY[mode], None
+        fallback, reply, save_cause, rule = True, FALLBACK_REPLY[mode], None, None
         step, new_tries = flow.Step(state, stage or flow.FRAMEWORKS[state].first), tries  # don't advance on a failure
 
     reasoning = {
@@ -294,6 +305,7 @@ async def _flow_turn(
         "flow": {
             "state": step.state, "stage": step.stage, "tries": new_tries, "modifier": step.modifier,
             "notes": notes,
+            "adapt": rule,
             "read": None if reading is None else {"kind": reading.kind, "cause": reading.cause,
                                                   "flavor": reading.flavor, "source": reading.source},
         },

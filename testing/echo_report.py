@@ -56,6 +56,21 @@ def seed_demo(db) -> None:
     db.commit()
 
 
+def echo_rules(db, uid, now) -> list[str]:
+    """Which E3 rules would fire for this user, per framework stage (from saved weeks + this week so far)."""
+    from brain import echo, flow
+
+    prof = echo.profile(db, uid, now)
+    on = []
+    for state, fw in flow.FRAMEWORKS.items():
+        stages = {"offer", *(st for (s_, st) in echo.MOVES if s_ == state)}
+        for stage in sorted(stages):
+            _, _, rule = echo.adapt(prof, state, stage, fw.tiny)
+            if rule:
+                on.append(f"{state}:{stage} -> {rule}")
+    return on
+
+
 def report(db, last_week: bool) -> str:
     from sqlalchemy import select
 
@@ -89,6 +104,8 @@ def report(db, last_week: bool) -> str:
         for move, row in sorted(facts.get("reactions", {}).items()):
             parts = ", ".join(f"{k} {v}" for k, v in row.items() if v and k not in ("offered", "progress_after"))
             out.append(f"  - {move}: offered {row['offered']} ({parts}); progress within a day {row['progress_after']}")
+        on = echo_rules(db, uid, now)
+        out.append(f"E3 rules on now: {', '.join(on) if on else 'none yet (each needs 3+ times)'}")
         for t in facts["open_tasks"]:
             out.append(f"- \"{titles.get(t['id'])}\": untouched {t['days_untouched']} day(s), check-ins "
                        f"{t['checkins_ignored']}/{t['checkins_sent']} ignored, postponed {t['postponed']}x")

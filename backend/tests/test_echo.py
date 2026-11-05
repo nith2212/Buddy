@@ -377,3 +377,52 @@ def test_page_is_only_the_callers_and_works_with_no_tasks(api, db):
     assert mine["wins"] == {"tasks_finished": 0, "steps_done": 0, "started_when_hard": 0}
     assert mine["total_days"] == 0 and mine["line"] == echo.QUIET_LINE and mine["helped"] == []
     assert api.get("/echo/week", headers=hb).json()["wins"]["tasks_finished"] == 1
+
+
+# ── E3: Buddy adapts (owner-approved rules) ───────────────────────────────────────
+
+@pytest.mark.parametrize("prof,state,stage,tiny,want", [
+    # brings their own plan (offers + "what's your step?" both count)
+    ({"afraid.offer": {"own_plan": 2}, "unclear.asked_their_step": {"own_plan": 1}},
+     "perfectionism", "offer", "reframe", (None, "own_plan_first")),
+    ({"afraid.offer": {"own_plan": 2}}, "perfectionism", "offer", "reframe", (None, None)),       # only twice
+    ({"afraid.offer": {"own_plan": 3, "wanted_move": 4}}, "perfectionism", "offer", "reframe", (None, None)),
+    # always asks for Buddy's move, never their own: straight to the tiny move
+    ({"tired.offer": {"wanted_move": 3}}, "fatigue", "offer", "move", ("move", "move_first")),
+    ({"tired.offer": {"wanted_move": 3, "own_plan": 1}}, "fatigue", "offer", "move", (None, None)),
+    ({"tired.offer": {"wanted_move": 3}, "tired.tiny_move": {"helped": 3}}, "fatigue", "offer", "move",
+     ("move", "move_first+lean_on_helped")),
+    # what helped, per cause
+    ({"afraid.rough_version": {"helped": 3}}, "perfectionism", "reframe", "reframe", (None, "lean_on_helped")),
+    ({"afraid.rough_version": {"helped": 3}}, "overwhelm", "micro", "micro", (None, None)),       # other cause
+    # what they turn down
+    ({"bored.lighter": {"declined": 3}}, "low_interest", "lighten", "lighten", (None, "avoid_declined")),
+    ({"bored.lighter": {"declined": 3, "took": 1}}, "low_interest", "lighten", "lighten", (None, None)),
+    ({}, "overwhelm", "micro", "micro", (None, None)),
+])
+def test_adapt_rules_switch_on_only_at_three(prof, state, stage, tiny, want):
+    reroute, hint, rule = echo.adapt(prof, state, stage, tiny)
+    assert (reroute, rule) == want
+    assert (hint is None) == (rule in (None, "move_first"))
+    assert hint is None or not any(ch.isdigit() for ch in hint)    # never a count
+
+
+def test_lean_hint_names_the_move_and_may_say_it_softly():
+    _, hint, _ = echo.adapt({"afraid.rough_version": {"helped": 4}}, "perfectionism", "reframe", "reframe")
+    assert "a rough first version" in hint and "softly" in hint
+
+
+def test_profile_sums_saved_weeks_and_this_week_so_far(api, db):
+    uid, _ = register(api)
+    now = datetime.now(UTC)
+    db.add(models.Memory(user_id=uid, key="echo.week.2026-10-25", source="echo",
+                         value=json.dumps({"reactions": {"afraid.offer": {"offered": 2, "own_plan": 2}}})))
+    db.commit()
+    t = add_task(db, uid, created=now - timedelta(days=30))
+    buddy(db, t, now - timedelta(minutes=5), "perfectionism", "offer")
+    buddy(db, t, now - timedelta(minutes=4), "perfectionism", "release", read="own_plan")
+    prof = echo.profile(db, uid, now)
+    assert prof["afraid.offer"]["own_plan"] == 3
+    assert echo.adapt(prof, "perfectionism", "offer", "reframe")[2] == "own_plan_first"
+    other, _ = register(api)
+    assert echo.profile(db, other, now) == {}

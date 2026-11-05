@@ -744,3 +744,68 @@ def test_opening_message_request_always_has_a_user_turn():
     assert llm.with_user_turn(system) == [*system, llm.OPENER_TURN]
     convo = [*system, {"role": "user", "content": "hi"}]
     assert llm.with_user_turn(convo) == convo
+
+
+# ── Echo E3: Buddy adapts once a pattern shows up 3+ times ───────────────────────
+
+def seed_reactions(db, user_id, reactions):
+    db.add(models.Memory(user_id=user_id, key="echo.week.2026-10-25", source="echo",
+                         value=json.dumps({"reactions": reactions})))
+    db.commit()
+
+
+def test_own_plan_person_is_asked_for_theirs_first_and_can_still_ask_buddy(api, db, monkeypatch):
+    # reframe declined -> the offer; they always bring their own plan, so Buddy asks for theirs first
+    fake = FakeLLM(reads=[{"kind": "confirm", "cause": "afraid"}, {"kind": "reject"}, {"kind": "wants_move"}])
+    monkeypatch.setattr(llm, "complete", fake)
+    user_id, h = register(api)
+    t = make_task(api, h)
+    seed_reactions(db, user_id, {"afraid.offer": {"own_plan": 3}})
+    start(api, h, t, "afraid")
+    say(api, h, t, "yeah exactly")                                     # -> reframe
+    assert say(api, h, t, "nah")["intervention"] == "perfectionism:offer"
+    assert flow_of(db, t)["adapt"] == "own_plan_first"
+    assert "they usually have their own plan" in system_of(fake.write_calls[-1])
+    # owner: if they'd rather have Buddy's move, Buddy suggests as usual
+    assert say(api, h, t, "hmm you say")["intervention"] == "perfectionism:reframe"
+    assert flow_of(db, t)["adapt"] is None
+
+
+def test_move_first_person_skips_the_either_or(api, db, monkeypatch):
+    fake = FakeLLM(reads=[{"kind": "wants_move"}])
+    monkeypatch.setattr(llm, "complete", fake)
+    user_id, h = register(api)
+    t = make_task(api, h)
+    seed_reactions(db, user_id, {"tired.offer": {"wanted_move": 3}})
+    start(api, h, t, "tired")
+    # fatigue: "I need to do something tonight" normally gets the offer; this person always wants Buddy's move
+    assert say(api, h, t, "long day but I need to do something")["intervention"] == "fatigue:move"
+    assert flow_of(db, t)["adapt"] == "move_first"
+
+
+def test_a_declined_move_is_never_offered_straight_back(api, db, monkeypatch):
+    fake = FakeLLM(reads=[{"kind": "confirm", "cause": "afraid"}, {"kind": "reject"}])
+    monkeypatch.setattr(llm, "complete", fake)
+    user_id, h = register(api)
+    t = make_task(api, h)
+    seed_reactions(db, user_id, {"afraid.offer": {"wanted_move": 3}})
+    start(api, h, t, "afraid")
+    say(api, h, t, "yeah exactly")                                     # -> reframe (the rough version)
+    assert say(api, h, t, "nah")["intervention"] == "perfectionism:offer"   # not bounced back to reframe
+    assert flow_of(db, t)["adapt"] is None
+
+
+def test_what_helped_reaches_the_writer_as_the_one_context_line(api, db, monkeypatch):
+    fake = FakeLLM(reads=[{"kind": "confirm", "cause": "afraid"}])
+    monkeypatch.setattr(llm, "complete", fake)
+    user_id, h = register(api)
+    t = make_task(api, h)
+    seed_reactions(db, user_id, {"afraid.rough_version": {"helped": 3}})
+    db.add(models.Memory(user_id=user_id, key="pattern.blocker.afraid", value="5"))
+    db.commit()
+    start(api, h, t, "afraid")
+    say(api, h, t, "yeah exactly")
+    system = system_of(fake.write_calls[-1])
+    assert "a rough first version has helped them get going with this before" in system
+    assert "Pattern:" not in system                                    # one line only: the hint wins
+    assert flow_of(db, t)["adapt"] == "lean_on_helped"
