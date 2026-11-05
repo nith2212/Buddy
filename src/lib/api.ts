@@ -19,6 +19,16 @@ export type Task = {
 export type ChatTurn = { role: 'user' | 'assistant'; content: string };
 export type BuddyReply = { reply: string; state: string | null; intervention: string | null };
 
+// GET /echo/week (backend brain/echo.py "The user's Echo page"): kind, earned things only.
+export type EchoWeek = {
+  week_start: string;
+  days: { date: string; active: boolean }[];
+  total_days: number;
+  wins: { tasks_finished: number; steps_done: number; started_when_hard: number };
+  line: string;
+  helped: { cause: string; move: string; times: number; text: string }[];
+};
+
 export class ApiError extends Error {
   constructor(public status: number) {
     super(`Request failed with status ${status}`);
@@ -62,5 +72,7 @@ export function api(token: string) {
     chat: (taskId: number, input: { message?: string; reason?: Reason }) =>
       request<BuddyReply>(token, '/chat', 'POST', { task_id: taskId, ...input }),
     initiate: (taskId: number) => request<BuddyReply>(token, '/initiate', 'POST', { task_id: taskId }),
+    echoWeek: () => request<EchoWeek>(token, '/echo/week'),
+    deleteMe: () => request<void>(token, '/me', 'DELETE'),
   };
 }

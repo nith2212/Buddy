@@ -140,3 +140,19 @@ A friend telling you what they noticed, never a report card. Code templates only
 - Stretch: (5) "Talk about my week" chat (new short framework: open, reflect, one gentle intention, release).
 - Never: ignored check-ins, days untouched, postpones, comparisons, percentages, empty praise. Quiet week: "Quiet week. That's okay."
 - Backend: read-only `GET /echo/week` (scoped to the caller), **built 2026-11-05** (`echo_routes.py`, `echo.this_week`): `days` (Mon..Sun, active or not), `total_days` (up-only), `wins` {tasks_finished, steps_done, started_when_hard}, `line` (template), `helped` [{cause, move, times, text}] only for causes confirmed 3+ times. Template wording (`CAUSE_TEXT`, `MOVE_TEXT`, `week_line`) awaits the owner's review. Weekly only: monthly reflections stay parked.
+
+## New UI (step F), built 2026-11-05
+Owner-approved mockup: https://claude.ai/artifact/1HqNqLYwuuZuWbqxWJgtGo (private to the owner). Hand-drawn style: ink outlines,
+uneven corners, hatched offset shadows, Gaegu (headings) + Nunito (text), "Dusk" palette (cream F2EAE0, sky B4D3D9,
+lavender BDA6CE, violet 9B8EC7; violet only for shadows, text is always ink 2A2238). Buddy = the owner's white "dumpling"
+blob that wobbles and blinks (moods: default, happy, worried; worried only for connection problems).
+- Files: `src/constants/sketch.ts` (palette, fonts, corners), `src/components/sketch.tsx` (Txt, Card, Hatch, SketchButton,
+  Chip, Bubble), `src/components/buddy-blob.tsx`, `src/components/side-menu.tsx` (menu + BrandHeader),
+  `src/components/buddy-splash.tsx` (loading screen, honest about Render waking up).
+- Screens: `/` tasks; `/task/[id]` that task's own chat (steps strip, its history, reason chips; "stuck again?" reopens them);
+  `/chat` "which task?" picker that opens the task's own thread; `/echoes` from GET /echo/week.
+- Menu has "Delete my data" instead of "Log out" (no accounts: DELETE /me, then a fresh anonymous identity via `restart()`).
+- New deps (owner OK): react-native-svg, @expo-google-fonts/gaegu, @expo-google-fonts/nunito. Native change: needs a new APK
+  (`eas build -p android --profile preview`). Native splash background is now cream; its icon is still the old one.
+- Not done: "talk to buddy about my week" opens the task picker (the reflection chat is Later); a Buddy PNG for the native
+  splash and app icon; dark mode (the design is light-only).

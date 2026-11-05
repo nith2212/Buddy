@@ -1,32 +1,36 @@
-import { Pressable, StyleSheet, Text } from 'react-native';
+import { Pressable, StyleSheet } from 'react-native';
+import Svg, { Path } from 'react-native-svg';
 
-import { Accent } from '@/constants/theme';
-import { useTheme } from '@/hooks/use-theme';
+import { Ink, Palette } from '@/constants/sketch';
 
-export function Checkbox({ checked, onPress, label }: { checked: boolean; onPress: () => void; label: string }) {
-  const theme = useTheme();
+/** A hand-drawn square checkbox with a 44px touch target. */
+export function Checkbox({ checked, onPress, label, size = 28 }: { checked: boolean; onPress: () => void; label: string; size?: number }) {
   return (
     <Pressable
       onPress={onPress}
-      hitSlop={10}
+      hitSlop={(44 - size) / 2 + 2}
       accessibilityRole="checkbox"
       accessibilityState={{ checked }}
       accessibilityLabel={label}
-      style={[styles.box, { borderColor: checked ? Accent : theme.textSecondary }, checked && styles.checked]}>
-      {checked ? <Text style={styles.tick}>✓</Text> : null}
+      style={[styles.box, { width: size, height: size, backgroundColor: checked ? Palette.pop : Palette.white }]}>
+      {checked ? (
+        <Svg width={size * 0.7} height={size * 0.62} viewBox="0 0 20 18">
+          <Path d="M2 9 L8 15 L18 2" fill="none" stroke={Ink} strokeWidth={3} strokeLinecap="round" strokeLinejoin="round" />
+        </Svg>
+      ) : null}
     </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
   box: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    borderWidth: 2,
+    borderWidth: 2.5,
+    borderColor: Ink,
+    borderTopLeftRadius: 6,
+    borderTopRightRadius: 9,
+    borderBottomRightRadius: 5,
+    borderBottomLeftRadius: 8,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  checked: { backgroundColor: Accent },
-  tick: { color: '#ffffff', fontSize: 14, fontWeight: '700', lineHeight: 16 },
 });

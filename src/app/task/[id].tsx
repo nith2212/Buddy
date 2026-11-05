@@ -1,33 +1,27 @@
+// One task's own chat (mockup 2a/2b): its steps strip, its whole conversation, and the reason chips.
+// No chat yet: Buddy asks "What's in the way?". Chat exists: "stuck again? tell Buddy why" reopens the chips.
+
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import {
-  ActivityIndicator,
-  FlatList,
-  KeyboardAvoidingView,
-  Pressable,
-  StyleSheet,
-  TextInput,
-  View,
-} from 'react-native';
+import { FlatList, KeyboardAvoidingView, Pressable, StyleSheet, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import Svg, { Path } from 'react-native-svg';
 
+import { BuddyBlob } from '@/components/buddy-blob';
 import { Checkbox } from '@/components/checkbox';
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { Accent, Danger, MaxContentWidth, Spacing } from '@/constants/theme';
+import { Bubble, Chip, SketchButton, Txt } from '@/components/sketch';
+import { Border, Font, Ink, Palette, Wobble } from '@/constants/sketch';
 import { useToken } from '@/hooks/use-session';
-import { useTheme } from '@/hooks/use-theme';
 import { api, ChatTurn, Subtask, Task } from '@/lib/api';
 import { formatDue, isOverdue } from '@/lib/dates';
 import { Reason, REASONS } from '@/lib/reasons';
 
 export default function TaskChatScreen() {
-  const { id, from } = useLocalSearchParams<{ id: string; from?: string }>();
+  const { id, from, ask } = useLocalSearchParams<{ id: string; from?: string; ask?: string }>();
   const taskId = Number(id);
   const token = useToken();
   const client = useMemo(() => api(token), [token]);
   const router = useRouter();
-  const theme = useTheme();
   const insets = useSafeAreaInsets();
 
   const [task, setTask] = useState<Task | null>(null);
@@ -37,6 +31,8 @@ export default function TaskChatScreen() {
   const [sending, setSending] = useState(false); // also true while Buddy writes the opening message
   const [sendFailed, setSendFailed] = useState(false);
   const [newStep, setNewStep] = useState('');
+  const [stepsOpen, setStepsOpen] = useState(false);
+  const [askAgain, setAskAgain] = useState(ask === '1'); // the reason chips, once a chat exists
 
   const listRef = useRef<FlatList<ChatTurn>>(null);
   const stickToEnd = useRef(true);
@@ -49,11 +45,12 @@ export default function TaskChatScreen() {
         if (cancelled) return;
         setTask(loadedTask);
         setTurns(history);
+        setStepsOpen(history.length === 0); // a fresh task shows its steps box; a chat keeps it folded
         setLoadState('ready');
 
         if (history.length === 0 && from === 'checkin') {
           // Arrived from a check-in ("Yes, let's chat"): they already told us how it feels, so Buddy
-          // speaks first. Opened from the task list instead, the reason chips below ask first.
+          // speaks first. Opened from the task list instead, the reason chips ask first.
           setSending(true);
           try {
             const opening = await client.initiate(taskId);
@@ -76,7 +73,7 @@ export default function TaskChatScreen() {
   // Scroll to the newest message once the list has actually laid it out.
   useEffect(() => {
     stickToEnd.current = true;
-  }, [turns.length, sending]);
+  }, [turns.length, sending, askAgain]);
 
   function goBack() {
     if (router.canGoBack()) router.back();
@@ -89,6 +86,7 @@ export default function TaskChatScreen() {
     setInput('');
     setSendFailed(false);
     setSending(true);
+    setAskAgain(false);
     setTurns((prev) => [...prev, { role: 'user', content: text }]);
     try {
       const res = await client.chat(taskId, { message: text });
@@ -109,7 +107,8 @@ export default function TaskChatScreen() {
     try {
       // The tap isn't a typed message: Buddy answers it by asking its first question.
       const res = await client.chat(taskId, { reason });
-      setTurns([{ role: 'assistant', content: res.reply }]);
+      setTurns((prev) => [...prev, { role: 'assistant', content: res.reply }]);
+      setAskAgain(false);
     } catch {
       setSendFailed(true); // chips stay, so they can tap again
     } finally {
@@ -141,124 +140,140 @@ export default function TaskChatScreen() {
     }
   }
 
-  const showReasons = turns.length === 0 && !sending;
-
-  const header = (
-    <View style={styles.header}>
-      {task && formatDue(task.due_date) && task.status !== 'done' ? (
-        <ThemedText type="small" themeColor="textSecondary" style={isOverdue(task.due_date) ? { color: Danger } : undefined}>
-          {formatDue(task.due_date)}
-        </ThemedText>
-      ) : null}
-
-      <View style={[styles.stepsCard, { backgroundColor: theme.backgroundElement }]}>
-        <ThemedText type="smallBold">Steps</ThemedText>
-        {task && task.subtasks.length === 0 ? (
-          <ThemedText type="small" themeColor="textSecondary">
-            Breaking it into small steps can help. Totally optional.
-          </ThemedText>
-        ) : null}
-        {[...(task?.subtasks ?? [])]
-          .sort((a, b) => a.position - b.position)
-          .map((s) => (
-            <View key={s.id} style={styles.stepRow}>
-              <Checkbox checked={s.done} onPress={() => toggleSubtask(s)} label={s.done ? `Mark "${s.title}" not done` : `Mark "${s.title}" done`} />
-              <ThemedText style={[styles.stepTitle, s.done && styles.struck]} themeColor={s.done ? 'textSecondary' : 'text'}>
-                {s.title}
-              </ThemedText>
-            </View>
-          ))}
-        <View style={styles.stepRow}>
-          <TextInput
-            value={newStep}
-            onChangeText={setNewStep}
-            placeholder="Add a step"
-            placeholderTextColor={theme.textSecondary}
-            maxLength={200}
-            returnKeyType="done"
-            onSubmitEditing={addStep}
-            style={[styles.stepInput, { color: theme.text, borderColor: theme.backgroundSelected }]}
-          />
-          <Pressable onPress={addStep} disabled={!newStep.trim()} accessibilityRole="button" accessibilityLabel="Add step">
-            <ThemedText type="linkPrimary" style={!newStep.trim() && styles.disabled}>
-              Add
-            </ThemedText>
-          </Pressable>
-        </View>
-      </View>
-    </View>
-  );
-
-  function renderTurn({ item }: { item: ChatTurn }) {
-    const mine = item.role === 'user';
-    return (
-      <View style={[styles.bubble, mine ? styles.mine : styles.theirs, { backgroundColor: mine ? Accent : theme.backgroundElement }]}>
-        <ThemedText style={mine ? styles.mineText : undefined}>{item.content}</ThemedText>
-      </View>
-    );
-  }
+  const subtasks = [...(task?.subtasks ?? [])].sort((a, b) => a.position - b.position);
+  const stepsDone = subtasks.filter((s) => s.done).length;
+  const fresh = turns.length === 0 && !sending;
+  const dueLabel = task && task.status !== 'done' ? formatDue(task.due_date) : task?.status === 'done' ? 'done!' : null;
 
   const topBar = (
-    <View style={[styles.topBar, { paddingTop: insets.top + Spacing.two }]}>
-      <Pressable onPress={goBack} hitSlop={12} accessibilityRole="button" accessibilityLabel="Back">
-        <ThemedText type="linkPrimary">‹ Back</ThemedText>
-      </Pressable>
-      <ThemedText type="smallBold" numberOfLines={1} style={styles.topTitle}>
-        {task?.title ?? ''}
-      </ThemedText>
-      <View style={styles.topSpacer} />
+    <View style={[styles.topBar, { paddingTop: insets.top + 12 }]}>
+      <View style={styles.titleRow}>
+        <SketchButton tone="plain" wobble="round" lifted={false} onPress={goBack} accessibilityLabel="Back to tasks" style={styles.back}>
+          <Svg width={18} height={16} viewBox="0 0 18 16">
+            <Path d="M9 2 L2 8 L9 14 M2 8 Q10 7.4 16 8" fill="none" stroke={Ink} strokeWidth={2.6} strokeLinecap="round" strokeLinejoin="round" />
+          </Svg>
+        </SketchButton>
+        <View style={styles.titleText}>
+          <Txt variant="heading" numberOfLines={2} accessibilityRole="header">{task?.title ?? ''}</Txt>
+          {dueLabel ? (
+            <View style={[styles.dueChip, { backgroundColor: task && isOverdue(task.due_date) ? Palette.soft : Palette.bg }]}>
+              <Txt variant="hand" style={styles.dueText}>{dueLabel}</Txt>
+            </View>
+          ) : null}
+        </View>
+      </View>
+
+      {task ? (
+        <View style={styles.steps}>
+          <SketchButton
+            tone="soft"
+            lifted={false}
+            onPress={() => setStepsOpen((o) => !o)}
+            accessibilityState={{ expanded: stepsOpen }}
+            style={styles.stepsToggle}>
+            <Txt variant="hand">{subtasks.length ? `Steps · ${stepsDone} of ${subtasks.length} done` : 'Steps (totally optional)'}</Txt>
+            <Txt variant="hand" importantForAccessibility="no">{stepsOpen ? '▴' : '▾'}</Txt>
+          </SketchButton>
+          {stepsOpen ? (
+            <View style={styles.stepsList}>
+              {subtasks.map((s) => (
+                <View key={s.id} style={styles.stepRow}>
+                  <Checkbox size={24} checked={s.done} onPress={() => toggleSubtask(s)} label={s.done ? `Mark "${s.title}" not done` : `Mark "${s.title}" done`} />
+                  <Txt variant="semi" style={[styles.stepTitle, s.done && styles.struck]}>{s.title}</Txt>
+                </View>
+              ))}
+              <View style={styles.stepRow}>
+                <TextInput
+                  value={newStep}
+                  onChangeText={setNewStep}
+                  placeholder="Add a step…"
+                  placeholderTextColor={Palette.muted}
+                  accessibilityLabel="Add a step"
+                  maxLength={200}
+                  returnKeyType="done"
+                  onSubmitEditing={addStep}
+                  style={[styles.input, styles.stepInput]}
+                />
+                <SketchButton label="add" lifted={false} onPress={addStep} disabled={!newStep.trim()} accessibilityLabel="Add step" style={styles.smallButton} />
+              </View>
+            </View>
+          ) : null}
+        </View>
+      ) : null}
     </View>
   );
 
   if (loadState !== 'ready') {
     return (
-      <ThemedView style={styles.screen}>
+      <View style={styles.screen}>
         {topBar}
         <View style={styles.center}>
-          {loadState === 'loading' ? (
-            <ActivityIndicator />
-          ) : (
-            <ThemedText>Couldn&apos;t open this task.</ThemedText>
-          )}
+          <BuddyBlob width={130} mood={loadState === 'error' ? 'worried' : 'default'} label={loadState === 'error' ? 'Buddy, worried' : 'Buddy'} />
+          <Txt variant="hand">{loadState === 'loading' ? 'Opening your chat…' : 'Couldn’t open this task.'}</Txt>
         </View>
-      </ThemedView>
+      </View>
     );
   }
 
+  function renderTurn({ item }: { item: ChatTurn }) {
+    const mine = item.role === 'user';
+    return (
+      <View style={[styles.turn, mine ? styles.turnMine : styles.turnTheirs]}>
+        {mine ? null : <BuddyBlob width={38} animated={false} style={styles.avatar} />}
+        <Bubble from={mine ? 'me' : 'buddy'}>{item.content}</Bubble>
+      </View>
+    );
+  }
+
+  const reasonChips = (
+    <View style={styles.chips} accessibilityLabel="Why it's hard to start">
+      {REASONS.map((r) => (
+        <Chip key={r.value} label={r.label} onPress={() => pickReason(r.value)} disabled={sending} />
+      ))}
+    </View>
+  );
+
   return (
-    <ThemedView style={styles.screen}>
+    <KeyboardAvoidingView style={styles.screen} behavior="padding">
       {topBar}
-      <KeyboardAvoidingView style={styles.screen} behavior="padding">
+      {fresh ? (
+        <View style={styles.freshBody}>
+          <BuddyBlob width={128} label="Buddy, curious, waiting for you" />
+          <Txt variant="title" style={styles.centerText} accessibilityRole="header">What’s in the way?</Txt>
+          <Txt style={[styles.centerText, styles.freshSub]}>Tap the closest one. Buddy will ask a little more before suggesting anything.</Txt>
+          <View style={styles.reasonList}>
+            {REASONS.map((r, i) => (
+              <SketchButton
+                key={r.value}
+                label={r.label}
+                tone="plain"
+                wobble={(['a', 'b', 'c', 'b', 'a'] as const)[i]}
+                onPress={() => pickReason(r.value)}
+                style={styles.reasonButton}
+              />
+            ))}
+          </View>
+        </View>
+      ) : (
         <FlatList
           ref={listRef}
           data={turns}
           keyExtractor={(_, i) => String(i)}
           renderItem={renderTurn}
-          ListHeaderComponent={header}
           ListFooterComponent={
-            showReasons ? (
-              <View style={styles.reasons}>
-                <ThemedText themeColor="textSecondary">What&apos;s making this one hard to start?</ThemedText>
-                <View style={styles.chips}>
-                  {REASONS.map((r) => (
-                    <Pressable
-                      key={r.value}
-                      onPress={() => pickReason(r.value)}
-                      accessibilityRole="button"
-                      accessibilityLabel={r.label}
-                      style={[styles.chip, { backgroundColor: theme.backgroundElement, borderColor: theme.backgroundSelected }]}>
-                      <ThemedText>{r.label}</ThemedText>
-                    </Pressable>
-                  ))}
-                </View>
+            sending ? (
+              <View style={[styles.turn, styles.turnTheirs]}>
+                <BuddyBlob width={38} animated={false} style={styles.avatar} />
+                <Bubble from="buddy">Buddy is typing…</Bubble>
               </View>
-            ) : sending ? (
-              <View style={[styles.bubble, styles.theirs, { backgroundColor: theme.backgroundElement }]}>
-                <ThemedText themeColor="textSecondary">Buddy is typing…</ThemedText>
+            ) : askAgain ? (
+              <View style={styles.askAgain}>
+                <Txt variant="hand">What’s in the way this time?</Txt>
+                {reasonChips}
               </View>
             ) : null
           }
-          ItemSeparatorComponent={() => <View style={{ height: Spacing.two }} />}
+          ItemSeparatorComponent={() => <View style={{ height: 12 }} />}
           onContentSizeChange={() => {
             if (stickToEnd.current) {
               listRef.current?.scrollToEnd({ animated: true });
@@ -268,100 +283,110 @@ export default function TaskChatScreen() {
           keyboardShouldPersistTaps="handled"
           contentContainerStyle={styles.content}
         />
-        {sendFailed ? (
-          <ThemedText type="small" style={[styles.error, { color: Danger }]}>
-            Couldn&apos;t send that. {turns.length === 0 ? 'Try again.' : 'Your message is back in the box. Try again.'}
-          </ThemedText>
+      )}
+
+      {sendFailed ? (
+        <Txt variant="small" style={styles.error}>
+          Couldn’t send that. {turns.length === 0 ? 'Try again.' : 'Your message is back in the box. Try again.'}
+        </Txt>
+      ) : null}
+      <View style={[styles.inputArea, { paddingBottom: insets.bottom + 14 }]}>
+        {!fresh && !sending && !askAgain ? (
+          <Pressable onPress={() => setAskAgain(true)} accessibilityRole="button" style={({ pressed }) => [styles.stuck, pressed && styles.pressed]}>
+            <Txt variant="hand" style={styles.stuckText}>stuck again? tell Buddy why</Txt>
+          </Pressable>
         ) : null}
-        <View style={[styles.inputBar, { paddingBottom: insets.bottom + Spacing.two, borderTopColor: theme.backgroundSelected }]}>
+        <View style={styles.inputRow}>
           <TextInput
             value={input}
             onChangeText={setInput}
-            placeholder="Message Buddy"
-            placeholderTextColor={theme.textSecondary}
+            placeholder={fresh ? 'Or just tell Buddy…' : 'Message Buddy…'}
+            placeholderTextColor={Palette.muted}
+            accessibilityLabel="Message Buddy about this task"
             maxLength={1000}
             multiline
-            style={[styles.messageInput, { color: theme.text, backgroundColor: theme.backgroundElement }]}
+            style={[styles.input, styles.messageInput]}
           />
-          <Pressable
-            onPress={send}
-            disabled={!input.trim() || sending}
-            accessibilityRole="button"
-            accessibilityLabel="Send message"
-            style={[styles.sendButton, (!input.trim() || sending) && styles.disabled]}>
-            <ThemedText style={styles.sendText}>Send</ThemedText>
-          </Pressable>
+          <SketchButton onPress={send} disabled={!input.trim() || sending} accessibilityLabel="Send message" style={styles.send}>
+            <Svg width={22} height={20} viewBox="0 0 22 20">
+              <Path d="M2 10 L20 2 L14 18 L11 11 Z" fill="none" stroke={Ink} strokeWidth={2.4} strokeLinejoin="round" />
+            </Svg>
+          </SketchButton>
         </View>
-      </KeyboardAvoidingView>
-    </ThemedView>
+      </View>
+    </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1 },
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  screen: { flex: 1, backgroundColor: Palette.bg },
+  center: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12 },
+  centerText: { textAlign: 'center' },
   topBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: Spacing.three,
-    paddingBottom: Spacing.two,
-    gap: Spacing.three,
+    paddingHorizontal: 18,
+    paddingBottom: 12,
+    gap: 10,
+    backgroundColor: Palette.card,
+    borderBottomWidth: Border,
+    borderStyle: 'dashed',
+    borderColor: Ink,
   },
-  topTitle: { flex: 1, textAlign: 'center' },
-  topSpacer: { width: 52 },
-  content: {
-    paddingHorizontal: Spacing.three,
-    paddingBottom: Spacing.three,
-    width: '100%',
-    maxWidth: MaxContentWidth,
-    alignSelf: 'center',
-  },
-  header: { gap: Spacing.three, marginBottom: Spacing.three },
-  stepsCard: { borderRadius: Spacing.three, padding: Spacing.three, gap: Spacing.two },
-  stepRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.three },
+  titleRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  back: { width: 44, height: 44, minHeight: 44, paddingHorizontal: 0 },
+  titleText: { flex: 1, gap: 4 },
+  dueChip: { alignSelf: 'flex-start', borderWidth: 2, borderColor: Ink, paddingHorizontal: 9, ...Wobble.c },
+  dueText: { fontSize: 15, lineHeight: 20 },
+  steps: { gap: 8 },
+  stepsToggle: { minHeight: 44, flexDirection: 'row', justifyContent: 'space-between', borderWidth: 2 },
+  stepsList: { gap: 8, paddingHorizontal: 2 },
+  stepRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   stepTitle: { flex: 1 },
-  stepInput: {
-    flex: 1,
-    fontSize: 16,
-    paddingVertical: Spacing.one,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-  },
   struck: { textDecorationLine: 'line-through' },
-  bubble: { maxWidth: '85%', borderRadius: Spacing.three, paddingHorizontal: Spacing.three, paddingVertical: Spacing.two },
-  mine: { alignSelf: 'flex-end' },
-  theirs: { alignSelf: 'flex-start' },
-  mineText: { color: '#ffffff' },
-  reasons: { gap: Spacing.two, marginTop: Spacing.two },
-  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.two },
-  chip: {
-    borderRadius: Spacing.four,
-    borderWidth: StyleSheet.hairlineWidth,
-    paddingHorizontal: Spacing.three,
-    paddingVertical: Spacing.two,
-  },
-  error: { paddingHorizontal: Spacing.three, paddingBottom: Spacing.one },
-  inputBar: {
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-    gap: Spacing.two,
-    paddingHorizontal: Spacing.three,
-    paddingTop: Spacing.two,
-    borderTopWidth: StyleSheet.hairlineWidth,
-  },
-  messageInput: {
-    flex: 1,
-    maxHeight: 120,
+  input: {
+    fontFamily: Font.semi,
     fontSize: 16,
-    borderRadius: Spacing.three,
-    paddingHorizontal: Spacing.three,
-    paddingVertical: Spacing.two,
+    color: Ink,
+    backgroundColor: Palette.white,
+    borderWidth: Border,
+    borderColor: Ink,
+    paddingHorizontal: 14,
   },
-  sendButton: {
-    backgroundColor: Accent,
-    borderRadius: Spacing.three,
-    paddingHorizontal: Spacing.three,
-    paddingVertical: Spacing.two + 2,
+  stepInput: { flex: 1, minHeight: 44, borderWidth: 2, ...Wobble.c },
+  smallButton: { minHeight: 44, borderWidth: 2 },
+  freshBody: { flex: 1, alignItems: 'center', paddingHorizontal: 22, paddingTop: 20, gap: 10 },
+  freshSub: { maxWidth: 290, marginBottom: 6 },
+  reasonList: { alignSelf: 'stretch', gap: 10 },
+  reasonButton: { backgroundColor: Palette.white, boxShadow: `4px 4px 0px ${Palette.deep}` },
+  content: { paddingHorizontal: 16, paddingTop: 16, paddingBottom: 16 },
+  turn: { flexDirection: 'row', alignItems: 'flex-start', gap: 8 },
+  turnMine: { justifyContent: 'flex-end' },
+  turnTheirs: { justifyContent: 'flex-start' },
+  avatar: { marginTop: 4 },
+  askAgain: { marginTop: 14, gap: 8 },
+  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  error: { color: Palette.danger, paddingHorizontal: 16, paddingBottom: 4 },
+  inputArea: {
+    paddingHorizontal: 16,
+    paddingTop: 10,
+    gap: 10,
+    backgroundColor: Palette.card,
+    borderTopWidth: Border,
+    borderStyle: 'dashed',
+    borderColor: Ink,
   },
-  sendText: { color: '#ffffff', fontWeight: '600' },
-  disabled: { opacity: 0.4 },
+  stuck: {
+    alignSelf: 'center',
+    minHeight: 40,
+    justifyContent: 'center',
+    paddingHorizontal: 14,
+    borderWidth: 2,
+    borderColor: Ink,
+    backgroundColor: Palette.bg,
+    ...Wobble.c,
+  },
+  stuckText: { fontSize: 18 },
+  pressed: { transform: [{ translateX: 2 }, { translateY: 2 }] },
+  inputRow: { flexDirection: 'row', alignItems: 'flex-end', gap: 10 },
+  messageInput: { flex: 1, minHeight: 50, maxHeight: 120, paddingVertical: 12, ...Wobble.round },
+  send: { width: 54, height: 50, minHeight: 50, paddingHorizontal: 0 },
 });

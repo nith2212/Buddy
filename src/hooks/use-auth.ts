@@ -10,7 +10,7 @@ export type AuthState =
   | { status: 'ready'; token: string; userId: string }
   | { status: 'error'; message: string };
 
-export function useAuth(): AuthState {
+export function useAuth(): AuthState & { restart: () => Promise<void> } {
   const [state, setState] = useState<AuthState>({ status: 'loading' });
 
   useEffect(() => {
@@ -52,5 +52,12 @@ export function useAuth(): AuthState {
     }
   }
 
-  return state;
+  /** Forget this identity and register a fresh one (after "Delete my data" wiped it on the server). */
+  async function restart() {
+    setState({ status: 'loading' });
+    await Promise.all([SecureStore.deleteItemAsync(TOKEN_KEY), SecureStore.deleteItemAsync(USER_ID_KEY)]);
+    await bootstrap();
+  }
+
+  return { ...state, restart };
 }

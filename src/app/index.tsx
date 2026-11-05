@@ -1,30 +1,26 @@
+// Home: just the task list (mockup screen 2). Tap a task to open its own chat.
+
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
-import {
-  ActivityIndicator,
-  FlatList,
-  Pressable,
-  RefreshControl,
-  StyleSheet,
-  TextInput,
-  View,
-} from 'react-native';
+import { FlatList, KeyboardAvoidingView, Pressable, RefreshControl, StyleSheet, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import Svg, { Path } from 'react-native-svg';
 
+import { BuddyBlob } from '@/components/buddy-blob';
 import { Checkbox } from '@/components/checkbox';
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { Accent, Danger, MaxContentWidth, Spacing } from '@/constants/theme';
+import { BrandHeader } from '@/components/side-menu';
+import { Card, Chip, SketchButton, Txt } from '@/components/sketch';
+import { Border, Font, Ink, Palette, Wobble } from '@/constants/sketch';
 import { useToken } from '@/hooks/use-session';
-import { useTheme } from '@/hooks/use-theme';
 import { api, Task } from '@/lib/api';
 import { DUE_OPTIONS, DueOption, dueDateFor, formatDue, isOverdue } from '@/lib/dates';
+
+const CARD_WOBBLES = ['a', 'b', 'c'] as const;
 
 export default function TaskListScreen() {
   const token = useToken();
   const client = useMemo(() => api(token), [token]);
   const router = useRouter();
-  const theme = useTheme();
   const insets = useSafeAreaInsets();
 
   const [tasks, setTasks] = useState<Task[] | null>(null);
@@ -45,7 +41,7 @@ export default function TaskListScreen() {
     }
   }, [client]);
 
-  // Refetch whenever this screen regains focus, so steps ticked in the chat screen show up here.
+  // Refetch whenever this screen regains focus, so steps ticked in a chat show up here.
   useFocusEffect(
     useCallback(() => {
       load();
@@ -91,160 +87,140 @@ export default function TaskListScreen() {
   // Open tasks first; the server already returns newest first within each group.
   const sorted = tasks ? [...tasks].sort((a, b) => Number(a.status === 'done') - Number(b.status === 'done')) : [];
 
-  const composer = (
-    <View style={styles.composer}>
-      <ThemedText type="subtitle">Your tasks</ThemedText>
-      <View style={[styles.inputRow, { backgroundColor: theme.backgroundElement }]}>
-        <TextInput
-          value={title}
-          onChangeText={setTitle}
-          placeholder="Add a task"
-          placeholderTextColor={theme.textSecondary}
-          maxLength={200}
-          returnKeyType="done"
-          onSubmitEditing={addTask}
-          style={[styles.input, { color: theme.text }]}
-        />
+  function renderItem({ item, index }: { item: Task; index: number }) {
+    const done = item.status === 'done';
+    const dueLabel = done ? 'done!' : formatDue(item.due_date);
+    const soon = !done && item.due_date !== null && (isOverdue(item.due_date) || /today|tomorrow/i.test(dueLabel ?? ''));
+    const stepsDone = item.subtasks.filter((s) => s.done).length;
+    return (
+      <View style={styles.row}>
+        <Checkbox checked={done} onPress={() => toggleDone(item)} label={`${done ? 'Mark not done' : 'Mark done'}: ${item.title ?? 'task'}`} />
         <Pressable
-          onPress={addTask}
-          disabled={!title.trim() || adding}
+          onPress={() => openTask(item.id)}
           accessibilityRole="button"
-          accessibilityLabel="Add task"
-          style={[styles.addButton, (!title.trim() || adding) && styles.disabled]}>
-          <ThemedText style={styles.addButtonText}>{adding ? '…' : 'Add'}</ThemedText>
+          accessibilityLabel={`Open ${item.title ?? 'task'}`}
+          style={({ pressed }) => [styles.rowCard, pressed && styles.pressed]}>
+          <Card wobble={CARD_WOBBLES[index % 3]} style={styles.cardBody}>
+            <Txt variant="bold" style={done ? styles.struck : undefined}>{item.title ?? 'Untitled'}</Txt>
+            <View style={styles.meta}>
+              {dueLabel ? (
+                <View style={[styles.dueChip, { backgroundColor: soon ? Palette.soft : done ? Palette.pop : Palette.bg }]}>
+                  <Txt variant="hand" style={styles.dueText}>{dueLabel}</Txt>
+                </View>
+              ) : null}
+              {item.subtasks.length ? <Txt variant="small">{`${stepsDone}/${item.subtasks.length} steps`}</Txt> : null}
+            </View>
+          </Card>
         </Pressable>
       </View>
-      <View style={styles.chips}>
-        {DUE_OPTIONS.map((option) => {
-          const selected = option.key === due;
-          return (
-            <Pressable
-              key={option.key}
-              onPress={() => setDue(option.key)}
-              accessibilityRole="button"
-              accessibilityState={{ selected }}
-              style={[styles.chip, { backgroundColor: selected ? Accent : theme.backgroundElement }]}>
-              <ThemedText type="small" style={{ color: selected ? '#ffffff' : theme.text }}>
-                {option.label}
-              </ThemedText>
-            </Pressable>
-          );
-        })}
-      </View>
-      {addFailed ? (
-        <ThemedText type="small" style={{ color: Danger }}>
-          Couldn&apos;t add that. Check your connection and try again.
-        </ThemedText>
-      ) : null}
-    </View>
-  );
-
-  function renderItem({ item }: { item: Task }) {
-    const done = item.status === 'done';
-    const dueLabel = done ? null : formatDue(item.due_date);
-    const overdue = !done && isOverdue(item.due_date);
-    const stepsDone = item.subtasks.filter((s) => s.done).length;
-    const details = [dueLabel, item.subtasks.length ? `${stepsDone}/${item.subtasks.length} steps` : null]
-      .filter(Boolean)
-      .join('  ·  ');
-
-    return (
-      <Pressable
-        onPress={() => openTask(item.id)}
-        accessibilityRole="button"
-        accessibilityLabel={`Open ${item.title ?? 'task'}`}
-        style={[styles.row, { backgroundColor: theme.backgroundElement }]}>
-        <Checkbox checked={done} onPress={() => toggleDone(item)} label={done ? 'Mark as not done' : 'Mark as done'} />
-        <View style={styles.rowText}>
-          <ThemedText style={done ? styles.struck : undefined} themeColor={done ? 'textSecondary' : 'text'}>
-            {item.title ?? 'Untitled'}
-          </ThemedText>
-          {details ? (
-            <ThemedText type="small" themeColor="textSecondary" style={overdue ? { color: Danger } : undefined}>
-              {details}
-            </ThemedText>
-          ) : null}
-        </View>
-        <ThemedText themeColor="textSecondary">›</ThemedText>
-      </Pressable>
     );
   }
 
+  const listHeader = (
+    <View style={styles.tasksHeading}>
+      <Txt variant="title" accessibilityRole="header">Tasks:</Txt>
+      <Svg width={96} height={10} viewBox="0 0 96 10">
+        <Path d="M2 6 Q14 1 26 6 T50 6 T74 6 T94 5" fill="none" stroke={Palette.deep} strokeWidth={3} strokeLinecap="round" />
+      </Svg>
+    </View>
+  );
+
   return (
-    <ThemedView style={styles.screen}>
+    <KeyboardAvoidingView style={styles.screen} behavior="padding">
+      <BrandHeader topInset={insets.top} />
+
       {tasks === null && !loadFailed ? (
         <View style={styles.center}>
-          <ActivityIndicator />
+          <BuddyBlob width={140} label="Buddy, fetching your tasks" />
+          <Txt variant="hand">Getting your tasks…</Txt>
         </View>
       ) : tasks === null ? (
         <View style={styles.center}>
-          <ThemedText>Couldn&apos;t reach Buddy.</ThemedText>
-          <Pressable onPress={load} accessibilityRole="button">
-            <ThemedText type="linkPrimary">Try again</ThemedText>
-          </Pressable>
+          <BuddyBlob width={140} mood="worried" label="Buddy, worried: can't reach the server" />
+          <Txt variant="heading">Couldn’t reach Buddy.</Txt>
+          <SketchButton label="Try again" onPress={load} />
         </View>
       ) : (
         <FlatList
           data={sorted}
           keyExtractor={(t) => String(t.id)}
           renderItem={renderItem}
-          ListHeaderComponent={composer}
+          ListHeaderComponent={listHeader}
           ListEmptyComponent={
-            <ThemedText themeColor="textSecondary" style={styles.empty}>
-              Nothing here yet. Add a task above and Buddy will check in when it&apos;s time.
-            </ThemedText>
+            <View style={styles.empty}>
+              <BuddyBlob width={130} label="Buddy" />
+              <Txt style={styles.emptyText}>Nothing here yet. Add a task below and Buddy will check in when it’s time.</Txt>
+            </View>
           }
-          ItemSeparatorComponent={() => <View style={{ height: Spacing.two }} />}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} />}
+          ItemSeparatorComponent={() => <View style={{ height: 16 }} />}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} colors={[Palette.deep]} />}
           keyboardShouldPersistTaps="handled"
-          contentContainerStyle={[
-            styles.content,
-            { paddingTop: insets.top + Spacing.three, paddingBottom: insets.bottom + Spacing.four },
-          ]}
+          contentContainerStyle={styles.list}
         />
       )}
-    </ThemedView>
+
+      <View style={[styles.composer, { paddingBottom: insets.bottom + 16 }]}>
+        <View style={styles.inputRow}>
+          <TextInput
+            value={title}
+            onChangeText={setTitle}
+            placeholder="Add a task…"
+            placeholderTextColor={Palette.muted}
+            accessibilityLabel="New task"
+            maxLength={200}
+            returnKeyType="done"
+            onSubmitEditing={addTask}
+            style={styles.input}
+          />
+          <SketchButton label={adding ? '…' : '+ Add'} onPress={addTask} disabled={!title.trim() || adding} accessibilityLabel="Add task" />
+        </View>
+        <View style={styles.chips} accessibilityLabel="Due date">
+          {DUE_OPTIONS.map((option) => (
+            <Chip key={option.key} label={option.label} selected={option.key === due} onPress={() => setDue(option.key)} />
+          ))}
+        </View>
+        {addFailed ? <Txt variant="small" style={{ color: Palette.danger }}>Couldn’t add that. Check your connection and try again.</Txt> : null}
+      </View>
+    </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1 },
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: Spacing.two },
-  content: {
-    paddingHorizontal: Spacing.three,
-    width: '100%',
-    maxWidth: MaxContentWidth,
-    alignSelf: 'center',
-  },
-  composer: { gap: Spacing.three, marginBottom: Spacing.three },
-  inputRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderRadius: Spacing.three,
-    paddingLeft: Spacing.three,
-    paddingRight: Spacing.two,
-    paddingVertical: Spacing.one,
-    gap: Spacing.two,
-  },
-  input: { flex: 1, fontSize: 16, paddingVertical: Spacing.two },
-  addButton: {
-    backgroundColor: Accent,
-    borderRadius: Spacing.three,
-    paddingHorizontal: Spacing.three,
-    paddingVertical: Spacing.two,
-  },
-  addButtonText: { color: '#ffffff', fontWeight: '600' },
-  disabled: { opacity: 0.4 },
-  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.two },
-  chip: { borderRadius: Spacing.four, paddingHorizontal: Spacing.three, paddingVertical: Spacing.one + 2 },
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.three,
-    borderRadius: Spacing.three,
-    padding: Spacing.three,
-  },
-  rowText: { flex: 1, gap: 2 },
+  screen: { flex: 1, backgroundColor: Palette.bg },
+  center: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 14, padding: 24 },
+  list: { paddingHorizontal: 24, paddingTop: 8, paddingBottom: 24 },
+  tasksHeading: { marginBottom: 16 },
+  row: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  rowCard: { flex: 1, marginRight: 6 },
+  pressed: { transform: [{ translateX: 2 }, { translateY: 2 }] },
+  cardBody: { paddingHorizontal: 16, paddingVertical: 12, gap: 6 },
+  meta: { flexDirection: 'row', alignItems: 'center', gap: 10, flexWrap: 'wrap' },
+  dueChip: { borderWidth: 2, borderColor: Ink, paddingHorizontal: 10, ...Wobble.c },
+  dueText: { fontSize: 16, lineHeight: 21 },
   struck: { textDecorationLine: 'line-through' },
-  empty: { textAlign: 'center', paddingVertical: Spacing.five },
+  empty: { alignItems: 'center', gap: 12, paddingVertical: 40 },
+  emptyText: { textAlign: 'center', maxWidth: 280 },
+  composer: {
+    paddingHorizontal: 20,
+    paddingTop: 14,
+    gap: 12,
+    backgroundColor: Palette.card,
+    borderTopWidth: Border,
+    borderStyle: 'dashed',
+    borderColor: Ink,
+  },
+  inputRow: { flexDirection: 'row', gap: 10 },
+  input: {
+    flex: 1,
+    minHeight: 48,
+    paddingHorizontal: 14,
+    fontFamily: Font.semi,
+    fontSize: 16,
+    color: Ink,
+    backgroundColor: Palette.white,
+    borderWidth: Border,
+    borderColor: Ink,
+    ...Wobble.c,
+  },
+  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
 });
