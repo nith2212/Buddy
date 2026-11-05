@@ -157,3 +157,11 @@ blob that wobbles and blinks (moods: default, happy, worried; worried only for c
 - App icon, Android adaptive + themed (monochrome) icon, splash and favicon are dumpling Buddy, drawn by
   `scripts/make_icons.py` (stdlib + macOS QuickLook, no installs). Icon background lavender, splash cream.
 - Not done: "talk to buddy about my week" opens the task picker (the reflection chat is Later); dark mode (light-only design).
+
+## Cleanup and the untapped-chat fix (2026-11-05)
+- Removed the Expo starter-template files and images, the reset-project script, `brain/rag.py` + `ingest.py`
+  (an unused vector-search experiment) and `playbook.get_playbook`. The iOS icon now uses Buddy.
+- Docs moved to `docs/` (this file, `state_frameworks.md`, `HOW_BUDDY_WORKS.md`).
+- Typed without a reason tap: Buddy reacts and asks what's in the way, and the app shows the chips
+  (`agent._ask_reason_turn`, wording in `framework_shared.md` "Ask the reason"). Before this, those chats
+  went straight to the generic path, which scored 25% in the evals.

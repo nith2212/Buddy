@@ -1,6 +1,6 @@
 # How Buddy works, end to end
 
-Status as of 2026-11-04. Written so another assistant can give informed suggestions. Code paths are
+Status as of 2026-11-05. Written so another assistant (or a new developer) can understand the whole system. Code paths are
 relative to the repo root.
 
 ## 1. The product
@@ -92,23 +92,29 @@ vars. Message content is never logged. Chat text goes to the model provider (dev
 | `POST /auth/anonymous` | Invite code → user + token |
 | `POST/GET /tasks`, `GET/PATCH /tasks/{id}` | Task CRUD (no task delete yet); PATCH logs `postponed` when due_date moves later |
 | `POST/PATCH/DELETE /tasks/{id}/subtasks[/{sid}]` | Steps |
-| `POST /chat` | `{task_id, message?, reason?}`. A reason writes an EmotionLog first. With no message, Buddy speaks first |
+| `POST /chat` | `{task_id, message?, reason?}`. A reason writes an EmotionLog first. With no message, Buddy speaks first. The reply has `ask_reason: true` when Buddy asked what's in the way (the app then shows the reason chips) |
 | `POST /initiate` | Buddy opens the chat (used after "Yes, let's chat" on a notification) |
 | `GET /chat/history` | Messages for one task |
 | `POST /devices/register` | Save the Expo push token |
 | `POST /checkin/action` | Notification button taps; drives the check-in stages |
 | `POST /cron/checkins` | Hourly: picks tasks and sends check-ins |
 | `POST /cron/echo` | Weekly: saves Echo facts for every user with tasks |
+| `GET /echo/week` | The Echoes page: this week (live) and last week (saved), kind data only |
 | `DELETE /me` | Wipe the account |
 
 ## 5. The user journey
 
-**In the app**
+**In the app** (hand-drawn design, the white "dumpling" Buddy mascot; files in `src/`)
+- **Loading screen:** Buddy floating, "Waking Buddy up…" while the free-tier server wakes.
 - **Home:** the task list. Add a task with an optional due date (preset options, no date picker), tick done.
-- **Task screen:** due date, optional steps (add/tick), and the chat.
-  - If the chat is empty, it shows **five reason chips**. Tapping one sends `POST /chat {reason}`, and Buddy
-    opens the conversation for that cause.
-  - The user can also just type.
+- **Menu** (slides in): Tasks, Chat with Buddy, Echoes, Delete my data.
+- **A task's own chat:** due date, a folding steps strip, the task's whole conversation.
+  - No chat yet: "What's in the way?" with **five reason buttons**. Tapping one sends `POST /chat {reason}`,
+    and Buddy opens the conversation for that cause.
+  - Typing without a tap: Buddy reacts and asks what's in the way, and the chips appear under its reply.
+  - "stuck again? tell Buddy why" reopens the chips once a chat exists.
+- **Chat with Buddy:** "Which task do you need help starting?", then that task's own chat.
+- **Echoes:** the weekly report (section 11).
 
 **Proactive check-ins**
 1. Every hour, `/cron/checkins` picks **at most one task per user**: an open task that is due within 24h,
@@ -133,6 +139,10 @@ moved into code.
 ### 6.1 Which path runs
 `run_turn` in `backend/brain/agent.py`:
 - If a reason was tapped in the last 24h for this task → the **framework path** (`_flow_turn`), described below.
+- A typed message with no recent tap (and not "thanks", not a finished task) → **ask the reason**
+  (`_ask_reason_turn`): one reply that reacts and asks what's in the way, and the app shows the chips.
+  Something bigger than work gets the step-back instead. If they type again instead of tapping, the next
+  reply uses the generic path, so Buddy never asks twice in a row.
 - Otherwise → the **older generic path**:
   - State detection: done → recovery; tapped → that state; 2+ ignored check-ins in a row →
     `avoidance`/`commitment_drift`.
@@ -215,7 +225,7 @@ moved into code.
     number".
 - Raw memory rows about causes are never shown to the writer.
 
-## 8. Echo (weekly learning, for Buddy only so far)
+## 8. Echo (weekly learning)
 Echo is the "Buddy knows *you*" layer. Built in steps:
 
 - **E1, built:** every Sunday 23:00 India time, `/cron/echo` counts each user's week in code (no model
@@ -236,10 +246,10 @@ Echo is the "Buddy knows *you*" layer. Built in steps:
 - **E3, built (2026-11-05):** four developer-approved adaptation rules (own plan first, straight to Buddy's move, lean on what helped (said softly), avoid what they decline) that fire only after something has
   happened 3+ times. Example: always brings their own plan → skip the offer and ask what they'll do. No
   automatic optimization (a bandit is parked).
-- **Echo page for the user (proposed, step F):** see section 11.
+- **The user's Echoes page:** see section 11.
 
 ## 9. Testing and quality
-- **Unit tests:** 327, all green, with a fake model. They cover user isolation, the stage tables walked
+- **Unit tests:** 359, all green, with a fake model. They cover user isolation, the stage tables walked
   through the developer's "dream conversations", reply checks, Echo, cron and the Anthropic adapter.
 - **Evals** (`testing/`): 17 scripted conversations (3 per chip, plus 2 from phone tests) run through the
   real app against the real model. Mechanical flags plus **hand-grading** on 7 criteria:
@@ -270,8 +280,8 @@ Echo is the "Buddy knows *you*" layer. Built in steps:
   - Grading is Claude grading Claude (the developer spot-checks).
 
 ## 10. Constraints and what's parked
-- **Timeline:** wrap up by Wed Nov 11 (Nov 7-8 off). Remaining: E2, E3, a new UI design plus the Echo
-  page, minor task CRUD (edit/delete), final test.
+- **Timeline:** wrap up by Wed Nov 11 (Nov 7-8 off). Built: E2, E3, the new UI and the Echoes page.
+  Remaining: the developer's phone testing, minor task CRUD (edit/delete), final test, ship.
 - **Hosting:** Render free + Neon + cron-job.org; Expo push; no second deployment.
 - **Parked on purpose** (don't build): sprint timer, check-back commitments, firmness levels, escalation,
   onboarding, a date picker, bandit, notes UI, multi-agent split, monthly reflections, accounts/passwords,
@@ -281,23 +291,18 @@ Echo is the "Buddy knows *you*" layer. Built in steps:
   - Possibly LoRA fine-tuning a small open model on Buddy's own conversations, only after the eval exists to
     measure it.
 
-## 11. Open design question: the Echo page (what to show the user)
-Goal: a friend telling you what they noticed this week, never a report card. User-facing text comes from
-code templates, not free model text, so nothing is invented.
+## 11. The Echoes page (built)
+A friend telling you what they noticed, never a report card. All user-facing text comes from code
+templates (`brain/echo.py`), not free model text, so nothing is invented.
 
-- **Must:**
-  - **Wins this week:** tasks finished, steps ticked, "started N times when it felt hard" (chats after a
-    reason tap that led to progress).
-  - **Gentle streak:** 7 dots, one per day you touched any task. Quiet reset every Sunday, never "streak
-    lost". Optional up-only total ("shown up 23 days").
-  - **One Buddy line** built from the week.
-- **Should** (needs E2): what got in the way **paired with** what helped. Only causes confirmed 3+ times,
-  e.g. "Fear came up 3 times; a rough first version helped twice."
-- **Stretch:** a "Talk about my week" button that opens a short reflection chat (open → reflect → one
-  gentle intention → release).
-- **Never show:** ignored check-ins, days untouched, postpone counts, comparisons with last week,
-  percentages, empty praise. In a quiet week: "Quiet week. That's okay."
-- **Backend, built:** read-only `GET /echo/week`, scoped to the caller. It returns: `days` (Mon..Sun, active or not), `total_days` (up-only), `wins` {tasks_finished, steps_done, started_when_hard}, `line` (one templated sentence), and `helped` [{cause, move, times, text}] (only causes confirmed 3+ times). Weekly only (monthly reflections are parked).
-
-Developer's own ideas to explore: positive reinforcement, gentler streaks, weekly reviews, and chatting with
-Buddy about the week.
+- **This week** (live, since Sunday 23:00 India time):
+  - wins: tasks finished, steps ticked, "got going N times when it felt hard"
+  - seven dots, one per day you touched any task; an up-only "shown up N days since you started"
+  - one Buddy line built from the week
+  - in the very first week: "Your first Echo lands on Monday!"
+- **Last week** (from the Sunday save): the same wins, dots and line. The page opens on it Monday to
+  Wednesday, and it can be saved or shared as plain text through the phone's share sheet.
+- **What helped:** only for causes confirmed 3+ times, e.g. "Worrying it won't be good enough has come up
+  a few times. A rough first version helped you get going twice."
+- **Never shown:** ignored check-ins, days untouched, postpone counts, comparisons, percentages.
+- "Talk to buddy about my week" opens the task picker for now; a reflection chat is planned.

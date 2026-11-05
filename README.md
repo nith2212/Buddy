@@ -97,6 +97,7 @@ backend/brain/buddy_docs/   the playbook: per-cause framework wording, reviewed 
 backend/tests/       unit tests (fake model, no network)
 testing/             evals against the real model, hand-grading kit, Echo dev report
 scripts/             make_icons.py draws the app icon, splash and favicon from Buddy's vector art
+docs/                how Buddy works end to end, the conversation designs, the build log
 ```
 
 ## Running locally
