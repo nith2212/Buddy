@@ -1,8 +1,7 @@
-fastapi
-uvicorn
-google-genai
-python-dotenv
-groq
-qdrant-client 
-sentence-transformers
-python-frontmatter
+fastapi>=0.111.0
+uvicorn[standard]>=0.29.0
+sqlalchemy>=2.0.0
+psycopg[binary]>=3.1.0
+httpx>=0.27.0
+python-dotenv>=1.0.0
+anthropic>=2.4,<3

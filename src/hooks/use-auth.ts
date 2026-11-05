@@ -1,0 +1,63 @@
+import { useEffect, useState } from 'react';
+import * as SecureStore from 'expo-secure-store';
+import { API_BASE_URL, INVITE_CODE } from '@/constants/api';
+
+const TOKEN_KEY = 'buddy_token';
+const USER_ID_KEY = 'buddy_user_id';
+
+export type AuthState =
+  | { status: 'loading' }
+  | { status: 'ready'; token: string; userId: string }
+  | { status: 'error'; message: string };
+
+export function useAuth(): AuthState & { restart: () => Promise<void> } {
+  const [state, setState] = useState<AuthState>({ status: 'loading' });
+
+  useEffect(() => {
+    bootstrap();
+  }, []);
+
+  async function bootstrap() {
+    try {
+      const [storedToken, storedUserId] = await Promise.all([
+        SecureStore.getItemAsync(TOKEN_KEY),
+        SecureStore.getItemAsync(USER_ID_KEY),
+      ]);
+
+      if (storedToken && storedUserId) {
+        if (__DEV__) console.log('[Auth] Using stored identity. user_id:', storedUserId); // never log the token
+        setState({ status: 'ready', token: storedToken, userId: storedUserId });
+        return;
+      }
+
+      // First launch — register a new anonymous user
+      const res = await fetch(`${API_BASE_URL}/auth/anonymous`, {
+        method: 'POST',
+        headers: { 'X-Invite-Code': INVITE_CODE },
+      });
+
+      if (!res.ok) throw new Error(`Registration failed: ${res.status}`);
+
+      const { token, user_id } = await res.json();
+
+      await Promise.all([
+        SecureStore.setItemAsync(TOKEN_KEY, token),
+        SecureStore.setItemAsync(USER_ID_KEY, user_id),
+      ]);
+
+      if (__DEV__) console.log('[Auth] Registered new identity. user_id:', user_id); // never log the token
+      setState({ status: 'ready', token, userId: user_id });
+    } catch (e: any) {
+      setState({ status: 'error', message: e.message ?? 'Auth failed' });
+    }
+  }
+
+  /** Forget this identity and register a fresh one (after "Delete my data" wiped it on the server). */
+  async function restart() {
+    setState({ status: 'loading' });
+    await Promise.all([SecureStore.deleteItemAsync(TOKEN_KEY), SecureStore.deleteItemAsync(USER_ID_KEY)]);
+    await bootstrap();
+  }
+
+  return { ...state, restart };
+}

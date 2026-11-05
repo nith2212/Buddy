@@ -1,0 +1,38 @@
+{"grader": "claude",
+ "order": ["follows_framework","reacts_to_user","offers_not_assigns","no_premature_step","keeps_their_plan","warm_voice","no_invention"],
+ "files": {
+  "2026-11-04_1244_openai-gpt-oss-20b.json": {
+   "ambiguity_main": [["n--y-ny","asks for a first step, skips the 'done' picture; flat"],
+                      ["nn-y-ny","guesses a cause instead of reflecting the end picture; ignores the cat sanctuary"],
+                      ["nyyy-ny","jumps to the offer instead of asking for their first move"],
+                      ["ny-yyny","backs the plan but no warm line, no 'I'm around'"],
+                      ["nn-yyny","repeats the last reply word for word"]],
+   "ambiguity_idk": [["n--y-ny","asks for a first step, skips the 'done' picture; flat"],
+                     ["nn-y-ny","after idk gives one guess, not two options"],
+                     ["nn-y-ny","second idk gets the same kind of question again"],
+                     ["nynn-ny","hands out a step (file name, code line) instead of letting them pick"],
+                     ["nynnnny","turns 'set up expo' into a specific command; adds to their plan"],
+                     ["yy-y-yy",""]],
+   "ambiguity_switch_tired": [["n--y-ny","generic 'what's tripping you up'; flat"],
+                              ["yy-y-yy",""],
+                              ["nn-y-ny","repeats the last reply word for word"],
+                              ["yy-y-yy",""]]
+  },
+  "2026-11-04_1549_openai-gpt-oss-20b.json": {
+   "ambiguity_main": [["y--y-yy","watch: 'totally normal to feel' is close to therapy-speak"],
+                      ["yy-y-ny","right stage, but no reaction to the cat sanctuary: not peppy"],
+                      ["yy-y-yy",""],
+                      ["yy-yyyy",""],
+                      ["yy-yyyy",""]],
+   "ambiguity_idk": [["y--y-ny","two warm reactions in one opener ('big win', 'totally get')"],
+                     ["yyyy-yy",""],
+                     ["yn-y-ny","canned offer fallback: ignores 'all of it'"],
+                     ["nn-y-yy","'maybe the swipe thing?' names a core: should ask for a tiny first move, not wrap up"],
+                     ["nn-yyyy","'Good plan!' is too thin: doesn't say their plan back or that Buddy's around"],
+                     ["yy-y-yy",""]],
+   "ambiguity_switch_tired": [["y--y-ny","robotic fragment opener with line breaks; same 'totally normal' line again"],
+                              ["yy-y-yy",""],
+                              ["yy-y-yy",""],
+                              ["yy-y-yy",""]]
+  }
+ }}

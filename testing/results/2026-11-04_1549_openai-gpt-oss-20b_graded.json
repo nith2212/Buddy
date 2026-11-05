@@ -1,0 +1,890 @@
+{
+  "meta": {
+    "model": "openai/gpt-oss-20b",
+    "grader": "claude (by hand, testing/GRADING.md)",
+    "started": "2026-11-04 15:49",
+    "minutes": 1.4,
+    "commit": "after: stages + trimmed prompt + read fixes (uncommitted)",
+    "usage": {
+      "pipeline": {
+        "calls": 24,
+        "prompt": 13465,
+        "completion": 1550
+      },
+      "grader": {
+        "calls": 11,
+        "prompt": 14621,
+        "completion": 4045
+      }
+    },
+    "unfinished": [
+      "perfectionism_main",
+      "perfectionism_own_plan",
+      "perfectionism_bigger",
+      "fatigue_main",
+      "fatigue_still_wants",
+      "overwhelm_main",
+      "overwhelm_own_step",
+      "overwhelm_vague",
+      "low_interest_boring",
+      "low_interest_pointless_none",
+      "low_interest_pointless_purpose",
+      "low_interest_optional"
+    ],
+    "scenarios": [
+      "ambiguity_main",
+      "ambiguity_idk",
+      "ambiguity_switch_tired",
+      "perfectionism_main",
+      "perfectionism_own_plan",
+      "perfectionism_bigger",
+      "fatigue_main",
+      "fatigue_still_wants",
+      "overwhelm_main",
+      "overwhelm_own_step",
+      "overwhelm_vague",
+      "low_interest_boring",
+      "low_interest_pointless_none",
+      "low_interest_pointless_purpose",
+      "low_interest_optional"
+    ]
+  },
+  "summary": {
+    "by_state": {
+      "ambiguity": {
+        "scenarios": 3,
+        "replies": 15,
+        "clean": 15,
+        "yes": 67,
+        "no": 9,
+        "cause_ok": 3,
+        "fallbacks": 0
+      }
+    },
+    "criteria": {
+      "follows_framework": {
+        "yes": 13,
+        "no": 2,
+        "n/a": 0,
+        "error": 0
+      },
+      "reacts_to_user": {
+        "yes": 9,
+        "no": 3,
+        "n/a": 3,
+        "error": 0
+      },
+      "offers_not_assigns": {
+        "yes": 1,
+        "no": 0,
+        "n/a": 14,
+        "error": 0
+      },
+      "no_premature_step": {
+        "yes": 15,
+        "no": 0,
+        "n/a": 0,
+        "error": 0
+      },
+      "keeps_their_plan": {
+        "yes": 3,
+        "no": 0,
+        "n/a": 12,
+        "error": 0
+      },
+      "warm_voice": {
+        "yes": 11,
+        "no": 4,
+        "n/a": 0,
+        "error": 0
+      },
+      "no_invention": {
+        "yes": 15,
+        "no": 0,
+        "n/a": 0,
+        "error": 0
+      }
+    },
+    "mech": {
+      "http_error": 0,
+      "fallback": 0,
+      "too_many_questions": 0,
+      "too_long": 0,
+      "banned_phrase": 0,
+      "clock_time": 0,
+      "repeated_opener": 0,
+      "repeats_earlier": 0,
+      "question_in_release": 0
+    }
+  },
+  "results": [
+    {
+      "id": "ambiguity_main",
+      "state": "ambiguity",
+      "chip": "unclear",
+      "note": "Goal -> core -> their own first step -> release. Buddy never supplies the content.",
+      "expect_cause": "unclear",
+      "dream": [
+        "Hey, I can understand. Some tasks might feel huge. do u have an end goal for this task? What will that look like?",
+        "That sounds great! Every task has a simple core working/design. what would that be for this task?",
+        "Good! You've narrowed it down. Now what would be the first ever step? Even as simple as opening your laptop is valid.",
+        "Yes, that sounds like a plan. I'll be here if you wanna plan more. Now go on you.",
+        "(release)"
+      ],
+      "user_lines": [
+        "This app will help me declutter my gallery while swiping. And each save gives me points. With those points I can build a cat sanctuary!",
+        "Hmmm for this, I need the swipe mechanism. Once that's built, others are additions.",
+        "Hmmm I can start setting up expo on my phone and laptop.",
+        "okay thanks!"
+      ],
+      "saved_cause": "unclear",
+      "cause_ok": true,
+      "turns": [
+        {
+          "user": null,
+          "reply": "Hey, I see you're working on finishing the Nixly app. It\u2019s totally normal to feel a bit stuck at the start. What would \u201cdone\u201d look like for this task?",
+          "status": 200,
+          "seconds": 1.8,
+          "phase": "open",
+          "intervention": null,
+          "state": "ambiguity",
+          "read": null,
+          "fallback": false,
+          "checks": {
+            "hard": [],
+            "soft": [],
+            "rewritten": false
+          },
+          "flags": [],
+          "rubric": {
+            "follows_framework": {
+              "verdict": "yes",
+              "why": ""
+            },
+            "reacts_to_user": {
+              "verdict": "n/a",
+              "why": ""
+            },
+            "offers_not_assigns": {
+              "verdict": "n/a",
+              "why": ""
+            },
+            "no_premature_step": {
+              "verdict": "yes",
+              "why": ""
+            },
+            "keeps_their_plan": {
+              "verdict": "n/a",
+              "why": ""
+            },
+            "warm_voice": {
+              "verdict": "yes",
+              "why": ""
+            },
+            "no_invention": {
+              "verdict": "yes",
+              "why": ""
+            }
+          }
+        },
+        {
+          "user": "This app will help me declutter my gallery while swiping. And each save gives me points. With those points I can build a cat sanctuary!",
+          "reply": "You\u2019re aiming to clear your gallery by swiping, earn points, and use those points to build a cat sanctuary. What\u2019s the one core feature that will make the swipe\u2011to\u2011declutter work?",
+          "status": 200,
+          "seconds": 1.0,
+          "phase": "core",
+          "intervention": null,
+          "state": "ambiguity",
+          "read": "answer",
+          "fallback": false,
+          "checks": {
+            "hard": [],
+            "soft": [],
+            "rewritten": false
+          },
+          "flags": [],
+          "rubric": {
+            "follows_framework": {
+              "verdict": "yes",
+              "why": ""
+            },
+            "reacts_to_user": {
+              "verdict": "yes",
+              "why": ""
+            },
+            "offers_not_assigns": {
+              "verdict": "n/a",
+              "why": ""
+            },
+            "no_premature_step": {
+              "verdict": "yes",
+              "why": ""
+            },
+            "keeps_their_plan": {
+              "verdict": "n/a",
+              "why": ""
+            },
+            "warm_voice": {
+              "verdict": "no",
+              "why": "right stage, but no reaction to the cat sanctuary: not peppy"
+            },
+            "no_invention": {
+              "verdict": "yes",
+              "why": ""
+            }
+          }
+        },
+        {
+          "user": "Hmmm for this, I need the swipe mechanism. Once that's built, others are additions.",
+          "reply": "Sounds good\u2014let\u2019s focus on the swipe mechanism first. What\u2019s the very first tiny action you can take to start building that swipe?",
+          "status": 200,
+          "seconds": 1.5,
+          "phase": "first_step",
+          "intervention": null,
+          "state": "ambiguity",
+          "read": "answer",
+          "fallback": false,
+          "checks": {
+            "hard": [],
+            "soft": [],
+            "rewritten": false
+          },
+          "flags": [],
+          "rubric": {
+            "follows_framework": {
+              "verdict": "yes",
+              "why": ""
+            },
+            "reacts_to_user": {
+              "verdict": "yes",
+              "why": ""
+            },
+            "offers_not_assigns": {
+              "verdict": "n/a",
+              "why": ""
+            },
+            "no_premature_step": {
+              "verdict": "yes",
+              "why": ""
+            },
+            "keeps_their_plan": {
+              "verdict": "n/a",
+              "why": ""
+            },
+            "warm_voice": {
+              "verdict": "yes",
+              "why": ""
+            },
+            "no_invention": {
+              "verdict": "yes",
+              "why": ""
+            }
+          }
+        },
+        {
+          "user": "Hmmm I can start setting up expo on my phone and laptop.",
+          "reply": "Great plan\u2014setting up Expo on your phone and laptop is a solid first step. Keep that momentum going! I'm around if you need a quick check-in.",
+          "status": 200,
+          "seconds": 3.9,
+          "phase": "release",
+          "intervention": null,
+          "state": "ambiguity",
+          "read": "own_plan",
+          "fallback": false,
+          "checks": {
+            "hard": [],
+            "soft": [],
+            "rewritten": false
+          },
+          "flags": [],
+          "rubric": {
+            "follows_framework": {
+              "verdict": "yes",
+              "why": ""
+            },
+            "reacts_to_user": {
+              "verdict": "yes",
+              "why": ""
+            },
+            "offers_not_assigns": {
+              "verdict": "n/a",
+              "why": ""
+            },
+            "no_premature_step": {
+              "verdict": "yes",
+              "why": ""
+            },
+            "keeps_their_plan": {
+              "verdict": "yes",
+              "why": ""
+            },
+            "warm_voice": {
+              "verdict": "yes",
+              "why": ""
+            },
+            "no_invention": {
+              "verdict": "yes",
+              "why": ""
+            }
+          }
+        },
+        {
+          "user": "okay thanks!",
+          "reply": "You're on the right track! Keep going and let me know if anything comes up.",
+          "status": 200,
+          "seconds": 0.4,
+          "phase": "release",
+          "intervention": null,
+          "state": "ambiguity",
+          "read": "ack",
+          "fallback": false,
+          "checks": {
+            "hard": [],
+            "soft": [],
+            "rewritten": false
+          },
+          "flags": [],
+          "rubric": {
+            "follows_framework": {
+              "verdict": "yes",
+              "why": ""
+            },
+            "reacts_to_user": {
+              "verdict": "yes",
+              "why": ""
+            },
+            "offers_not_assigns": {
+              "verdict": "n/a",
+              "why": ""
+            },
+            "no_premature_step": {
+              "verdict": "yes",
+              "why": ""
+            },
+            "keeps_their_plan": {
+              "verdict": "yes",
+              "why": ""
+            },
+            "warm_voice": {
+              "verdict": "yes",
+              "why": ""
+            },
+            "no_invention": {
+              "verdict": "yes",
+              "why": ""
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "ambiguity_idk",
+      "state": "ambiguity",
+      "chip": "unclear",
+      "note": "Repeated idk: Buddy must narrow with two concrete options, never repeat the question.",
+      "expect_cause": "unclear",
+      "dream": null,
+      "user_lines": [
+        "idk honestly",
+        "idk, all of it I guess",
+        "maybe the swipe thing?",
+        "I'll set up expo then",
+        "thanks bye"
+      ],
+      "saved_cause": "unclear",
+      "cause_ok": true,
+      "turns": [
+        {
+          "user": null,
+          "reply": "Finishing the Nixly app sounds like a big win for you! I totally get how the first step can feel fuzzy. What would \u201cdone\u201d look like for this project?",
+          "status": 200,
+          "seconds": 0.8,
+          "phase": "open",
+          "intervention": null,
+          "state": "ambiguity",
+          "read": null,
+          "fallback": false,
+          "checks": {
+            "hard": [],
+            "soft": [],
+            "rewritten": false
+          },
+          "flags": [],
+          "rubric": {
+            "follows_framework": {
+              "verdict": "yes",
+              "why": ""
+            },
+            "reacts_to_user": {
+              "verdict": "n/a",
+              "why": ""
+            },
+            "offers_not_assigns": {
+              "verdict": "n/a",
+              "why": ""
+            },
+            "no_premature_step": {
+              "verdict": "yes",
+              "why": ""
+            },
+            "keeps_their_plan": {
+              "verdict": "n/a",
+              "why": ""
+            },
+            "warm_voice": {
+              "verdict": "no",
+              "why": "two warm reactions in one opener ('big win', 'totally get')"
+            },
+            "no_invention": {
+              "verdict": "yes",
+              "why": ""
+            }
+          }
+        },
+        {
+          "user": "idk honestly",
+          "reply": "Is it more that you\u2019re unsure what the first feature should be, or that you\u2019re unsure how to set up the environment?",
+          "status": 200,
+          "seconds": 1.4,
+          "phase": "open",
+          "intervention": null,
+          "state": "ambiguity",
+          "read": "idk",
+          "fallback": false,
+          "checks": {
+            "hard": [],
+            "soft": [],
+            "rewritten": true
+          },
+          "flags": [],
+          "rubric": {
+            "follows_framework": {
+              "verdict": "yes",
+              "why": ""
+            },
+            "reacts_to_user": {
+              "verdict": "yes",
+              "why": ""
+            },
+            "offers_not_assigns": {
+              "verdict": "yes",
+              "why": ""
+            },
+            "no_premature_step": {
+              "verdict": "yes",
+              "why": ""
+            },
+            "keeps_their_plan": {
+              "verdict": "n/a",
+              "why": ""
+            },
+            "warm_voice": {
+              "verdict": "yes",
+              "why": ""
+            },
+            "no_invention": {
+              "verdict": "yes",
+              "why": ""
+            }
+          }
+        },
+        {
+          "user": "idk, all of it I guess",
+          "reply": "Want a tiny first move from me, or do you already know what you'll do?",
+          "status": 200,
+          "seconds": 2.0,
+          "phase": "offer",
+          "intervention": null,
+          "state": "ambiguity",
+          "read": "idk",
+          "fallback": false,
+          "checks": {
+            "hard": [],
+            "soft": [
+              "offer_shape"
+            ],
+            "rewritten": true,
+            "offer_template": true
+          },
+          "flags": [],
+          "rubric": {
+            "follows_framework": {
+              "verdict": "yes",
+              "why": ""
+            },
+            "reacts_to_user": {
+              "verdict": "no",
+              "why": "canned offer fallback: ignores 'all of it'"
+            },
+            "offers_not_assigns": {
+              "verdict": "n/a",
+              "why": ""
+            },
+            "no_premature_step": {
+              "verdict": "yes",
+              "why": ""
+            },
+            "keeps_their_plan": {
+              "verdict": "n/a",
+              "why": ""
+            },
+            "warm_voice": {
+              "verdict": "no",
+              "why": "canned offer fallback: ignores 'all of it'"
+            },
+            "no_invention": {
+              "verdict": "yes",
+              "why": ""
+            }
+          }
+        },
+        {
+          "user": "maybe the swipe thing?",
+          "reply": "That sounds like a great start!",
+          "status": 200,
+          "seconds": 1.1,
+          "phase": "release",
+          "intervention": null,
+          "state": "ambiguity",
+          "read": "own_plan",
+          "fallback": false,
+          "checks": {
+            "hard": [],
+            "soft": [],
+            "rewritten": false
+          },
+          "flags": [],
+          "rubric": {
+            "follows_framework": {
+              "verdict": "no",
+              "why": "'maybe the swipe thing?' names a core: should ask for a tiny first move, not wrap up"
+            },
+            "reacts_to_user": {
+              "verdict": "no",
+              "why": "'maybe the swipe thing?' names a core: should ask for a tiny first move, not wrap up"
+            },
+            "offers_not_assigns": {
+              "verdict": "n/a",
+              "why": ""
+            },
+            "no_premature_step": {
+              "verdict": "yes",
+              "why": ""
+            },
+            "keeps_their_plan": {
+              "verdict": "n/a",
+              "why": ""
+            },
+            "warm_voice": {
+              "verdict": "yes",
+              "why": ""
+            },
+            "no_invention": {
+              "verdict": "yes",
+              "why": ""
+            }
+          }
+        },
+        {
+          "user": "I'll set up expo then",
+          "reply": "Good plan!",
+          "status": 200,
+          "seconds": 4.3,
+          "phase": "release",
+          "intervention": null,
+          "state": "ambiguity",
+          "read": "own_plan",
+          "fallback": false,
+          "checks": {
+            "hard": [],
+            "soft": [],
+            "rewritten": false
+          },
+          "flags": [],
+          "rubric": {
+            "follows_framework": {
+              "verdict": "no",
+              "why": "'Good plan!' is too thin: doesn't say their plan back or that Buddy's around"
+            },
+            "reacts_to_user": {
+              "verdict": "no",
+              "why": "'Good plan!' is too thin: doesn't say their plan back or that Buddy's around"
+            },
+            "offers_not_assigns": {
+              "verdict": "n/a",
+              "why": ""
+            },
+            "no_premature_step": {
+              "verdict": "yes",
+              "why": ""
+            },
+            "keeps_their_plan": {
+              "verdict": "yes",
+              "why": ""
+            },
+            "warm_voice": {
+              "verdict": "yes",
+              "why": ""
+            },
+            "no_invention": {
+              "verdict": "yes",
+              "why": ""
+            }
+          }
+        },
+        {
+          "user": "thanks bye",
+          "reply": "You\u2019ve got this\u2014just let me know if anything comes up!",
+          "status": 200,
+          "seconds": 3.4,
+          "phase": "release",
+          "intervention": null,
+          "state": "ambiguity",
+          "read": "ack",
+          "fallback": false,
+          "checks": {
+            "hard": [],
+            "soft": [],
+            "rewritten": false
+          },
+          "flags": [],
+          "rubric": {
+            "follows_framework": {
+              "verdict": "yes",
+              "why": ""
+            },
+            "reacts_to_user": {
+              "verdict": "yes",
+              "why": ""
+            },
+            "offers_not_assigns": {
+              "verdict": "n/a",
+              "why": ""
+            },
+            "no_premature_step": {
+              "verdict": "yes",
+              "why": ""
+            },
+            "keeps_their_plan": {
+              "verdict": "n/a",
+              "why": ""
+            },
+            "warm_voice": {
+              "verdict": "yes",
+              "why": ""
+            },
+            "no_invention": {
+              "verdict": "yes",
+              "why": ""
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "ambiguity_switch_tired",
+      "state": "ambiguity",
+      "chip": "unclear",
+      "note": "Tapped unclear, reveals tiredness: switch to tired. No task step after that.",
+      "expect_cause": "tired",
+      "dream": null,
+      "user_lines": [
+        "honestly I'm just exhausted today, I worked all day",
+        "yeah I just want to sleep",
+        "bye"
+      ],
+      "saved_cause": "tired",
+      "cause_ok": true,
+      "turns": [
+        {
+          "user": null,
+          "reply": "Finishing the Nixly app.  \nIt\u2019s totally normal to feel a bit stuck at the start.  \nWhat would \u201cdone\u201d look like for this task?",
+          "status": 200,
+          "seconds": 1.2,
+          "phase": "open",
+          "intervention": null,
+          "state": "ambiguity",
+          "read": null,
+          "fallback": false,
+          "checks": {
+            "hard": [],
+            "soft": [],
+            "rewritten": false
+          },
+          "flags": [],
+          "rubric": {
+            "follows_framework": {
+              "verdict": "yes",
+              "why": ""
+            },
+            "reacts_to_user": {
+              "verdict": "n/a",
+              "why": ""
+            },
+            "offers_not_assigns": {
+              "verdict": "n/a",
+              "why": ""
+            },
+            "no_premature_step": {
+              "verdict": "yes",
+              "why": ""
+            },
+            "keeps_their_plan": {
+              "verdict": "n/a",
+              "why": ""
+            },
+            "warm_voice": {
+              "verdict": "no",
+              "why": "robotic fragment opener with line breaks; same 'totally normal' line again"
+            },
+            "no_invention": {
+              "verdict": "yes",
+              "why": ""
+            }
+          }
+        },
+        {
+          "user": "honestly I'm just exhausted today, I worked all day",
+          "reply": "Sounds exhausting!  \nTake the rest you need\u2014I'll be here when you\u2019re ready.",
+          "status": 200,
+          "seconds": 0.6,
+          "phase": "rest",
+          "intervention": null,
+          "state": "fatigue",
+          "read": "new_cause",
+          "fallback": false,
+          "checks": {
+            "hard": [],
+            "soft": [],
+            "rewritten": false
+          },
+          "flags": [],
+          "rubric": {
+            "follows_framework": {
+              "verdict": "yes",
+              "why": ""
+            },
+            "reacts_to_user": {
+              "verdict": "yes",
+              "why": ""
+            },
+            "offers_not_assigns": {
+              "verdict": "n/a",
+              "why": ""
+            },
+            "no_premature_step": {
+              "verdict": "yes",
+              "why": ""
+            },
+            "keeps_their_plan": {
+              "verdict": "n/a",
+              "why": ""
+            },
+            "warm_voice": {
+              "verdict": "yes",
+              "why": ""
+            },
+            "no_invention": {
+              "verdict": "yes",
+              "why": ""
+            }
+          }
+        },
+        {
+          "user": "yeah I just want to sleep",
+          "reply": "Got it, rest well!",
+          "status": 200,
+          "seconds": 1.4,
+          "phase": "release",
+          "intervention": null,
+          "state": "fatigue",
+          "read": "own_plan",
+          "fallback": false,
+          "checks": {
+            "hard": [],
+            "soft": [],
+            "rewritten": false
+          },
+          "flags": [],
+          "rubric": {
+            "follows_framework": {
+              "verdict": "yes",
+              "why": ""
+            },
+            "reacts_to_user": {
+              "verdict": "yes",
+              "why": ""
+            },
+            "offers_not_assigns": {
+              "verdict": "n/a",
+              "why": ""
+            },
+            "no_premature_step": {
+              "verdict": "yes",
+              "why": ""
+            },
+            "keeps_their_plan": {
+              "verdict": "n/a",
+              "why": ""
+            },
+            "warm_voice": {
+              "verdict": "yes",
+              "why": ""
+            },
+            "no_invention": {
+              "verdict": "yes",
+              "why": ""
+            }
+          }
+        },
+        {
+          "user": "bye",
+          "reply": "Bye! Take care.",
+          "status": 200,
+          "seconds": 0.4,
+          "phase": "release",
+          "intervention": null,
+          "state": "fatigue",
+          "read": "ack",
+          "fallback": false,
+          "checks": {
+            "hard": [],
+            "soft": [],
+            "rewritten": false
+          },
+          "flags": [],
+          "rubric": {
+            "follows_framework": {
+              "verdict": "yes",
+              "why": ""
+            },
+            "reacts_to_user": {
+              "verdict": "yes",
+              "why": ""
+            },
+            "offers_not_assigns": {
+              "verdict": "n/a",
+              "why": ""
+            },
+            "no_premature_step": {
+              "verdict": "yes",
+              "why": ""
+            },
+            "keeps_their_plan": {
+              "verdict": "n/a",
+              "why": ""
+            },
+            "warm_voice": {
+              "verdict": "yes",
+              "why": ""
+            },
+            "no_invention": {
+              "verdict": "yes",
+              "why": ""
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

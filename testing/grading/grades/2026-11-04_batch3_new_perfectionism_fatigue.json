@@ -1,0 +1,26 @@
+{"grader": "claude",
+ "order": ["follows_framework","reacts_to_user","offers_not_assigns","no_premature_step","keeps_their_plan","warm_voice","no_invention"],
+ "files": {
+  "2026-11-04_1312_openai-gpt-oss-20b.json": {
+   "perfectionism_main": [["y--y-ny","'It's okay to feel that way' is a banned therapy phrase (a later fix catches it)"],
+                          ["yy-y-yy",""],
+                          ["yy-y-ny","right move, flat"],
+                          ["ynyy-yy","reframe frames it as code practice; misses their worry about how it looks to others"],
+                          ["ny-yyyy","'Sounds fun!' is too thin: no 'I'm around'"]],
+   "perfectionism_own_plan": [["y--y-nn","'I'm working on finishing the Nixly app': speaks as if it's Buddy's task"],
+                              ["nyyn-yy","skips the confirm step and jumps to the rough-version reframe"],
+                              ["yy-yyyy",""],
+                              ["yy-yyyy",""],
+                              ["yy-yyny","repeats the same closing line; 'will really shine' is empty cheering"]],
+   "perfectionism_bigger": [["y--y-yy",""],
+                            ["yy-y-yy",""],
+                            ["yy-y-yy",""]],
+   "fatigue_main": [["y--y-yy",""],
+                    ["yy-y-yy",""],
+                    ["yy-y-yy",""]],
+   "fatigue_still_wants": [["y--y-yy",""],
+                           ["ny-ynnn","they want to do something: no tiny move offered; turns 'get something done' into 'finish it tonight'"],
+                           ["nyyy-yy","offers a move, then also asks them for one: two moves mixed"],
+                           ["yy-yyyy",""]]
+  }
+ }}

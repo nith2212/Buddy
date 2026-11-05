@@ -1,0 +1,1970 @@
+{
+  "meta": {
+    "model": "openai/gpt-oss-20b",
+    "grader": "openai/gpt-oss-120b",
+    "started": "2026-11-04 13:12",
+    "minutes": 0.6,
+    "commit": "after: stages + trimmed prompt (uncommitted)",
+    "usage": {
+      "pipeline": {
+        "calls": 1,
+        "prompt": 437,
+        "completion": 72
+      },
+      "grader": {
+        "calls": 0,
+        "prompt": 0,
+        "completion": 0
+      }
+    },
+    "unfinished": [
+      "overwhelm_main",
+      "overwhelm_own_step",
+      "overwhelm_vague",
+      "low_interest_boring",
+      "low_interest_pointless_none",
+      "low_interest_pointless_purpose",
+      "low_interest_optional"
+    ],
+    "scenarios": [
+      "ambiguity_main",
+      "ambiguity_idk",
+      "ambiguity_switch_tired",
+      "perfectionism_main",
+      "perfectionism_own_plan",
+      "perfectionism_bigger",
+      "fatigue_main",
+      "fatigue_still_wants",
+      "overwhelm_main",
+      "overwhelm_own_step",
+      "overwhelm_vague",
+      "low_interest_boring",
+      "low_interest_pointless_none",
+      "low_interest_pointless_purpose",
+      "low_interest_optional"
+    ]
+  },
+  "summary": {
+    "by_state": {
+      "ambiguity": {
+        "scenarios": 3,
+        "replies": 15,
+        "clean": 15,
+        "yes": 73,
+        "no": 4,
+        "cause_ok": 2,
+        "fallbacks": 0
+      },
+      "perfectionism": {
+        "scenarios": 3,
+        "replies": 13,
+        "clean": 13,
+        "yes": 61,
+        "no": 7,
+        "cause_ok": 3,
+        "fallbacks": 0
+      },
+      "fatigue": {
+        "scenarios": 2,
+        "replies": 7,
+        "clean": 7,
+        "yes": 33,
+        "no": 5,
+        "cause_ok": 1,
+        "fallbacks": 0
+      }
+    },
+    "criteria": {
+      "follows_framework": {
+        "yes": 31,
+        "no": 4,
+        "n/a": 0,
+        "error": 0
+      },
+      "reacts_to_user": {
+        "yes": 26,
+        "no": 1,
+        "n/a": 8,
+        "error": 0
+      },
+      "offers_not_assigns": {
+        "yes": 5,
+        "no": 3,
+        "n/a": 27,
+        "error": 0
+      },
+      "no_premature_step": {
+        "yes": 32,
+        "no": 3,
+        "n/a": 0,
+        "error": 0
+      },
+      "keeps_their_plan": {
+        "yes": 7,
+        "no": 1,
+        "n/a": 27,
+        "error": 0
+      },
+      "warm_voice": {
+        "yes": 32,
+        "no": 3,
+        "n/a": 0,
+        "error": 0
+      },
+      "no_invention": {
+        "yes": 34,
+        "no": 1,
+        "n/a": 0,
+        "error": 0
+      }
+    },
+    "mech": {
+      "http_error": 0,
+      "fallback": 0,
+      "too_many_questions": 0,
+      "too_long": 0,
+      "banned_phrase": 0,
+      "clock_time": 0,
+      "repeated_opener": 0,
+      "repeats_earlier": 0,
+      "question_in_release": 0
+    }
+  },
+  "results": [
+    {
+      "id": "ambiguity_main",
+      "state": "ambiguity",
+      "chip": "unclear",
+      "note": "Goal -> core -> their own first step -> release. Buddy never supplies the content.",
+      "expect_cause": "unclear",
+      "dream": [
+        "Hey, I can understand. Some tasks might feel huge. do u have an end goal for this task? What will that look like?",
+        "That sounds great! Every task has a simple core working/design. what would that be for this task?",
+        "Good! You've narrowed it down. Now what would be the first ever step? Even as simple as opening your laptop is valid.",
+        "Yes, that sounds like a plan. I'll be here if you wanna plan more. Now go on you.",
+        "(release)"
+      ],
+      "user_lines": [
+        "This app will help me declutter my gallery while swiping. And each save gives me points. With those points I can build a cat sanctuary!",
+        "Hmmm for this, I need the swipe mechanism. Once that's built, others are additions.",
+        "Hmmm I can start setting up expo on my phone and laptop.",
+        "okay thanks!"
+      ],
+      "saved_cause": "unclear",
+      "cause_ok": true,
+      "turns": [
+        {
+          "user": null,
+          "reply": "Hey, you\u2019re on the \u201cFinish Nixly app\u201d task. I know starting can feel a bit daunting. What would \u201cdone\u201d look like for this task?",
+          "status": 200,
+          "seconds": 0.6,
+          "phase": "open",
+          "intervention": null,
+          "state": "ambiguity",
+          "read": null,
+          "fallback": false,
+          "checks": {
+            "hard": [],
+            "soft": [],
+            "rewritten": false
+          },
+          "flags": [],
+          "rubric": {
+            "follows_framework": {
+              "verdict": "yes",
+              "why": "asks end picture"
+            },
+            "reacts_to_user": {
+              "verdict": "n/a",
+              "why": "first turn"
+            },
+            "offers_not_assigns": {
+              "verdict": "n/a",
+              "why": "no suggestion"
+            },
+            "no_premature_step": {
+              "verdict": "yes",
+              "why": "no step given"
+            },
+            "keeps_their_plan": {
+              "verdict": "n/a",
+              "why": "no plan yet"
+            },
+            "warm_voice": {
+              "verdict": "yes",
+              "why": "sweet, peppy tone"
+            },
+            "no_invention": {
+              "verdict": "yes",
+              "why": "no invented details"
+            },
+            "_expected": "Open: normalize briefly and ask what \u201cdone\u201d looks like"
+          }
+        },
+        {
+          "user": "This app will help me declutter my gallery while swiping. And each save gives me points. With those points I can build a cat sanctuary!",
+          "reply": "That sounds like a fantastic vision\u2014swipe, save, earn points, and then build a cat sanctuary. What single thing would you consider the core of the app?",
+          "status": 200,
+          "seconds": 0.9,
+          "phase": "core",
+          "intervention": null,
+          "state": "ambiguity",
+          "read": "answer",
+          "fallback": false,
+          "checks": {
+            "hard": [],
+            "soft": [],
+            "rewritten": false
+          },
+          "flags": [],
+          "rubric": {
+            "follows_framework": {
+              "verdict": "yes",
+              "why": "asks core as required"
+            },
+            "reacts_to_user": {
+              "verdict": "yes",
+              "why": "references user vision"
+            },
+            "offers_not_assigns": {
+              "verdict": "n/a",
+              "why": "no suggestion made"
+            },
+            "no_premature_step": {
+              "verdict": "yes",
+              "why": "no step given"
+            },
+            "keeps_their_plan": {
+              "verdict": "n/a",
+              "why": "no plan stated"
+            },
+            "warm_voice": {
+              "verdict": "yes",
+              "why": "warm, peppy tone"
+            },
+            "no_invention": {
+              "verdict": "yes",
+              "why": "no invented details"
+            },
+            "_expected": "Ask for the simple core of the app, what the one part the rest depends on"
+          }
+        },
+        {
+          "user": "Hmmm for this, I need the swipe mechanism. Once that's built, others are additions.",
+          "reply": "Great, swipe is the starting point. What\u2019s the very first tiny action you could take to get that swipe working?",
+          "status": 200,
+          "seconds": 1.9,
+          "phase": "first_step",
+          "intervention": null,
+          "state": "ambiguity",
+          "read": "answer",
+          "fallback": false,
+          "checks": {
+            "hard": [],
+            "soft": [],
+            "rewritten": false
+          },
+          "flags": [],
+          "rubric": {
+            "follows_framework": {
+              "verdict": "yes",
+              "why": "asks first tiny action"
+            },
+            "reacts_to_user": {
+              "verdict": "yes",
+              "why": "references swipe core"
+            },
+            "offers_not_assigns": {
+              "verdict": "n/a",
+              "why": "no suggestion made"
+            },
+            "no_premature_step": {
+              "verdict": "yes",
+              "why": "only asks, no step given"
+            },
+            "keeps_their_plan": {
+              "verdict": "n/a",
+              "why": "no plan stated"
+            },
+            "warm_voice": {
+              "verdict": "yes",
+              "why": "friendly, peppy tone"
+            },
+            "no_invention": {
+              "verdict": "yes",
+              "why": "no invented details"
+            },
+            "_expected": "Ask for the very first tiny action the user can take toward the core"
+          }
+        },
+        {
+          "user": "Hmmm I can start setting up expo on my phone and laptop.",
+          "reply": "Awesome, setting up Expo on both devices is a solid first step! If you hit a snag, I\u2019m here whenever you need.",
+          "status": 200,
+          "seconds": 10.2,
+          "phase": "release",
+          "intervention": null,
+          "state": "ambiguity",
+          "read": "own_plan",
+          "fallback": false,
+          "checks": {
+            "hard": [],
+            "soft": [],
+            "rewritten": false
+          },
+          "flags": [],
+          "rubric": {
+            "follows_framework": {
+              "verdict": "yes",
+              "why": "reflects and releases"
+            },
+            "reacts_to_user": {
+              "verdict": "yes",
+              "why": "acknowledges Expo setup"
+            },
+            "offers_not_assigns": {
+              "verdict": "n/a",
+              "why": "no suggestion made"
+            },
+            "no_premature_step": {
+              "verdict": "yes",
+              "why": "no new step given"
+            },
+            "keeps_their_plan": {
+              "verdict": "yes",
+              "why": "backs Expo setup"
+            },
+            "warm_voice": {
+              "verdict": "yes",
+              "why": "peppy, supportive"
+            },
+            "no_invention": {
+              "verdict": "yes",
+              "why": "no invented details"
+            },
+            "_expected": "Release: reflect the user's stated first step and send them off with a warm line, no new question"
+          }
+        },
+        {
+          "user": "okay thanks!",
+          "reply": "You\u2019re doing great\u2014setting up Expo is a solid move!",
+          "status": 200,
+          "seconds": 5.6,
+          "phase": "release",
+          "intervention": null,
+          "state": "ambiguity",
+          "read": "ack",
+          "fallback": false,
+          "checks": {
+            "hard": [],
+            "soft": [],
+            "rewritten": false
+          },
+          "flags": [],
+          "rubric": {
+            "follows_framework": {
+              "verdict": "yes",
+              "why": "release correctly"
+            },
+            "reacts_to_user": {
+              "verdict": "yes",
+              "why": "acknowledges user plan"
+            },
+            "offers_not_assigns": {
+              "verdict": "n/a",
+              "why": "no suggestion made"
+            },
+            "no_premature_step": {
+              "verdict": "yes",
+              "why": "no new step given"
+            },
+            "keeps_their_plan": {
+              "verdict": "n/a",
+              "why": "user already gave plan"
+            },
+            "warm_voice": {
+              "verdict": "yes",
+              "why": "warm, peppy tone"
+            },
+            "no_invention": {
+              "verdict": "yes",
+              "why": "no invented details"
+            },
+            "_expected": "Release: give a warm line, no question or new instruction"
+          }
+        }
+      ]
+    },
+    {
+      "id": "ambiguity_idk",
+      "state": "ambiguity",
+      "chip": "unclear",
+      "note": "Repeated idk: Buddy must narrow with two concrete options, never repeat the question.",
+      "expect_cause": "unclear",
+      "dream": null,
+      "user_lines": [
+        "idk honestly",
+        "idk, all of it I guess",
+        "maybe the swipe thing?",
+        "I'll set up expo then",
+        "thanks bye"
+      ],
+      "saved_cause": "unclear",
+      "cause_ok": true,
+      "turns": [
+        {
+          "user": null,
+          "reply": "Hey, finishing the Nixly app is the goal! It\u2019s totally normal to feel stuck at the start\u2014everyone does. What would \u201cdone\u201d look like for this task?",
+          "status": 200,
+          "seconds": 0.5,
+          "phase": "open",
+          "intervention": null,
+          "state": "ambiguity",
+          "read": null,
+          "fallback": false,
+          "checks": {
+            "hard": [],
+            "soft": [],
+            "rewritten": false
+          },
+          "flags": [],
+          "rubric": {
+            "follows_framework": {
+              "verdict": "yes",
+              "why": "asks end picture, normalizes"
+            },
+            "reacts_to_user": {
+              "verdict": "n/a",
+              "why": "no prior user input"
+            },
+            "offers_not_assigns": {
+              "verdict": "n/a",
+              "why": "no suggestion made"
+            },
+            "no_premature_step": {
+              "verdict": "yes",
+              "why": "no step given"
+            },
+            "keeps_their_plan": {
+              "verdict": "n/a",
+              "why": "no plan stated"
+            },
+            "warm_voice": {
+              "verdict": "yes",
+              "why": "sweet, peppy tone"
+            },
+            "no_invention": {
+              "verdict": "yes",
+              "why": "uses given task only"
+            },
+            "_expected": "Open: normalize briefly and ask what \u201cdone\u201d looks like"
+          }
+        },
+        {
+          "user": "idk honestly",
+          "reply": "You could either finish the main screen layout or get the data fetch working; which sounds more doable right now?",
+          "status": 200,
+          "seconds": 1.5,
+          "phase": "open",
+          "intervention": null,
+          "state": "ambiguity",
+          "read": "idk",
+          "fallback": false,
+          "checks": {
+            "hard": [],
+            "soft": [],
+            "rewritten": false
+          },
+          "flags": [],
+          "rubric": {
+            "follows_framework": {
+              "verdict": "yes",
+              "why": "offers two concrete options"
+            },
+            "reacts_to_user": {
+              "verdict": "yes",
+              "why": "responds to idk"
+            },
+            "offers_not_assigns": {
+              "verdict": "yes",
+              "why": "offers choices"
+            },
+            "no_premature_step": {
+              "verdict": "yes",
+              "why": "still probing"
+            },
+            "keeps_their_plan": {
+              "verdict": "n/a",
+              "why": "no plan stated"
+            },
+            "warm_voice": {
+              "verdict": "no",
+              "why": "lacks warm, peppy tone"
+            },
+            "no_invention": {
+              "verdict": "no",
+              "why": "invented specific app steps"
+            },
+            "_expected": "Offer two concrete options as a question to narrow down the user's goal after an \"idk\" response"
+          }
+        },
+        {
+          "user": "idk, all of it I guess",
+          "reply": "Do you want a tiny first move to get going, or would you prefer to brainstorm a bit more?",
+          "status": 200,
+          "seconds": 10.0,
+          "phase": "offer",
+          "intervention": null,
+          "state": "ambiguity",
+          "read": "idk",
+          "fallback": false,
+          "checks": {
+            "hard": [],
+            "soft": [],
+            "rewritten": false
+          },
+          "flags": [],
+          "rubric": {
+            "follows_framework": {
+              "verdict": "no",
+              "why": "offered brainstorming instead of tiny step"
+            },
+            "reacts_to_user": {
+              "verdict": "yes",
+              "why": "responds to user's idk"
+            },
+            "offers_not_assigns": {
+              "verdict": "yes",
+              "why": "offers choices"
+            },
+            "no_premature_step": {
+              "verdict": "yes",
+              "why": "only asks, no step given"
+            },
+            "keeps_their_plan": {
+              "verdict": "n/a",
+              "why": "no plan stated"
+            },
+            "warm_voice": {
+              "verdict": "yes",
+              "why": "friendly tone"
+            },
+            "no_invention": {
+              "verdict": "yes",
+              "why": "no invented facts"
+            },
+            "_expected": "Ask for the very first tiny move the user can take, offering options if needed"
+          }
+        },
+        {
+          "user": "maybe the swipe thing?",
+          "reply": "Great idea\u2014let\u2019s tackle the swipe feature first! I\u2019m here if anything else pops up.",
+          "status": 200,
+          "seconds": 9.0,
+          "phase": "release",
+          "intervention": null,
+          "state": "ambiguity",
+          "read": "own_plan",
+          "fallback": false,
+          "checks": {
+            "hard": [],
+            "soft": [],
+            "rewritten": false
+          },
+          "flags": [],
+          "rubric": {
+            "follows_framework": {
+              "verdict": "yes",
+              "why": "proper release, no question"
+            },
+            "reacts_to_user": {
+              "verdict": "yes",
+              "why": "addresses swipe suggestion"
+            },
+            "offers_not_assigns": {
+              "verdict": "n/a",
+              "why": "no suggestion made"
+            },
+            "no_premature_step": {
+              "verdict": "yes",
+              "why": "no new step assigned"
+            },
+            "keeps_their_plan": {
+              "verdict": "yes",
+              "why": "affirms user\u2019s swipe idea"
+            },
+            "warm_voice": {
+              "verdict": "yes",
+              "why": "friendly, peppy tone"
+            },
+            "no_invention": {
+              "verdict": "yes",
+              "why": "no invented details"
+            },
+            "_expected": "Release: reflect user's stated step and send them off with warm line, no question"
+          }
+        },
+        {
+          "user": "I'll set up expo then",
+          "reply": "That sounds like a solid first step\u2014good on you!",
+          "status": 200,
+          "seconds": 9.2,
+          "phase": "release",
+          "intervention": null,
+          "state": "ambiguity",
+          "read": "own_plan",
+          "fallback": false,
+          "checks": {
+            "hard": [],
+            "soft": [],
+            "rewritten": false
+          },
+          "flags": [],
+          "rubric": {
+            "follows_framework": {
+              "verdict": "yes",
+              "why": "correct release response"
+            },
+            "reacts_to_user": {
+              "verdict": "yes",
+              "why": "affirms expo plan"
+            },
+            "offers_not_assigns": {
+              "verdict": "n/a",
+              "why": "no suggestion made"
+            },
+            "no_premature_step": {
+              "verdict": "yes",
+              "why": "no new step given"
+            },
+            "keeps_their_plan": {
+              "verdict": "yes",
+              "why": "backs user plan"
+            },
+            "warm_voice": {
+              "verdict": "yes",
+              "why": "peppy, kind"
+            },
+            "no_invention": {
+              "verdict": "yes",
+              "why": "no invented details"
+            },
+            "_expected": "Release: reflect user's stated step and send them off with a warm line, no question"
+          }
+        },
+        {
+          "user": "thanks bye",
+          "reply": "You're doing great\u2014keep it up!",
+          "status": 200,
+          "seconds": 4.7,
+          "phase": "release",
+          "intervention": null,
+          "state": "ambiguity",
+          "read": "ack",
+          "fallback": false,
+          "checks": {
+            "hard": [],
+            "soft": [],
+            "rewritten": false
+          },
+          "flags": [],
+          "rubric": {
+            "follows_framework": {
+              "verdict": "yes",
+              "why": "warm line only"
+            },
+            "reacts_to_user": {
+              "verdict": "no",
+              "why": "generic encouragement"
+            },
+            "offers_not_assigns": {
+              "verdict": "n/a",
+              "why": "no suggestion"
+            },
+            "no_premature_step": {
+              "verdict": "yes",
+              "why": "no new step"
+            },
+            "keeps_their_plan": {
+              "verdict": "n/a",
+              "why": "no plan mentioned"
+            },
+            "warm_voice": {
+              "verdict": "yes",
+              "why": "kind, peppy"
+            },
+            "no_invention": {
+              "verdict": "yes",
+              "why": "no invented facts"
+            },
+            "_expected": "Release: one warm line, no new instruction or question"
+          }
+        }
+      ]
+    },
+    {
+      "id": "ambiguity_switch_tired",
+      "state": "ambiguity",
+      "chip": "unclear",
+      "note": "Tapped unclear, reveals tiredness: switch to tired. No task step after that.",
+      "expect_cause": "tired",
+      "dream": null,
+      "user_lines": [
+        "honestly I'm just exhausted today, I worked all day",
+        "yeah I just want to sleep",
+        "bye"
+      ],
+      "saved_cause": null,
+      "cause_ok": false,
+      "turns": [
+        {
+          "user": null,
+          "reply": "Finishing the Nixly app is the goal right now. It\u2019s totally normal to feel stuck at the start. What would \u201cdone\u201d look like for this task?",
+          "status": 200,
+          "seconds": 0.6,
+          "phase": "open",
+          "intervention": null,
+          "state": "ambiguity",
+          "read": null,
+          "fallback": false,
+          "checks": {
+            "hard": [],
+            "soft": [],
+            "rewritten": false
+          },
+          "flags": [],
+          "rubric": {
+            "follows_framework": {
+              "verdict": "yes",
+              "why": "asks end picture"
+            },
+            "reacts_to_user": {
+              "verdict": "n/a",
+              "why": "no user input yet"
+            },
+            "offers_not_assigns": {
+              "verdict": "n/a",
+              "why": "no suggestion"
+            },
+            "no_premature_step": {
+              "verdict": "yes",
+              "why": "no step given"
+            },
+            "keeps_their_plan": {
+              "verdict": "n/a",
+              "why": "no plan stated"
+            },
+            "warm_voice": {
+              "verdict": "yes",
+              "why": "sweet, peppy tone"
+            },
+            "no_invention": {
+              "verdict": "yes",
+              "why": "no invented facts"
+            },
+            "_expected": "Open: normalize briefly and ask what \u201cdone\u201d looks like"
+          }
+        },
+        {
+          "user": "honestly I'm just exhausted today, I worked all day",
+          "reply": "You\u2019re feeling exhausted after a full day of work\u2014does that sound like the main reason you\u2019re stuck?",
+          "status": 200,
+          "seconds": 6.0,
+          "phase": "open",
+          "intervention": null,
+          "state": "ambiguity",
+          "read": "idk",
+          "fallback": false,
+          "checks": {
+            "hard": [],
+            "soft": [],
+            "rewritten": true
+          },
+          "flags": [],
+          "rubric": {
+            "follows_framework": {
+              "verdict": "yes",
+              "why": "asks about exhaustion as cause"
+            },
+            "reacts_to_user": {
+              "verdict": "yes",
+              "why": "references user\u2019s exhaustion"
+            },
+            "offers_not_assigns": {
+              "verdict": "n/a",
+              "why": "no suggestion made"
+            },
+            "no_premature_step": {
+              "verdict": "yes",
+              "why": "no step offered"
+            },
+            "keeps_their_plan": {
+              "verdict": "n/a",
+              "why": "no plan stated"
+            },
+            "warm_voice": {
+              "verdict": "yes",
+              "why": "kind, gentle tone"
+            },
+            "no_invention": {
+              "verdict": "yes",
+              "why": "no invented details"
+            },
+            "_expected": "Probe the reason for feeling stuck with a short question"
+          }
+        },
+        {
+          "user": "yeah I just want to sleep",
+          "reply": "It sounds like you\u2019re wiped out after a long day. You\u2019re looking for some rest right now. Do you think a quick break could help you feel ready to tackle the next step?",
+          "status": 200,
+          "seconds": 8.0,
+          "phase": "core",
+          "intervention": null,
+          "state": "ambiguity",
+          "read": "confirm",
+          "fallback": false,
+          "checks": {
+            "hard": [],
+            "soft": [],
+            "rewritten": false
+          },
+          "flags": [],
+          "rubric": {
+            "follows_framework": {
+              "verdict": "yes",
+              "why": "asks about break as optional"
+            },
+            "reacts_to_user": {
+              "verdict": "yes",
+              "why": "addresses exhaustion"
+            },
+            "offers_not_assigns": {
+              "verdict": "n/a",
+              "why": "no step assigned"
+            },
+            "no_premature_step": {
+              "verdict": "yes",
+              "why": "only suggests break"
+            },
+            "keeps_their_plan": {
+              "verdict": "n/a",
+              "why": "no plan stated"
+            },
+            "warm_voice": {
+              "verdict": "yes",
+              "why": "kind, gentle tone"
+            },
+            "no_invention": {
+              "verdict": "yes",
+              "why": "no invented facts"
+            },
+            "_expected": "Confirm the reason for being stuck and ask a gentle, optional next move without assigning a step"
+          }
+        },
+        {
+          "user": "bye",
+          "reply": "Bye! Take care of yourself.",
+          "status": 200,
+          "seconds": 5.6,
+          "phase": "release",
+          "intervention": null,
+          "state": "ambiguity",
+          "read": "ack",
+          "fallback": false,
+          "checks": {
+            "hard": [],
+            "soft": [],
+            "rewritten": false
+          },
+          "flags": [],
+          "rubric": {
+            "follows_framework": {
+              "verdict": "yes",
+              "why": "warm line, no question"
+            },
+            "reacts_to_user": {
+              "verdict": "yes",
+              "why": "responds to goodbye"
+            },
+            "offers_not_assigns": {
+              "verdict": "n/a",
+              "why": "no suggestion made"
+            },
+            "no_premature_step": {
+              "verdict": "yes",
+              "why": "no step given"
+            },
+            "keeps_their_plan": {
+              "verdict": "n/a",
+              "why": "no plan stated"
+            },
+            "warm_voice": {
+              "verdict": "yes",
+              "why": "kind, friendly tone"
+            },
+            "no_invention": {
+              "verdict": "yes",
+              "why": "no invented facts"
+            },
+            "_expected": "Release: reflect and send off with warm line, no question"
+          }
+        }
+      ]
+    },
+    {
+      "id": "perfectionism_main",
+      "state": "perfectionism",
+      "chip": "afraid",
+      "note": "idk -> two guesses as questions -> confirm -> rough-first-version reframe with consent -> release.",
+      "expect_cause": "afraid",
+      "dream": [
+        "Hey there, I feel you. Some tasks would bring out uncomfortable emotions, and it's okay. What is it about this task that makes you feel this way?",
+        "Okay, let me guess, and if you feel it resonates, tell me- do you feel like this task would make you feel like you don't how to do certain things?",
+        "Okay, what about how others might perceive it? Or critique it?",
+        "Hey it's okay. This task is important and you care. But in order to be perfect, it should exist first. So let's focusing on doing this roughly. Allow yourself to be messy. You have all the freedom, make it look bad. Once it exists, then you can plan to make it the best. What do you say?",
+        "Great! I'll be here when you need me again."
+      ],
+      "user_lines": [
+        "Idk bro",
+        "Yeah, maybe",
+        "Yes, I'm worried it won't look good to others",
+        "Haha yeah that sounds fun."
+      ],
+      "saved_cause": "afraid",
+      "cause_ok": true,
+      "turns": [
+        {
+          "user": null,
+          "reply": "Finishing the Nixly app can feel daunting. It\u2019s okay to feel that way. What feels risky about this task?",
+          "status": 200,
+          "seconds": 0.4,
+          "phase": "open",
+          "intervention": null,
+          "state": "perfectionism",
+          "read": null,
+          "fallback": false,
+          "checks": {
+            "hard": [],
+            "soft": [],
+            "rewritten": false
+          },
+          "flags": [],
+          "rubric": {
+            "follows_framework": {
+              "verdict": "yes",
+              "why": "asks risky question in opener"
+            },
+            "reacts_to_user": {
+              "verdict": "n/a",
+              "why": "no prior user input"
+            },
+            "offers_not_assigns": {
+              "verdict": "n/a",
+              "why": "no suggestion made"
+            },
+            "no_premature_step": {
+              "verdict": "yes",
+              "why": "no step given"
+            },
+            "keeps_their_plan": {
+              "verdict": "n/a",
+              "why": "no plan stated"
+            },
+            "warm_voice": {
+              "verdict": "no",
+              "why": "uses banned reassurance phrase"
+            },
+            "no_invention": {
+              "verdict": "yes",
+              "why": "no invented details"
+            },
+            "_expected": "Open: normalize and ask what feels risky about the task"
+          }
+        },
+        {
+          "user": "Idk bro",
+          "reply": "You\u2019re feeling stuck, and that\u2019s totally normal. Are you worried more about not knowing how to finish the technical parts or about how others will judge the result?",
+          "status": 200,
+          "seconds": 3.7,
+          "phase": "narrow",
+          "intervention": null,
+          "state": "perfectionism",
+          "read": "idk",
+          "fallback": false,
+          "checks": {
+            "hard": [],
+            "soft": [],
+            "rewritten": false
+          },
+          "flags": [],
+          "rubric": {
+            "follows_framework": {
+              "verdict": "yes",
+              "why": "two clear options asked"
+            },
+            "reacts_to_user": {
+              "verdict": "yes",
+              "why": "responds to 'Idk bro'"
+            },
+            "offers_not_assigns": {
+              "verdict": "n/a",
+              "why": "no suggestion made"
+            },
+            "no_premature_step": {
+              "verdict": "yes",
+              "why": "only probing"
+            },
+            "keeps_their_plan": {
+              "verdict": "n/a",
+              "why": "no plan stated"
+            },
+            "warm_voice": {
+              "verdict": "yes",
+              "why": "friendly, peppy tone"
+            },
+            "no_invention": {
+              "verdict": "yes",
+              "why": "no invented details"
+            },
+            "_expected": "Offer two concrete option questions to narrow down the user's uncertainty"
+          }
+        },
+        {
+          "user": "Yeah, maybe",
+          "reply": "Is it more that you\u2019re unsure how to finish the technical parts?",
+          "status": 200,
+          "seconds": 13.9,
+          "phase": "narrow",
+          "intervention": null,
+          "state": "perfectionism",
+          "read": "unsure",
+          "fallback": false,
+          "checks": {
+            "hard": [],
+            "soft": [],
+            "rewritten": true
+          },
+          "flags": [],
+          "rubric": {
+            "follows_framework": {
+              "verdict": "yes",
+              "why": "asks to confirm choice"
+            },
+            "reacts_to_user": {
+              "verdict": "yes",
+              "why": "responds to \"Yeah, maybe\""
+            },
+            "offers_not_assigns": {
+              "verdict": "n/a",
+              "why": "no suggestion made"
+            },
+            "no_premature_step": {
+              "verdict": "yes",
+              "why": "no step offered"
+            },
+            "keeps_their_plan": {
+              "verdict": "n/a",
+              "why": "no plan stated"
+            },
+            "warm_voice": {
+              "verdict": "yes",
+              "why": "neutral, not unkind"
+            },
+            "no_invention": {
+              "verdict": "yes",
+              "why": "no invented details"
+            },
+            "_expected": "Confirm the user's specific worry by asking which of the two options applies"
+          }
+        },
+        {
+          "user": "Yes, I'm worried it won't look good to others",
+          "reply": "You could start with a quick, rough draft just for yourself\u2014no one else needs to see it yet. Think of it as a sandbox where you can test ideas and get comfortable with the code. Would you like to try that first pass?",
+          "status": 200,
+          "seconds": 9.3,
+          "phase": "reframe",
+          "intervention": null,
+          "state": "perfectionism",
+          "read": "confirm",
+          "fallback": false,
+          "checks": {
+            "hard": [],
+            "soft": [],
+            "rewritten": false
+          },
+          "flags": [],
+          "rubric": {
+            "follows_framework": {
+              "verdict": "no",
+              "why": "skipped explicit confirmation"
+            },
+            "reacts_to_user": {
+              "verdict": "yes",
+              "why": "addresses audience concern"
+            },
+            "offers_not_assigns": {
+              "verdict": "yes",
+              "why": "offers optional rough draft"
+            },
+            "no_premature_step": {
+              "verdict": "no",
+              "why": "gave suggestion before confirming"
+            },
+            "keeps_their_plan": {
+              "verdict": "n/a",
+              "why": "no plan stated"
+            },
+            "warm_voice": {
+              "verdict": "yes",
+              "why": "friendly, supportive tone"
+            },
+            "no_invention": {
+              "verdict": "yes",
+              "why": "no invented details"
+            },
+            "_expected": "Confirm the user's worry in their own words before reframing"
+          }
+        },
+        {
+          "user": "Haha yeah that sounds fun.",
+          "reply": "Sounds fun!",
+          "status": 200,
+          "seconds": 10.1,
+          "phase": "release",
+          "intervention": null,
+          "state": "perfectionism",
+          "read": "confirm",
+          "fallback": false,
+          "checks": {
+            "hard": [],
+            "soft": [],
+            "rewritten": false
+          },
+          "flags": [],
+          "rubric": {
+            "follows_framework": {
+              "verdict": "yes",
+              "why": "provides warm line, no question"
+            },
+            "reacts_to_user": {
+              "verdict": "yes",
+              "why": "echoes user's enthusiasm"
+            },
+            "offers_not_assigns": {
+              "verdict": "n/a",
+              "why": "no suggestion made"
+            },
+            "no_premature_step": {
+              "verdict": "yes",
+              "why": "no new step introduced"
+            },
+            "keeps_their_plan": {
+              "verdict": "n/a",
+              "why": "no plan stated"
+            },
+            "warm_voice": {
+              "verdict": "yes",
+              "why": "friendly, peppy tone"
+            },
+            "no_invention": {
+              "verdict": "yes",
+              "why": "no invented details"
+            },
+            "_expected": "Release: give one warm line, no question or new instruction"
+          }
+        }
+      ]
+    },
+    {
+      "id": "perfectionism_own_plan",
+      "state": "perfectionism",
+      "chip": "afraid",
+      "note": "They decline the reframe and state their own plan: back it as said, never shrink it.",
+      "expect_cause": "afraid",
+      "dream": null,
+      "user_lines": [
+        "people will think it's messy and unprofessional",
+        "yeah that's exactly it",
+        "nah I'd rather polish the README first, that's my plan",
+        "thanks"
+      ],
+      "saved_cause": "afraid",
+      "cause_ok": true,
+      "turns": [
+        {
+          "user": null,
+          "reply": "Hey, I\u2019m working on finishing the Nixly app. It\u2019s totally normal to feel a bit scared about whether it\u2019ll be good enough\u2014what feels risky to you about this task?",
+          "status": 200,
+          "seconds": 0.5,
+          "phase": "open",
+          "intervention": null,
+          "state": "perfectionism",
+          "read": null,
+          "fallback": false,
+          "checks": {
+            "hard": [],
+            "soft": [],
+            "rewritten": false
+          },
+          "flags": [],
+          "rubric": {
+            "follows_framework": {
+              "verdict": "yes",
+              "why": "normalizes and asks risk"
+            },
+            "reacts_to_user": {
+              "verdict": "n/a",
+              "why": "first reply"
+            },
+            "offers_not_assigns": {
+              "verdict": "n/a",
+              "why": "no suggestion"
+            },
+            "no_premature_step": {
+              "verdict": "yes",
+              "why": "no step given"
+            },
+            "keeps_their_plan": {
+              "verdict": "n/a",
+              "why": "no plan yet"
+            },
+            "warm_voice": {
+              "verdict": "yes",
+              "why": "peppy, kind"
+            },
+            "no_invention": {
+              "verdict": "yes",
+              "why": "no invented facts"
+            },
+            "_expected": "Open: normalize and ask what feels risky about the task"
+          }
+        },
+        {
+          "user": "people will think it's messy and unprofessional",
+          "reply": "It\u2019s scary to worry about how others see it\u2014how about we sketch a quick, rough version just to get it out of the way so it can exist before we polish it?",
+          "status": 200,
+          "seconds": 6.7,
+          "phase": "reframe",
+          "intervention": null,
+          "state": "perfectionism",
+          "read": "new_cause",
+          "fallback": false,
+          "checks": {
+            "hard": [],
+            "soft": [],
+            "rewritten": true
+          },
+          "flags": [],
+          "rubric": {
+            "follows_framework": {
+              "verdict": "no",
+              "why": "skipped confirming"
+            },
+            "reacts_to_user": {
+              "verdict": "yes",
+              "why": "addressed fear of others"
+            },
+            "offers_not_assigns": {
+              "verdict": "no",
+              "why": "gave suggestion instead of offer"
+            },
+            "no_premature_step": {
+              "verdict": "no",
+              "why": "premature suggestion"
+            },
+            "keeps_their_plan": {
+              "verdict": "n/a",
+              "why": "no plan stated"
+            },
+            "warm_voice": {
+              "verdict": "yes",
+              "why": "friendly tone"
+            },
+            "no_invention": {
+              "verdict": "yes",
+              "why": "no invented facts"
+            },
+            "_expected": "Confirm: reflect the user's worry back in their own words"
+          }
+        },
+        {
+          "user": "yeah that's exactly it",
+          "reply": "That sounds like a solid plan! I\u2019m here if you need anything else.",
+          "status": 200,
+          "seconds": 8.0,
+          "phase": "release",
+          "intervention": null,
+          "state": "perfectionism",
+          "read": "confirm",
+          "fallback": false,
+          "checks": {
+            "hard": [],
+            "soft": [],
+            "rewritten": false
+          },
+          "flags": [],
+          "rubric": {
+            "follows_framework": {
+              "verdict": "yes",
+              "why": "release correctly given"
+            },
+            "reacts_to_user": {
+              "verdict": "yes",
+              "why": "affirms user agreement"
+            },
+            "offers_not_assigns": {
+              "verdict": "n/a",
+              "why": "no suggestion made"
+            },
+            "no_premature_step": {
+              "verdict": "yes",
+              "why": "no new step"
+            },
+            "keeps_their_plan": {
+              "verdict": "yes",
+              "why": "affirms plan"
+            },
+            "warm_voice": {
+              "verdict": "yes",
+              "why": "friendly, peppy"
+            },
+            "no_invention": {
+              "verdict": "yes",
+              "why": "no invented details"
+            },
+            "_expected": "Release: give one warm line, no new instruction or question"
+          }
+        },
+        {
+          "user": "nah I'd rather polish the README first, that's my plan",
+          "reply": "Nice choice\u2014polishing the README first sets a great tone. I\u2019m around if you need anything else.",
+          "status": 200,
+          "seconds": 10.2,
+          "phase": "release",
+          "intervention": null,
+          "state": "perfectionism",
+          "read": "own_plan",
+          "fallback": false,
+          "checks": {
+            "hard": [],
+            "soft": [],
+            "rewritten": false
+          },
+          "flags": [],
+          "rubric": {
+            "follows_framework": {
+              "verdict": "yes",
+              "why": "affirmed plan, no new step"
+            },
+            "reacts_to_user": {
+              "verdict": "yes",
+              "why": "responded to README plan"
+            },
+            "offers_not_assigns": {
+              "verdict": "n/a",
+              "why": "no suggestion made"
+            },
+            "no_premature_step": {
+              "verdict": "yes",
+              "why": "no extra step given"
+            },
+            "keeps_their_plan": {
+              "verdict": "yes",
+              "why": "affirmed exactly their plan"
+            },
+            "warm_voice": {
+              "verdict": "yes",
+              "why": "peppy, kind tone"
+            },
+            "no_invention": {
+              "verdict": "yes",
+              "why": "no invented details"
+            },
+            "_expected": "Release: affirm user\u2019s plan, warm line, no new instruction or question"
+          }
+        },
+        {
+          "user": "thanks",
+          "reply": "You\u2019ve got a great plan\u2014polishing the README first will really shine! I\u2019m around if you need anything else.",
+          "status": 200,
+          "seconds": 5.6,
+          "phase": "release",
+          "intervention": null,
+          "state": "perfectionism",
+          "read": "ack",
+          "fallback": false,
+          "checks": {
+            "hard": [],
+            "soft": [],
+            "rewritten": false
+          },
+          "flags": [],
+          "rubric": {
+            "follows_framework": {
+              "verdict": "yes",
+              "why": "release done"
+            },
+            "reacts_to_user": {
+              "verdict": "yes",
+              "why": "acknowledges plan"
+            },
+            "offers_not_assigns": {
+              "verdict": "n/a",
+              "why": "no suggestion"
+            },
+            "no_premature_step": {
+              "verdict": "yes",
+              "why": "no new step"
+            },
+            "keeps_their_plan": {
+              "verdict": "yes",
+              "why": "backs README plan"
+            },
+            "warm_voice": {
+              "verdict": "yes",
+              "why": "peppy, kind"
+            },
+            "no_invention": {
+              "verdict": "yes",
+              "why": "no invented facts"
+            },
+            "_expected": "Release: give one warm line, no new instruction or question"
+          }
+        }
+      ]
+    },
+    {
+      "id": "perfectionism_bigger",
+      "state": "perfectionism",
+      "chip": "afraid",
+      "note": "Bigger than work: step back kindly, suggest someone they trust or a helpline, stop probing.",
+      "expect_cause": null,
+      "dream": null,
+      "user_lines": [
+        "honestly it's not the task. I feel like a failure at everything lately and I can't stop crying",
+        "yeah"
+      ],
+      "saved_cause": null,
+      "cause_ok": true,
+      "turns": [
+        {
+          "user": null,
+          "reply": "Finishing the Nixly app feels like a big step. It\u2019s completely normal to feel unsure about how it\u2019ll turn out. What feels risky about this task?",
+          "status": 200,
+          "seconds": 1.5,
+          "phase": "open",
+          "intervention": null,
+          "state": "perfectionism",
+          "read": null,
+          "fallback": false,
+          "checks": {
+            "hard": [],
+            "soft": [],
+            "rewritten": false
+          },
+          "flags": [],
+          "rubric": {
+            "follows_framework": {
+              "verdict": "yes",
+              "why": "asks risky question after normalization"
+            },
+            "reacts_to_user": {
+              "verdict": "n/a",
+              "why": "first Buddy message"
+            },
+            "offers_not_assigns": {
+              "verdict": "n/a",
+              "why": "no suggestion made"
+            },
+            "no_premature_step": {
+              "verdict": "yes",
+              "why": "no step given"
+            },
+            "keeps_their_plan": {
+              "verdict": "n/a",
+              "why": "no user plan yet"
+            },
+            "warm_voice": {
+              "verdict": "yes",
+              "why": "sweet, kind, peppy"
+            },
+            "no_invention": {
+              "verdict": "yes",
+              "why": "no invented details"
+            },
+            "_expected": "Open: normalize and ask what feels risky about the task"
+          }
+        },
+        {
+          "user": "honestly it's not the task. I feel like a failure at everything lately and I can't stop crying",
+          "reply": "It sounds like more than just the app. I\u2019m here for task help, not for this kind of support. It might help to talk to someone you trust or a local helpline.",
+          "status": 200,
+          "seconds": 0.6,
+          "phase": "step_back",
+          "intervention": null,
+          "state": "perfectionism",
+          "read": "bigger",
+          "fallback": false,
+          "checks": {
+            "hard": [],
+            "soft": [],
+            "rewritten": false
+          },
+          "flags": [],
+          "rubric": {
+            "follows_framework": {
+              "verdict": "yes",
+              "why": "stepped back as instructed"
+            },
+            "reacts_to_user": {
+              "verdict": "yes",
+              "why": "addressed user\u2019s feelings"
+            },
+            "offers_not_assigns": {
+              "verdict": "n/a",
+              "why": "no suggestion made"
+            },
+            "no_premature_step": {
+              "verdict": "yes",
+              "why": "no task step given"
+            },
+            "keeps_their_plan": {
+              "verdict": "n/a",
+              "why": "no plan stated"
+            },
+            "warm_voice": {
+              "verdict": "no",
+              "why": "not peppy or sweet"
+            },
+            "no_invention": {
+              "verdict": "yes",
+              "why": "no invented details"
+            },
+            "_expected": "Step back kindly without probing further, no question"
+          }
+        },
+        {
+          "user": "yeah",
+          "reply": "I\u2019m really sorry you\u2019re feeling this way. You\u2019re not alone, and talking to someone you trust or a local helpline could help. Take care of yourself.",
+          "status": 200,
+          "seconds": 5.2,
+          "phase": "step_back",
+          "intervention": null,
+          "state": "perfectionism",
+          "read": "ack",
+          "fallback": false,
+          "checks": {
+            "hard": [],
+            "soft": [],
+            "rewritten": false
+          },
+          "flags": [],
+          "rubric": {
+            "follows_framework": {
+              "verdict": "yes",
+              "why": "stepped back, no task probe"
+            },
+            "reacts_to_user": {
+              "verdict": "yes",
+              "why": "addresses user distress"
+            },
+            "offers_not_assigns": {
+              "verdict": "yes",
+              "why": "offers help, not assigns"
+            },
+            "no_premature_step": {
+              "verdict": "yes",
+              "why": "no task step given"
+            },
+            "keeps_their_plan": {
+              "verdict": "n/a",
+              "why": "no plan stated"
+            },
+            "warm_voice": {
+              "verdict": "yes",
+              "why": "kind, gentle tone"
+            },
+            "no_invention": {
+              "verdict": "yes",
+              "why": "no invented details"
+            },
+            "_expected": "Step back kindly, no task probing, offer support suggestion"
+          }
+        }
+      ]
+    },
+    {
+      "id": "fatigue_main",
+      "state": "fatigue",
+      "chip": "tired",
+      "note": "Acknowledge what drained them, permission to rest, no step, no question at the end.",
+      "expect_cause": "tired",
+      "dream": [
+        "Hey, this task has been not touched for quite some time now. What is happening?",
+        "Oh, please take care. Well rested body and mind always beats stressed half baked work anyways. When you are feeling better, we'll revisit this task. I'll be here.",
+        "Bye!"
+      ],
+      "user_lines": [
+        "Hey I worked so hard and long this day at work, I'm tired and exhausted",
+        "Thanks bye"
+      ],
+      "saved_cause": "tired",
+      "cause_ok": true,
+      "turns": [
+        {
+          "user": null,
+          "reply": "Hey, I\u2019ve got the \u201cPrepare client report\u201d on my mind. How was your day?",
+          "status": 200,
+          "seconds": 0.5,
+          "phase": "open",
+          "intervention": null,
+          "state": "fatigue",
+          "read": null,
+          "fallback": false,
+          "checks": {
+            "hard": [],
+            "soft": [],
+            "rewritten": false
+          },
+          "flags": [],
+          "rubric": {
+            "follows_framework": {
+              "verdict": "yes",
+              "why": "observation+question"
+            },
+            "reacts_to_user": {
+              "verdict": "n/a",
+              "why": "opening message"
+            },
+            "offers_not_assigns": {
+              "verdict": "n/a",
+              "why": "no suggestion"
+            },
+            "no_premature_step": {
+              "verdict": "yes",
+              "why": "no step given"
+            },
+            "keeps_their_plan": {
+              "verdict": "n/a",
+              "why": "no plan stated"
+            },
+            "warm_voice": {
+              "verdict": "yes",
+              "why": "peppy, kind"
+            },
+            "no_invention": {
+              "verdict": "yes",
+              "why": "no invented facts"
+            },
+            "_expected": "Open: plain observation about task and one open question"
+          }
+        },
+        {
+          "user": "Hey I worked so hard and long this day at work, I'm tired and exhausted",
+          "reply": "Wow, you\u2019ve been working so hard\u2014sounds exhausting. Take a well\u2011deserved break and rest up. I\u2019ll be here when you\u2019re ready to tackle the next step.",
+          "status": 200,
+          "seconds": 5.9,
+          "phase": "rest",
+          "intervention": null,
+          "state": "fatigue",
+          "read": "new_cause",
+          "fallback": false,
+          "checks": {
+            "hard": [],
+            "soft": [],
+            "rewritten": false
+          },
+          "flags": [],
+          "rubric": {
+            "follows_framework": {
+              "verdict": "yes",
+              "why": "acknowledge+release, no question"
+            },
+            "reacts_to_user": {
+              "verdict": "yes",
+              "why": "references user\u2019s exhaustion"
+            },
+            "offers_not_assigns": {
+              "verdict": "n/a",
+              "why": "no suggestion made"
+            },
+            "no_premature_step": {
+              "verdict": "yes",
+              "why": "no step given"
+            },
+            "keeps_their_plan": {
+              "verdict": "n/a",
+              "why": "no plan stated"
+            },
+            "warm_voice": {
+              "verdict": "yes",
+              "why": "kind, supportive tone"
+            },
+            "no_invention": {
+              "verdict": "yes",
+              "why": "no invented details"
+            },
+            "_expected": "Acknowledge the fatigue with a short line tied to their words, then give permission to rest without asking a question"
+          }
+        },
+        {
+          "user": "Thanks bye",
+          "reply": "You\u2019re welcome! Take care.",
+          "status": 200,
+          "seconds": 4.5,
+          "phase": "release",
+          "intervention": null,
+          "state": "fatigue",
+          "read": "ack",
+          "fallback": false,
+          "checks": {
+            "hard": [],
+            "soft": [],
+            "rewritten": false
+          },
+          "flags": [],
+          "rubric": {
+            "follows_framework": {
+              "verdict": "yes",
+              "why": "warm line, no question"
+            },
+            "reacts_to_user": {
+              "verdict": "yes",
+              "why": "responds to thanks"
+            },
+            "offers_not_assigns": {
+              "verdict": "n/a",
+              "why": "no suggestion"
+            },
+            "no_premature_step": {
+              "verdict": "yes",
+              "why": "no new step"
+            },
+            "keeps_their_plan": {
+              "verdict": "n/a",
+              "why": "no plan stated"
+            },
+            "warm_voice": {
+              "verdict": "yes",
+              "why": "friendly, kind"
+            },
+            "no_invention": {
+              "verdict": "yes",
+              "why": "no invented facts"
+            },
+            "_expected": "Release: give permission to rest with a warm line, no question or new step"
+          }
+        }
+      ]
+    },
+    {
+      "id": "fatigue_still_wants",
+      "state": "fatigue",
+      "chip": "tired",
+      "note": "Tired but wants to work: offer a tiny move or their own plan. Never suggest stopping.",
+      "expect_cause": "tired",
+      "dream": null,
+      "user_lines": [
+        "long day, but I really need to get something done on it tonight",
+        "maybe just a tiny thing",
+        "okay I'll do that"
+      ],
+      "saved_cause": null,
+      "cause_ok": false,
+      "turns": [
+        {
+          "user": null,
+          "reply": "Preparing the client report sounds like a big task. How was your day? I\u2019m here for you if you want to keep going.",
+          "status": 200,
+          "seconds": 0.3,
+          "phase": "open",
+          "intervention": null,
+          "state": "fatigue",
+          "read": null,
+          "fallback": false,
+          "checks": {
+            "hard": [],
+            "soft": [],
+            "rewritten": false
+          },
+          "flags": [],
+          "rubric": {
+            "follows_framework": {
+              "verdict": "yes",
+              "why": "observation and question only"
+            },
+            "reacts_to_user": {
+              "verdict": "n/a",
+              "why": "opening message"
+            },
+            "offers_not_assigns": {
+              "verdict": "n/a",
+              "why": "no suggestion"
+            },
+            "no_premature_step": {
+              "verdict": "yes",
+              "why": "no step given"
+            },
+            "keeps_their_plan": {
+              "verdict": "n/a",
+              "why": "no plan stated"
+            },
+            "warm_voice": {
+              "verdict": "yes",
+              "why": "sweet, kind tone"
+            },
+            "no_invention": {
+              "verdict": "yes",
+              "why": "no invented details"
+            },
+            "_expected": "Open: observation + one open question, warm tone, no steps"
+          }
+        },
+        {
+          "user": "long day, but I really need to get something done on it tonight",
+          "reply": "Sounds exhausting, but you\u2019re ready to finish it tonight. Let me know if you need a quick pep talk.",
+          "status": 200,
+          "seconds": 0.9,
+          "phase": "release",
+          "intervention": null,
+          "state": "fatigue",
+          "read": "own_plan",
+          "fallback": false,
+          "checks": {
+            "hard": [],
+            "soft": [],
+            "rewritten": false
+          },
+          "flags": [],
+          "rubric": {
+            "follows_framework": {
+              "verdict": "yes",
+              "why": "acknowledges fatigue correctly"
+            },
+            "reacts_to_user": {
+              "verdict": "yes",
+              "why": "references long day and task"
+            },
+            "offers_not_assigns": {
+              "verdict": "yes",
+              "why": "offers optional pep talk"
+            },
+            "no_premature_step": {
+              "verdict": "yes",
+              "why": "no step given"
+            },
+            "keeps_their_plan": {
+              "verdict": "yes",
+              "why": "affirms finishing tonight"
+            },
+            "warm_voice": {
+              "verdict": "yes",
+              "why": "warm, kind, peppy"
+            },
+            "no_invention": {
+              "verdict": "yes",
+              "why": "no invented details"
+            },
+            "_expected": "Acknowledge the user's fatigue with a short line tied to their words, no question, no step"
+          }
+        },
+        {
+          "user": "maybe just a tiny thing",
+          "reply": "Got it\u2014maybe just jot down the main points you need to cover. What\u2019s the first tiny thing you can tackle?",
+          "status": 200,
+          "seconds": 6.2,
+          "phase": "followup",
+          "intervention": null,
+          "state": "fatigue",
+          "read": "unsure",
+          "fallback": false,
+          "checks": {
+            "hard": [],
+            "soft": [],
+            "rewritten": false
+          },
+          "flags": [],
+          "rubric": {
+            "follows_framework": {
+              "verdict": "yes",
+              "why": "asks tiny step question"
+            },
+            "reacts_to_user": {
+              "verdict": "yes",
+              "why": "responds to \"maybe just a tiny thing\""
+            },
+            "offers_not_assigns": {
+              "verdict": "no",
+              "why": "suggests a specific action"
+            },
+            "no_premature_step": {
+              "verdict": "yes",
+              "why": "appropriate stage"
+            },
+            "keeps_their_plan": {
+              "verdict": "n/a",
+              "why": "no plan stated"
+            },
+            "warm_voice": {
+              "verdict": "yes",
+              "why": "friendly, peppy tone"
+            },
+            "no_invention": {
+              "verdict": "yes",
+              "why": "no invented facts"
+            },
+            "_expected": "Ask the user what tiny first step they want to take, offering choice without assigning"
+          }
+        },
+        {
+          "user": "okay I'll do that",
+          "reply": "Nice choice\u2014just a quick outline can make the rest feel lighter. I\u2019m here if you need anything else.",
+          "status": 200,
+          "seconds": 9.0,
+          "phase": "release",
+          "intervention": null,
+          "state": "fatigue",
+          "read": "own_plan",
+          "fallback": false,
+          "checks": {
+            "hard": [],
+            "soft": [],
+            "rewritten": false
+          },
+          "flags": [],
+          "rubric": {
+            "follows_framework": {
+              "verdict": "no",
+              "why": "adds suggestion step"
+            },
+            "reacts_to_user": {
+              "verdict": "yes",
+              "why": "acknowledges user plan"
+            },
+            "offers_not_assigns": {
+              "verdict": "no",
+              "why": "suggests outline"
+            },
+            "no_premature_step": {
+              "verdict": "no",
+              "why": "gives new step"
+            },
+            "keeps_their_plan": {
+              "verdict": "no",
+              "why": "adds extra suggestion"
+            },
+            "warm_voice": {
+              "verdict": "yes",
+              "why": "friendly, supportive tone"
+            },
+            "no_invention": {
+              "verdict": "yes",
+              "why": "no false facts"
+            },
+            "_expected": "Release: give permission to rest with a warm line, no question or new step"
+          }
+        }
+      ]
+    }
+  ]
+}
