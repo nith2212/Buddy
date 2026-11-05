@@ -260,7 +260,7 @@ async def _flow_turn(
         step = flow.next_stage(state, stage, reading, tries)
     else:
         step = flow.Step(state, stage, modifier="stay")  # reopened without a new message
-    # E3: an owner-approved rule may reroute a fresh offer, or add one hint line (it then wins over the
+    # E3: an developer-approved rule may reroute a fresh offer, or add one hint line (it then wins over the
     # other context line: it's about the move Buddy is making right now).
     reroute, hint, rule = (echo.adapt(known, step.state, step.stage, flow.FRAMEWORKS[step.state].tiny)
                            if step.modifier is None else (None, None, None))

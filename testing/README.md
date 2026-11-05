@@ -11,7 +11,7 @@ testing/
   GRADING.md         the grading rules: how to score each reply by hand
   evals/
     run.py           conversation eval: scripted chats through the real app, mechanical checks, report
-    scenarios.py     the scripted conversations (3 per chip), with the owner's dream lines
+    scenarios.py     the scripted conversations (3 per chip), with the developer's dream lines
     read_eval.py     read-call eval: does Buddy read each user message right? (idk / answer / own_plan ...)
     read_cases.py    the labeled messages for the read eval
   grading/

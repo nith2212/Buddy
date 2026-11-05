@@ -766,7 +766,7 @@ def test_own_plan_person_is_asked_for_theirs_first_and_can_still_ask_buddy(api, 
     assert say(api, h, t, "nah")["intervention"] == "perfectionism:offer"
     assert flow_of(db, t)["adapt"] == "own_plan_first"
     assert "they usually have their own plan" in system_of(fake.write_calls[-1])
-    # owner: if they'd rather have Buddy's move, Buddy suggests as usual
+    # developer: if they'd rather have Buddy's move, Buddy suggests as usual
     assert say(api, h, t, "hmm you say")["intervention"] == "perfectionism:reframe"
     assert flow_of(db, t)["adapt"] is None
 

@@ -46,7 +46,7 @@ def test_mechanical_flags():
     assert "repeats_earlier" in mechanical("Open the folder now.", ["Open the folder now!"], False)
     assert mechanical("Love that plan, I'm here.", [], True) == []
     assert mechanical("Love that plan, ready?", [], True) == ["question_in_release"]
-    # warm reactions in the owner's voice are fine
+    # warm reactions in the developer's voice are fine
     assert mechanical("I get it! A cat sanctuary sounds great.", [], False) == []
 
 

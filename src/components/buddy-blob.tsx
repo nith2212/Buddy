@@ -1,4 +1,4 @@
-// Buddy: the soft white "dumpling" blob (owner's drawing). The body wobbles like an amoeba and the
+// Buddy: the soft white "dumpling" blob (developer's drawing). The body wobbles like an amoeba and the
 // eyes blink; both stop when the phone asks for reduced motion. Three moods:
 //   default  round eyes, small smile (loading, chat, menu)
 //   happy    ^ ^ eyes, little open mouth (Echoes, wins)

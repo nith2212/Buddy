@@ -2,7 +2,7 @@
 # (the FastAPI app on a throwaway SQLite DB) against real Groq, scored three ways:
 #   1. mechanical checks on every reply (the target rules, independent of how the code is built)
 #   2. a rubric graded by a bigger model, from state_frameworks.md
-#   3. a markdown report the owner reads, with the dream version next to each transcript
+#   3. a markdown report the developer reads, with the dream version next to each transcript
 #
 # From the repo root (buddy/), see testing/README.md:
 #   backend/venv/bin/python -m testing.evals.run                      # all scenarios, current GROQ_MODEL
@@ -38,7 +38,7 @@ DEFAULT_GRADER = "openai/gpt-oss-120b"
 # ── mechanical checks (the target rules from CLAUDE.md / state_frameworks.md) ─────────────
 MAX_SENTENCES = 3
 _SENTENCE_END = re.compile(r"[.!?]+(?:\s+|$)")
-# The owner's voice allows warm reactions; these stay banned: therapy phrases, promises, pressure.
+# The developer's voice allows warm reactions; these stay banned: therapy phrases, promises, pressure.
 _BANNED = re.compile(
     r"\bi hear you\b|\bit['’]?s (?:totally |completely |perfectly )?(?:okay|ok) to feel\b|\bunderstandable\b"
     r"|\btrust me\b|\beasily fixed\b|\brelax\b|\bbuckle up\b|\bcalm down\b",
@@ -327,7 +327,7 @@ def write_report(path: Path, meta: dict, results: list[dict], summary: dict) -> 
                 out += [f"> - ⚠ {n}" for n in notes]
             out.append("")
         if res.get("dream"):
-            out += ["<details><summary>Dream version (the owner's reference)</summary>", ""]
+            out += ["<details><summary>Dream version (the developer's reference)</summary>", ""]
             for i, line in enumerate(res["dream"]):
                 user = res["user_lines"][i - 1] if i >= 1 and i - 1 < len(res["user_lines"]) else None
                 if user:

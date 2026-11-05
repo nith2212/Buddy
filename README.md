@@ -40,7 +40,7 @@ invent anything:
 - what you did with each of Buddy's suggestions (took it, brought your own plan, said no)
 - whether progress followed within a day
 
-A few owner-approved rules let Buddy adapt once a pattern shows up three or more times. For example, if you
+A few developer-approved rules let Buddy adapt once a pattern shows up three or more times. For example, if you
 usually bring your own plan, Buddy asks for yours first. Buddy never quotes these numbers back to you.
 
 **5. A kind weekly report.** The Echoes page shows only earned, non-shaming things:
@@ -93,7 +93,7 @@ If the model fails, a canned reply goes out instead of an error.
 src/                 the app: screens in src/app, the hand-drawn components in src/components
 backend/             FastAPI app: auth, tasks, chat, notifications, cron
 backend/brain/       conversation engine (flow.py, agent.py), reply checks, Echo, model adapter
-backend/brain/buddy_docs/   the playbook: per-cause framework wording, reviewed by the owner
+backend/brain/buddy_docs/   the playbook: per-cause framework wording, reviewed by the developer
 backend/tests/       unit tests (fake model, no network)
 testing/             evals against the real model, hand-grading kit, Echo dev report
 scripts/             make_icons.py draws the app icon, splash and favicon from Buddy's vector art

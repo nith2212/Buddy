@@ -1,4 +1,4 @@
-// The hand-drawn look (owner-approved mockup, 2026-11-05): the "Dusk" palette, ink outlines,
+// The hand-drawn look (developer-approved mockup, 2026-11-05): the "Dusk" palette, ink outlines,
 // slightly uneven corners and offset shadows. Light only for now.
 
 import type { ViewStyle } from 'react-native';

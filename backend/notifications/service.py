@@ -73,7 +73,7 @@ TITLE_IN_BODY = 60  # characters of the task title shown in a check-in
 
 def checkin_body(title: str | None) -> str:
     """Name the task: a check-in that doesn't say which task gets ignored (and Echo counts it as ignored).
-    The title leaves our server via Expo's and Google's push services (owner OK, 2026-11-04)."""
+    The title leaves our server via Expo's and Google's push services (developer OK, 2026-11-04)."""
     title = " ".join((title or "").split())
     if not title:
         return "How's your task going today?"
