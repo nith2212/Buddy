@@ -25,21 +25,37 @@ const AnimatedEllipse = Animated.createAnimatedComponent(Ellipse);
 const AnimatedCircle = Animated.createAnimatedComponent(Circle);
 
 // Three body outlines with the same commands (M + 4 curves), so the wobble is a plain number blend.
-const SHAPES = [
-  [80, 14, 121, 12, 149, 32, 151, 62, 153, 91, 131, 108, 82, 108, 35, 108, 9, 95, 9, 64, 9, 32, 39, 16, 80, 14],
-  [78, 10, 124, 12, 152, 36, 150, 64, 148, 94, 126, 110, 80, 110, 38, 110, 12, 92, 11, 62, 10, 30, 36, 8, 78, 10],
-  [82, 15, 118, 10, 147, 28, 152, 60, 156, 90, 134, 112, 84, 107, 33, 106, 6, 98, 8, 66, 10, 34, 42, 19, 82, 15],
-];
-const SKETCH = 'M82 11 C123 13 147 34 149 60 C151 92 128 110 80 106 C37 106 11 93 12 62 C13 33 41 13 82 11 Z';
-const WOBBLE_MS = 4200;
+// They live INSIDE a worklet: a module-level array captured by the animation turned up undefined on
+// the UI thread (phone test 2026-11-05), which crashed the frame loop and froze the loading screen.
+const POINTS = 26;
 
-function outline(n: number[]): string {
+function shapePoint(shape: number, k: number): number {
   'worklet';
-  const p = (i: number) => n[i].toFixed(1);
-  let d = `M${p(0)} ${p(1)}`;
-  for (let i = 2; i < 26; i += 6) d += ` C${p(i)} ${p(i + 1)} ${p(i + 2)} ${p(i + 3)} ${p(i + 4)} ${p(i + 5)}`;
+  const S0 = [80, 14, 121, 12, 149, 32, 151, 62, 153, 91, 131, 108, 82, 108, 35, 108, 9, 95, 9, 64, 9, 32, 39, 16, 80, 14];
+  const S1 = [78, 10, 124, 12, 152, 36, 150, 64, 148, 94, 126, 110, 80, 110, 38, 110, 12, 92, 11, 62, 10, 30, 36, 8, 78, 10];
+  const S2 = [82, 15, 118, 10, 147, 28, 152, 60, 156, 90, 134, 112, 84, 107, 33, 106, 6, 98, 8, 66, 10, 34, 42, 19, 82, 15];
+  return (shape === 0 ? S0 : shape === 1 ? S1 : S2)[k];
+}
+
+/** The body outline `s` (0..1) of the way from shape `from` to the next one. */
+function blendedOutline(from: number, s: number): string {
+  'worklet';
+  const to = (from + 1) % 3;
+  const n: number[] = [];
+  for (let k = 0; k < POINTS; k++) {
+    const a = shapePoint(from, k);
+    n.push(a + (shapePoint(to, k) - a) * s);
+  }
+  let d = `M${n[0].toFixed(1)} ${n[1].toFixed(1)}`;
+  for (let i = 2; i < POINTS; i += 6) {
+    d += ` C${n[i].toFixed(1)} ${n[i + 1].toFixed(1)} ${n[i + 2].toFixed(1)} ${n[i + 3].toFixed(1)} ${n[i + 4].toFixed(1)} ${n[i + 5].toFixed(1)}`;
+  }
   return d + ' Z';
 }
+
+const REST_OUTLINE = 'M80 14 C121 12 149 32 151 62 C153 91 131 108 82 108 C35 108 9 95 9 64 C9 32 39 16 80 14 Z';
+const SKETCH = 'M82 11 C123 13 147 34 149 60 C151 92 128 110 80 106 C37 106 11 93 12 62 C13 33 41 13 82 11 Z';
+const WOBBLE_MS = 4200;
 
 export type Mood = 'default' | 'happy' | 'worried';
 
@@ -76,9 +92,7 @@ export function BuddyBlob({ width, mood = 'default', animated = true, label = 'B
     const i = Math.min(2, Math.floor(t));
     const f = t - i;
     const s = f * f * (3 - 2 * f); // ease in-out
-    const a = SHAPES[i];
-    const b = SHAPES[(i + 1) % 3];
-    return { d: outline(a.map((v, k) => v + (b[k] - v) * s)) };
+    return { d: blendedOutline(i, s) };
   });
   // one set of animated props per element (each animated component gets its own)
   const leftEye = useAnimatedProps(() => ({ ry: (mood === 'worried' ? 10 : 7) * blink.value }));
@@ -89,7 +103,7 @@ export function BuddyBlob({ width, mood = 'default', animated = true, label = 'B
   return (
     <View accessible accessibilityRole="image" accessibilityLabel={label} style={[{ width, height }, style]}>
       <Svg width={width} height={height} viewBox="0 0 160 120">
-        <AnimatedPath animatedProps={bodyProps} d={outline(SHAPES[0])} fill="#FFFFFF" stroke={Ink} strokeWidth={stroke} strokeLinejoin="round" />
+        <AnimatedPath animatedProps={bodyProps} d={REST_OUTLINE} fill="#FFFFFF" stroke={Ink} strokeWidth={stroke} strokeLinejoin="round" />
         {width >= 80 ? <Path d={SKETCH} fill="none" stroke={Ink} strokeWidth={stroke * 0.45} strokeOpacity={0.55} /> : null}
 
         {mood === 'default' ? (
