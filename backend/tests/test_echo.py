@@ -429,3 +429,23 @@ def test_profile_sums_saved_weeks_and_this_week_so_far(api, db):
     assert echo.adapt(prof, "perfectionism", "offer", "reframe")[2] == "own_plan_first"
     other, _ = register(api)
     assert echo.profile(db, other, now) == {}
+
+
+def test_last_week_comes_from_the_sunday_save_and_stays_kind(api, db):
+    uid, _ = register(api)
+    t = add_task(db, uid, created=START - timedelta(days=3))
+    tap(db, t, START + timedelta(days=2), "afraid")
+    tick(db, t, START + timedelta(days=2, hours=1))
+    checkin(db, t, START + timedelta(days=3))                       # ignored: never shown
+    monday = END + timedelta(hours=10)
+    assert echo.this_week(db, uid, monday)["last_week"] is None     # not saved yet
+    assert echo.run_echo(db, uid, END + timedelta(minutes=5)) == "saved"
+    page = echo.this_week(db, uid, monday)
+    last = page["last_week"]
+    assert last["wins"] == {"tasks_finished": 0, "steps_done": 1, "started_when_hard": 1}
+    assert last["line"] == "You got going once last week, even when it felt hard."
+    assert [d["date"] for d in last["days"]][0] == "2026-11-02" and len(last["days"]) == 7
+    assert sum(d["active"] for d in last["days"]) == 2   # the tap Tue 23:00, the tick just after midnight
+    assert page["first_week"] is False
+    text = json.dumps(page).lower()
+    assert not any(w in text for w in ("ignor", "untouched", "postpone", "checkin", "check-in", "%"))

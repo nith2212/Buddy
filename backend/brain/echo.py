@@ -358,6 +358,7 @@ MOVE_TEXT = {
     "offer": "going with your own plan",
 }
 QUIET_LINE = "Quiet week. That's okay, I'm here whenever you're ready."
+QUIET_LAST_WEEK = "A quiet week. That's okay, rest counts too."
 
 
 def _times(n: int) -> str:
@@ -368,16 +369,16 @@ def _plural(n: int, word: str) -> str:
     return f"{n} {word}{'' if n == 1 else 's'}"
 
 
-def week_line(finished: int, steps: int, started: int, days: int) -> str:
+def week_line(finished: int, steps: int, started: int, days: int, when: str = "this week") -> str:
     if finished:
-        return f"You finished {_plural(finished, 'task')} this week! That's real progress."
+        return f"You finished {_plural(finished, 'task')} {when}! That's real progress."
     if started:
-        return f"You got going {_times(started)} this week, even when it felt hard."
+        return f"You got going {_times(started)} {when}, even when it felt hard."
     if steps:
-        return f"You ticked off {_plural(steps, 'step')} this week. Every one counts."
+        return f"You ticked off {_plural(steps, 'step')} {when}. Every one counts."
     if days:
-        return f"You showed up {_plural(days, 'day')} this week. That counts."
-    return QUIET_LINE
+        return f"You showed up {_plural(days, 'day')} {when}. That counts."
+    return QUIET_LINE if when == "this week" else QUIET_LAST_WEEK
 
 
 def _helped(db: Session, user_id: str, this_week: dict) -> list[dict]:
@@ -409,35 +410,64 @@ def _helped(db: Session, user_id: str, this_week: dict) -> list[dict]:
     return out
 
 
+def _week_days(start: datetime, active: set[str]) -> list[dict]:
+    """Mon..Sun of the week that starts at `start` (Sunday 23:00 India time), active or not."""
+    first_day = start.astimezone(WEEK_TZ).date() + timedelta(days=1)   # the week's Monday
+    days = [(first_day + timedelta(days=i)).isoformat() for i in range(7)]
+    # Sunday 23:00-24:00 belongs to the new week but has the old Sunday's date: show it on Monday.
+    if (first_day - timedelta(days=1)).isoformat() in active:
+        active = active | {days[0]}
+    return [{"date": d, "active": d in active} for d in days]
+
+
+def _last_week(db: Session, user_id: str, start: datetime) -> Optional[dict]:
+    """The week that ended at `start`, from the row the Sunday cron saved (None if it saved none)."""
+    row = db.execute(select(Memory).where(Memory.user_id == user_id, Memory.key == KEY_PREFIX + week_id(start))
+                     ).scalars().first()
+    if row is None:
+        return None
+    try:
+        facts = json.loads(row.value)
+    except (TypeError, ValueError):
+        return None
+    days = _week_days(start - timedelta(days=7), set(facts.get("days_active", [])))
+    finished = int(facts.get("tasks_finished", 0))
+    steps = int(facts.get("steps_done", 0))
+    started = int(facts.get("started_after_tap", 0))
+    shown = sum(1 for d in days if d["active"])
+    return {
+        "days": days,
+        "wins": {"tasks_finished": finished, "steps_done": steps, "started_when_hard": started},
+        "line": week_line(finished, steps, started, shown, when="last week"),
+    }
+
+
 def this_week(db: Session, user_id: str, now: datetime) -> dict:
     """The user's Echo page: this week so far (since Sunday 23:00 India time)."""
     _, start = week_window(now)
     now = as_utc(now)
-    first_day = start.astimezone(WEEK_TZ).date() + timedelta(days=1)   # the week's Monday
-    days = [(first_day + timedelta(days=i)).isoformat() for i in range(7)]
 
     facts = week_facts(db, user_id, start, now)
     all_tasks = db.execute(select(Task).where(Task.user_id == user_id)).scalars().all()
     touches, _ = _touches(db, user_id, list(all_tasks)) if all_tasks else ({}, [])
     ever = {_local_day(d) for ds in touches.values() for d in ds}
 
-    active = set(facts["days_active"]) if facts else set()
-    # Sunday 23:00-24:00 belongs to the new week but has the old Sunday's date: show it on Monday.
-    if (first_day - timedelta(days=1)).isoformat() in active:
-        active.add(days[0])
+    days = _week_days(start, set(facts["days_active"]) if facts else set())
     finished = facts["tasks_finished"] if facts else 0
     steps = facts["steps_done"] if facts else 0
     started = facts["started_after_tap"] if facts else 0
-    shown = sum(1 for d in days if d in active)
+    shown = sum(1 for d in days if d["active"])
     saved = db.execute(select(Memory.id).where(Memory.user_id == user_id, Memory.key.startswith(KEY_PREFIX))).first()
     return {
         "week_start": start.isoformat(),
         "first_week": saved is None,   # no weekly Echo saved yet: the page says the first one comes Monday
-        "days": [{"date": d, "active": d in active} for d in days],
+        "days": days,
         "total_days": len(ever),   # only ever goes up
         "wins": {"tasks_finished": finished, "steps_done": steps, "started_when_hard": started},
         "line": week_line(finished, steps, started, shown),
         "helped": _helped(db, user_id, facts["reactions"] if facts else {}),
+        # the week that just ended (saved Sunday 23:00), so Monday has a real report; None until then
+        "last_week": _last_week(db, user_id, start),
     }
 
 

@@ -20,14 +20,18 @@ export type ChatTurn = { role: 'user' | 'assistant'; content: string };
 export type BuddyReply = { reply: string; state: string | null; intervention: string | null };
 
 // GET /echo/week (backend brain/echo.py "The user's Echo page"): kind, earned things only.
-export type EchoWeek = {
-  week_start: string;
-  first_week: boolean; // no weekly Echo saved yet: the first one comes Monday
+export type EchoWeekSummary = {
   days: { date: string; active: boolean }[];
-  total_days: number;
   wins: { tasks_finished: number; steps_done: number; started_when_hard: number };
   line: string;
+};
+
+export type EchoWeek = EchoWeekSummary & {
+  week_start: string;
+  first_week: boolean; // no weekly Echo saved yet: the first one comes Monday
+  total_days: number;
   helped: { cause: string; move: string; times: number; text: string }[];
+  last_week: EchoWeekSummary | null; // saved by the Sunday 23:00 cron; null until the first one
 };
 
 export class ApiError extends Error {
