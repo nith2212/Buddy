@@ -228,3 +228,152 @@ def test_local_report_runs_on_the_demo_week(db):
     text = echo_report.report(db, last_week=True)
     assert "Prepare client report" in text and "Buddy's line: Context, never mention it" in text
     assert db.query(models.Memory).filter(models.Memory.key.startswith("echo.")).count() == 0  # read-only
+
+
+# ── E2: how they react to Buddy's moves ───────────────────────────────────────────
+
+def buddy(db, task, at, state, stage, read=None):
+    """One Buddy framework reply, with the reading of the user message it answered."""
+    flow = {"state": state, "stage": stage, "tries": 1, "read": None if read is None else {"kind": read}}
+    db.add(models.Message(user_id=task.user_id, task_id=task.id, role="assistant", content="(reply)",
+                          reasoning=json.dumps({"flow": flow}), created_at=at))
+    db.commit()
+
+
+def tick(db, task, at):
+    db.add(models.Subtask(user_id=task.user_id, task_id=task.id, title="a step", done=True,
+                          created_at=at, updated_at=at))
+    db.commit()
+
+
+def test_a_tiny_move_they_took_and_the_progress_after_it(api, db):
+    uid, _ = register(api)
+    t = add_task(db, uid, created=START - timedelta(days=3))
+    at = START + timedelta(days=2)
+    buddy(db, t, at, "overwhelm", "open")
+    buddy(db, t, at + timedelta(minutes=1), "overwhelm", "micro", read="idk")
+    buddy(db, t, at + timedelta(minutes=2), "overwhelm", "micro", read="answer")   # "that's all?": same move
+    buddy(db, t, at + timedelta(minutes=3), "overwhelm", "release", read="accept")
+    tick(db, t, at + timedelta(hours=5))
+    r = echo.week_facts(db, uid, START, END)["reactions"]
+    assert r["too_much.tiny_move"]["offered"] == 1                      # counted once, judged on the last time
+    assert r["too_much.tiny_move"]["took"] == 1 and r["too_much.tiny_move"]["progress_after"] == 1
+    assert r["too_much.asked_their_step"]["idk"] == 1                   # "what's the smallest first move?" -> idk
+
+
+def test_own_plans_offers_and_silence(api, db):
+    uid, _ = register(api)
+    t = add_task(db, uid, created=START - timedelta(days=3))
+    at = START + timedelta(days=1)
+    buddy(db, t, at, "perfectionism", "offer")
+    buddy(db, t, at + timedelta(minutes=1), "perfectionism", "release", read="own_plan")
+    buddy(db, t, at + timedelta(days=1), "fatigue", "offer")
+    buddy(db, t, at + timedelta(days=1, minutes=1), "fatigue", "move", read="idk")      # "you say"
+    buddy(db, t, at + timedelta(days=3), "low_interest", "lighten")                      # never answered
+    buddy(db, t, at + timedelta(days=4), "perfectionism", "reframe")
+    buddy(db, t, at + timedelta(days=4, hours=13), "perfectionism", "release", read="accept")  # too late
+    r = echo.week_facts(db, uid, START, END)["reactions"]
+    assert (r["afraid.offer"]["own_plan"], r["tired.offer"]["wanted_move"]) == (1, 1)
+    assert r["tired.tiny_move"]["no_reply"] == 1
+    assert r["bored.lighter"]["no_reply"] == 1 and r["afraid.rough_version"]["no_reply"] == 1
+    assert all(row["progress_after"] == 0 for row in r.values())
+
+
+def test_moves_outside_the_week_and_other_users_are_not_counted(api, db):
+    a, _ = register(api)
+    b, _ = register(api)
+    ta = add_task(db, a, created=START - timedelta(days=10))
+    tb = add_task(db, b, created=START - timedelta(days=10))
+    buddy(db, ta, START - timedelta(days=1), "overwhelm", "micro")   # last week
+    buddy(db, tb, START + timedelta(days=1), "overwhelm", "micro")   # someone else
+    assert echo.week_facts(db, a, START, END)["reactions"] == {}
+
+
+def test_checkin_replies_and_days_active(api, db):
+    uid, _ = register(api)
+    t = add_task(db, uid, created=START - timedelta(days=10))
+    checkin(db, t, START + timedelta(days=1))
+    db.add_all([models.EmotionLog(user_id=uid, task_id=t.id, emotion="tired", chat_opt_in=True,
+                                  created_at=START + timedelta(days=1, hours=1)),
+                models.EmotionLog(user_id=uid, task_id=t.id, emotion="unclear", chat_opt_in=False,
+                                  created_at=START + timedelta(days=4))])
+    db.commit()
+    facts = echo.week_facts(db, uid, START, END)
+    assert facts["checkins"] == {"sent": 1, "ignored": 0, "chat_yes": 1, "chat_no": 1}
+    # India-time days (the check-in itself is not activity): Tue 3 Nov just after midnight, Thu 5 Nov
+    assert facts["days_active"] == ["2026-11-03", "2026-11-05"]
+
+
+# ── the user's Echo page: GET /echo/week ─────────────────────────────────────────
+
+PAGE_NOW = END + timedelta(days=3)   # Wednesday of the week after END
+PAGE_START = END
+
+
+def test_page_shows_wins_days_and_a_kind_line(api, db):
+    uid, _ = register(api)
+    t = add_task(db, uid, created=PAGE_START - timedelta(days=10))
+    tap(db, t, PAGE_START + timedelta(days=1), "too_much")
+    tick(db, t, PAGE_START + timedelta(days=1, hours=2))           # got going after the tap
+    page = echo.this_week(db, uid, PAGE_NOW)
+    assert page["wins"] == {"tasks_finished": 0, "steps_done": 1, "started_when_hard": 1}
+    assert page["line"] == "You got going once this week, even when it felt hard."
+    assert [d["date"] for d in page["days"]][0] == "2026-11-09" and len(page["days"]) == 7   # Mon..Sun
+    # the tap is Monday 23:00 India time, the tick 2 hours later is Tuesday
+    assert [d["active"] for d in page["days"]] == [True, True, False, False, False, False, False]
+    assert page["total_days"] == 3                     # plus the day the task was made
+
+
+def test_page_never_shows_ignores_untouched_days_or_postpones(api, db):
+    uid, h = register(api)
+    t = add_task(db, uid, created=PAGE_START - timedelta(days=30))
+    for d in (1, 2):
+        checkin(db, t, PAGE_START + timedelta(days=d))
+    db.add(models.Event(user_id=uid, task_id=t.id, type="postponed", created_at=PAGE_START + timedelta(days=1)))
+    db.commit()
+    page = echo.this_week(db, uid, PAGE_NOW)
+    text = json.dumps(page).lower()
+    assert not any(w in text for w in ("ignor", "untouched", "postpone", "checkin", "check-in", "%"))
+    assert page["line"] == echo.QUIET_LINE
+    assert api.get("/echo/week", headers=h).status_code == 200
+
+
+def test_page_says_what_helped_only_for_causes_confirmed_three_times(api, db):
+    uid, _ = register(api)
+    t = add_task(db, uid, created=PAGE_START - timedelta(days=10))
+    at = PAGE_START + timedelta(days=1)
+    buddy(db, t, at, "perfectionism", "reframe")
+    buddy(db, t, at + timedelta(minutes=1), "perfectionism", "release", read="accept")
+    tick(db, t, at + timedelta(hours=3))
+    db.add(models.Memory(user_id=uid, key="pattern.blocker.afraid", value="2"))
+    db.commit()
+    assert echo.this_week(db, uid, PAGE_NOW)["helped"] == []        # not earned yet
+    db.query(models.Memory).filter_by(key="pattern.blocker.afraid").one().value = "3"
+    db.commit()
+    helped = echo.this_week(db, uid, PAGE_NOW)["helped"]
+    assert helped == [{"cause": "afraid", "move": "rough_version", "times": 1,
+                       "text": "Worrying it won't be good enough has come up a few times. "
+                               "A rough first version helped you get going once."}]
+
+
+def test_declined_moves_never_count_as_helped(api, db):
+    uid, _ = register(api)
+    t = add_task(db, uid, created=PAGE_START - timedelta(days=10))
+    at = PAGE_START + timedelta(days=1)
+    buddy(db, t, at, "low_interest", "lighten")
+    buddy(db, t, at + timedelta(minutes=1), "low_interest", "offer", read="reject")
+    tick(db, t, at + timedelta(hours=3))
+    db.add(models.Memory(user_id=uid, key="pattern.blocker.bored", value="5"))
+    db.commit()
+    assert echo.this_week(db, uid, PAGE_NOW)["helped"] == []
+
+
+def test_page_is_only_the_callers_and_works_with_no_tasks(api, db):
+    a, ha = register(api)
+    b, hb = register(api)
+    t = add_task(db, b, created=datetime.now(UTC) - timedelta(days=1), status="done", completed=datetime.now(UTC))
+    assert api.get("/echo/week").status_code == 401
+    mine = api.get("/echo/week", headers=ha).json()
+    assert mine["wins"] == {"tasks_finished": 0, "steps_done": 0, "started_when_hard": 0}
+    assert mine["total_days"] == 0 and mine["line"] == echo.QUIET_LINE and mine["helped"] == []
+    assert api.get("/echo/week", headers=hb).json()["wins"]["tasks_finished"] == 1

@@ -10,6 +10,7 @@ from auth import router as auth_router
 from chat import router as chat_router
 from cron import router as cron_router
 from db import Base, engine
+from echo_routes import router as echo_router
 from me import router as me_router
 from notifications.router import router as notifications_router
 from tasks import router as tasks_router
@@ -41,3 +42,6 @@ app.include_router(cron_router)
 
 # Chat with Buddy: POST /chat, POST /initiate, GET /chat/history.
 app.include_router(chat_router)
+
+# The user's Echo page: GET /echo/week (read-only).
+app.include_router(echo_router)

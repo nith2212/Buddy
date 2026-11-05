@@ -45,6 +45,14 @@ def seed_demo(db) -> None:
     db.add(models.Memory(user_id=user.id, key=f"blocker.task.{app.id}", value="afraid", updated_at=start + timedelta(days=5)))
     db.add(models.Memory(user_id=user.id, key="pattern.blocker.afraid", value="3"))
     db.add(models.Event(user_id=user.id, task_id=report.id, type="postponed", created_at=start + timedelta(days=2)))
+    # E2: a chat on the app task: asked for a rough version, they took it and ticked a step that evening
+    at = start + timedelta(days=5, minutes=5)
+    for i, (stage, read) in enumerate([("open", None), ("reframe", "confirm"), ("release", "accept")]):
+        flow = {"state": "perfectionism", "stage": stage, "read": read and {"kind": read}}
+        db.add(models.Message(user_id=user.id, task_id=app.id, role="assistant", content="(reply)",
+                              reasoning=json.dumps({"flow": flow}), created_at=at + timedelta(minutes=i)))
+    db.add(models.Subtask(user_id=user.id, task_id=app.id, title="rough draft of the swipe screen", done=True,
+                          created_at=at, updated_at=at + timedelta(hours=4)))
     db.commit()
 
 
@@ -73,6 +81,14 @@ def report(db, last_week: bool) -> str:
         out.append(f"cause totals so far: {facts['cause_totals'] or 'none'}")
         out.append(f"reasons tapped: {facts['reasons_tapped'] or 'none'}")
         out.append(f"finished: {facts['tasks_finished']} task(s), {facts['steps_done']} step(s)")
+        out.append(f"days active: {len(facts.get('days_active', []))} {facts.get('days_active', [])}")
+        c = facts.get("checkins", {})
+        out.append(f"check-ins: {c.get('sent', 0)} sent, {c.get('ignored', 0)} ignored, "
+                   f"chat yes {c.get('chat_yes', 0)} / no {c.get('chat_no', 0)}")
+        out.append("reactions to Buddy's moves:" if facts.get("reactions") else "reactions to Buddy's moves: none")
+        for move, row in sorted(facts.get("reactions", {}).items()):
+            parts = ", ".join(f"{k} {v}" for k, v in row.items() if v and k not in ("offered", "progress_after"))
+            out.append(f"  - {move}: offered {row['offered']} ({parts}); progress within a day {row['progress_after']}")
         for t in facts["open_tasks"]:
             out.append(f"- \"{titles.get(t['id'])}\": untouched {t['days_untouched']} day(s), check-ins "
                        f"{t['checkins_ignored']}/{t['checkins_sent']} ignored, postponed {t['postponed']}x")
