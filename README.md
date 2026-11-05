@@ -164,3 +164,8 @@ The app reads `EXPO_PUBLIC_API_URL` and `EXPO_PUBLIC_INVITE_CODE`. New native mo
 - **A small fine-tuned model** that holds Buddy's voice, trained only on Buddy's own consented conversations and
   measured against the eval suite.
 - **Dark mode** for the hand-drawn theme.
+
+## License
+
+Copyright © 2026 Nithyasri Sukumaran. All rights reserved. The code and the Buddy character are shared
+for viewing only; see [LICENSE](LICENSE).
