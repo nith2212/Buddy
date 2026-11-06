@@ -57,6 +57,8 @@ Sprint timer, check-back commitments, firmness levels, escalation, onboarding, a
 - Eval system: scripted conversations per reason and state, scored for reply rules (reply_check) and for the cause-then-move order, run against the real model before changing prompts or docs. Also track whether confirmed causes match what the user said.
 - Fine-tuning: LoRA-tune a small open model (about 8B) on Buddy's own conversations (the developer's dream scripts plus consented real chats) so a cheap model holds the voice. Not on public therapy/counseling datasets: they push toward therapy-speak and raise consent issues. Only after the eval system exists, so the gain can be measured against prompt-only.
 
+- EAS Update (`expo-updates`) at the next APK rebuild, so app fixes reach testers without a reinstall. Also iPhone testing options. Details and current status (friends testing the preview APK from 2026-11-06, dev → main after testing) are in .github/copilot-instructions.md, section 7.
+
 ## Data and privacy (non-negotiable)
 - user_id on every table. No hardcoded users.
 - Identity comes ONLY from the Bearer token. Never from the body, URL or in-message text.

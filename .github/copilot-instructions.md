@@ -261,7 +261,12 @@ Env vars: `INVITE_CODE`, `CRON_SECRET`, `GROQ_MODEL=claude-haiku-5-5`, `ANTHROPI
   a push alone does not deploy.
 - **App:** the EAS env var `GOOGLE_SERVICES_JSON` is a secret file, used by `app.config.js`.
 - **A standalone build** (`--profile preview`) also needs `EXPO_PUBLIC_API_URL` and `EXPO_PUBLIC_INVITE_CODE`
-  set in the EAS preview environment. They aren't set yet.
+  set in the EAS preview environment. Both are set (2026-11-06). Without them, the APK falls back to
+  `localhost:8000` and can't reach the server.
+- **When a new APK is needed:** a backend change only needs a Render deploy, since every phone talks to the
+  server. **Any** app change (any file in `src/`, even a typo) needs a new APK, and testers reinstall it,
+  because the APK carries a frozen copy of the JS. The dev build is different: it loads JS from Metro, so it
+  only needs a rebuild for new native dependencies.
 
 **Git**
 - Work on `dev`. `main` is updated through a dev → main PR.
@@ -316,9 +321,26 @@ Env vars: `INVITE_CODE`, `CRON_SECRET`, `GROQ_MODEL=claude-haiku-5-5`, `ANTHROPI
      - a `Card` with a title input and the due-date `Chip`s
      - "save" (`tone="pop"`) and "delete task" (`tone="plain"`, behind an `Alert` confirm)
      - Add `deleteTask` and an extended `updateTask` to `src/lib/api.ts`.
-3. **Standalone preview APK** for the final test: set the two `EXPO_PUBLIC_*` vars in EAS "preview", then
-   `npx eas-cli build -p android --profile preview`.
-4. **After that**, in no particular order: Google sign-in (Expo auth + Google ID-token check on the backend,
+3. **Standalone preview APK:** the first one was built on 2026-11-06 (Render deployed from `dev` first) and
+   goes to Android friends for weekend testing. On Monday Nov 9 their Echo shows a real "last week".
+   - **While friends test, deploy only for fixes.** Every deploy restarts the server, and anything
+     half-finished on `dev` reaches their phones.
+   - **After testing (Nov 9–11):** merge `dev` → `main` with a PR, then switch Render's deploy branch to
+     `main`, so `main` = what's live.
+4. **EAS Update, at the next APK rebuild** (developer's call, 2026-11-06). Add `expo-updates` (a new
+   dependency: ask first), run `eas update:configure`, then build one more APK. After that, app-code fixes
+   reach installed APKs over the air with `eas update`, and testers don't reinstall. Native changes still
+   need a new build. Don't cancel a running build just for this; add it when a rebuild is needed anyway.
+5. **iPhone testers.** There's no APK-style install on iOS. The options:
+   - **TestFlight:** needs an Apple Developer account ($99 a year).
+   - **Expo Go + `npx expo start --tunnel`:** free. All the deps are standard Expo modules, so it should
+     run, but only while the developer's laptop serves it, and push notifications probably won't work.
+   - **Possibly Expo Go loading an EAS Update** (no laptop needed): unverified for SDK 57, so try it once
+     EAS Update exists.
+   - **A web build is parked** (web frontend and a second deployment are both on the parked list). It would
+     need CORS on the backend, a web fallback for `expo-secure-store` in `use-auth.ts`, notification guards,
+     and static hosting.
+6. **After that**, in no particular order: Google sign-in (Expo auth + Google ID-token check on the backend,
    linking the current anonymous user), the "talk about my week" reflection chat, per-user time zones for
    Echo, exact citations in the playbook, and dark mode.
 
