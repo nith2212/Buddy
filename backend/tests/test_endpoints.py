@@ -197,3 +197,11 @@ def test_delete_me_wipes_caller_only(api, users, db):
     # A's token no longer works; B's still does.
     assert api.get("/tasks", headers=a_h).status_code == 401
     assert api.get("/tasks", headers=b_h).status_code == 200
+
+
+# ── keep-warm ping ──────────────────────────────────────────────────────────
+
+def test_health_is_public_and_cheap(api):
+    r = api.get("/health")
+    assert r.status_code == 200
+    assert r.json() == {"ok": True}

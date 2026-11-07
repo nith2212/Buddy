@@ -45,3 +45,10 @@ app.include_router(chat_router)
 
 # The user's Echo page: GET /echo/week (read-only).
 app.include_router(echo_router)
+
+
+# Keep-warm ping: cron-job.org calls this every 10 minutes during the day so Render's free server doesn't
+# fall asleep and make the hourly check-in cron time out. No auth and no database: it must stay cheap.
+@app.get("/health")
+def health():
+    return {"ok": True}
