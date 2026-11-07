@@ -205,3 +205,9 @@ def test_health_is_public_and_cheap(api):
     r = api.get("/health")
     assert r.status_code == 200
     assert r.json() == {"ok": True}
+
+
+def test_db_checks_connections_before_reuse():
+    # Neon drops idle connections when it sleeps; pre-ping swaps a dead one for a fresh one.
+    from db import engine
+    assert engine.pool._pre_ping is True

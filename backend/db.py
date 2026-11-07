@@ -14,6 +14,9 @@ engine = create_engine(
     DATABASE_URL,
     # SQLite requires this flag when used with FastAPI's threaded request handling.
     connect_args={"check_same_thread": False} if DATABASE_URL.startswith("sqlite") else {},
+    # Check a saved connection is still alive before reusing it. Neon's free plan sleeps after a few idle
+    # minutes and drops open connections; without this the next request fails on a dead one.
+    pool_pre_ping=True,
 )
 
 if DATABASE_URL.startswith("sqlite"):
