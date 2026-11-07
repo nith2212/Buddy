@@ -61,3 +61,8 @@ INTERVIEW_NOTES.md
 # Echo dev reports (hold task titles)
 testing/echo_reports/
 testing/grading/packets/
+
+# Developer-only notes and AI-assistant instructions: kept on the developer's Mac, not in the repo
+CLAUDE.md
+AGENTS.md
+.github/copilot-instructions.md
