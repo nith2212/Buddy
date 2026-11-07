@@ -31,6 +31,9 @@ def test_read_cases_are_labeled():
 
 
 def test_every_scenario_state_has_a_framework():
+    # docs/state_frameworks.md is a developer-only note (gitignored since 2026-11-07).
+    if not (Path(__file__).resolve().parents[2] / "docs" / "state_frameworks.md").exists():
+        pytest.skip("docs/state_frameworks.md is local-only")
     shared, states = load_frameworks()
     assert "Shared skeleton" in shared and "Example conversations" not in "".join(states.values())
     assert {s["state"] for s in SCENARIOS} <= set(states)
@@ -51,7 +54,11 @@ def test_mechanical_flags():
 
 
 def test_grading_rules_doc_names_every_criterion():
-    doc = (Path(__file__).resolve().parents[2] / "testing" / "GRADING.md").read_text()
+    # GRADING.md is a developer-only note (gitignored since 2026-11-07), so a fresh clone won't have it.
+    path = Path(__file__).resolve().parents[2] / "testing" / "GRADING.md"
+    if not path.exists():
+        pytest.skip("testing/GRADING.md is local-only")
+    doc = path.read_text()
     for key in CRITERIA:
         assert f"**{key}**" in doc
 

@@ -66,3 +66,8 @@ testing/grading/packets/
 CLAUDE.md
 AGENTS.md
 .github/copilot-instructions.md
+# Developer-only docs and eval write-ups (2026-11-07). A "documentation/" folder for readers comes later.
+# docs/buddy.svg stays tracked: the README shows it.
+docs/*.md
+testing/*.md
+testing/results/
