@@ -4,6 +4,7 @@
 #   GET    /tasks                               — list the caller's tasks, newest first (capped)
 #   GET    /tasks/{task_id}                     — one task with its subtasks
 #   PATCH  /tasks/{task_id}                      — edit title/due_date, or mark status
+#   DELETE /tasks/{task_id}                      — delete a task and everything about it, for good
 #   POST   /tasks/{task_id}/subtasks             — add a subtask
 #   PATCH  /tasks/{task_id}/subtasks/{subtask_id} — edit title and/or toggle done
 #   DELETE /tasks/{task_id}/subtasks/{subtask_id} — remove a subtask
@@ -19,12 +20,13 @@ from typing import Literal, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from pydantic import BaseModel, Field
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.orm import Session, selectinload
 
 from auth import current_user, owned_or_404
+from brain.echo import forget_task
 from db import get_db
-from models import Event, Subtask, Task, User
+from models import EmotionLog, Event, Memory, Message, Subtask, Task, User
 
 router = APIRouter(prefix="/tasks", tags=["tasks"])
 
@@ -143,6 +145,22 @@ def update_task(
     db.commit()
     db.refresh(task)
     return task
+
+
+@router.delete("/{task_id}", status_code=204)
+def delete_task(task_id: int, user: User = Depends(current_user), db: Session = Depends(get_db)):
+    """Delete a task and everything about it, in one transaction: its steps, chat, check-ins, tapped
+    reasons, the cause Buddy saved for it, and its row in Echo's saved weeks. There's no undo.
+    The person's own counts stay (pattern.blocker.*, Echo's weekly totals): they name no task."""
+    task = owned_or_404(db, Task, task_id, user)
+    # Children before the task, so foreign keys hold.
+    for model in (EmotionLog, Subtask, Event, Message):
+        db.execute(delete(model).where(model.user_id == user.id, model.task_id == task.id))
+    db.execute(delete(Memory).where(Memory.user_id == user.id, Memory.key == f"blocker.task.{task.id}"))
+    forget_task(db, user.id, task.id)
+    db.execute(delete(Task).where(Task.id == task.id, Task.user_id == user.id))
+    db.commit()
+    return Response(status_code=204)
 
 
 # ── Subtasks ─────────────────────────────────────────────────────────────────

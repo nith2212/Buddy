@@ -303,6 +303,23 @@ def run_echo(db: Session, user_id: str, now: datetime) -> str:
     return "saved"
 
 
+def forget_task(db: Session, user_id: str, task_id: int) -> None:
+    """A task was deleted: drop its row (open_tasks, by id) from every week Echo saved. Doesn't commit.
+    The week's totals stay: they're about the person, and name no task."""
+    rows = db.execute(select(Memory).where(Memory.user_id == user_id, Memory.key.startswith(KEY_PREFIX))
+                      ).scalars().all()
+    for row in rows:
+        try:
+            facts = json.loads(row.value)
+            tasks = facts["open_tasks"]
+        except (TypeError, ValueError, KeyError):
+            continue
+        kept = [t for t in tasks if t.get("id") != task_id]
+        if len(kept) != len(tasks):
+            facts["open_tasks"] = kept
+            row.value = json.dumps(facts)
+
+
 def latest(db: Session, user_id: str, now: datetime) -> Optional[dict]:
     """The newest saved week, if it's fresh enough to use."""
     rows = db.execute(select(Memory).where(Memory.user_id == user_id, Memory.key.startswith(KEY_PREFIX))

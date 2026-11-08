@@ -1,3 +1,5 @@
+import json
+
 import pytest
 from sqlalchemy import func, select
 
@@ -34,6 +36,7 @@ def make_task(api, headers, title="write report", **extra):
     ("post", "/tasks", {"title": "x"}),
     ("get", "/tasks", None),
     ("delete", "/me", None),
+    ("delete", "/tasks/1", None),
 ])
 def test_protected_endpoints_need_token(api, method, path, body):
     r = getattr(api, method)(path, **({"json": body} if body else {}))
@@ -255,6 +258,68 @@ def test_delete_me_wipes_caller_only(api, users, db):
     # A's token no longer works; B's still does.
     assert api.get("/tasks", headers=a_h).status_code == 401
     assert api.get("/tasks", headers=b_h).status_code == 200
+
+
+# ── delete a task ───────────────────────────────────────────────────────────
+
+def test_delete_task_removes_everything_about_it_and_nothing_else(api, users, db):
+    (a_id, a_h), (b_id, b_h) = users
+    gone, kept = make_task(api, a_h, "Lab report"), make_task(api, a_h, "Essay")
+    theirs = make_task(api, b_h, "Their task")
+    for uid, h, t in ((a_id, a_h, gone), (a_id, a_h, kept), (b_id, b_h, theirs)):
+        api.post("/checkin/action", json={"task_id": t, "stage": "emotion", "value": "afraid"}, headers=h)
+        db.add_all([
+            models.Subtask(user_id=uid, task_id=t, title="step 1"),
+            models.Event(user_id=uid, task_id=t, type="checkin_sent"),
+            models.Message(user_id=uid, task_id=t, role="user", content="hi"),
+            models.Memory(user_id=uid, key=f"blocker.task.{t}", value="afraid"),
+        ])
+    week = {"end": "2026-11-01T17:30:00+00:00", "checkins": {"sent": 3},
+            "open_tasks": [{"id": gone, "checkins_ignored": 2}, {"id": kept, "checkins_ignored": 0}]}
+    db.add_all([
+        models.Memory(user_id=a_id, key="pattern.blocker.afraid", value="2"),
+        models.Memory(user_id=a_id, key="echo.week.2026-11-01", value=json.dumps(week)),
+        models.Message(user_id=a_id, task_id=None, role="user", content="not about a task"),
+    ])
+    db.commit()
+    task_tables = [models.EmotionLog, models.Subtask, models.Event, models.Message]
+
+    def rows_of(t):
+        return {m.__tablename__: db.scalar(select(func.count()).select_from(m).where(m.task_id == t))
+                for m in task_tables}
+
+    before = {t: rows_of(t) for t in (gone, kept, theirs)}
+    assert all(n >= 1 for counts in before.values() for n in counts.values())
+    b_before = {m.__tablename__: count(db, m, b_id) for m in USER_TABLES}
+
+    assert api.delete(f"/tasks/{gone}", headers=a_h).status_code == 204
+
+    db.expire_all()
+    assert api.get(f"/tasks/{gone}", headers=a_h).status_code == 404
+    assert [t["id"] for t in api.get("/tasks", headers=a_h).json()] == [kept]
+    assert all(n == 0 for n in rows_of(gone).values())
+    assert rows_of(kept) == before[kept] and rows_of(theirs) == before[theirs]
+
+    memory = {r.key: r.value for r in db.query(models.Memory).filter_by(user_id=a_id)}
+    assert f"blocker.task.{gone}" not in memory and memory[f"blocker.task.{kept}"] == "afraid"
+    assert memory["pattern.blocker.afraid"] == "2"   # the person's own count stays; it names no task
+    saved = json.loads(memory["echo.week.2026-11-01"])
+    assert [t["id"] for t in saved["open_tasks"]] == [kept] and saved["checkins"] == {"sent": 3}
+    assert db.query(models.Message).filter_by(user_id=a_id, task_id=None).count() == 1
+    assert {m.__tablename__: count(db, m, b_id) for m in USER_TABLES} == b_before
+
+    # A check-in still sitting in the notification tray for the deleted task: nothing to act on.
+    r = api.post("/checkin/action", json={"task_id": gone, "stage": "task_state", "value": "done"}, headers=a_h)
+    assert r.status_code == 404
+
+
+def test_cannot_delete_someone_elses_task(api, users):
+    (_, a_h), (_, b_h) = users
+    theirs = make_task(api, b_h, "Their secret plan")
+    r = api.delete(f"/tasks/{theirs}", headers=a_h)
+    assert r.status_code == 404 and "secret" not in r.text
+    assert api.get(f"/tasks/{theirs}", headers=b_h).json()["title"] == "Their secret plan"
+    assert api.delete("/tasks/999999", headers=a_h).status_code == 404
 
 
 # ── keep-warm ping ──────────────────────────────────────────────────────────
