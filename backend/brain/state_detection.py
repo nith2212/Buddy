@@ -18,8 +18,8 @@ from sqlalchemy.orm import Session
 from models import Event, Subtask, Task
 
 # Each reason the user can tap maps straight to the playbook state it's designed for.
-# The first three are notification buttons (Android allows 3); "afraid" and "bored" are
-# in-app chips only. "avoidance" has no tap — see notifications/router.py — so it never
+# All five are notification buttons, in two sets because Android allows 3 per notification,
+# and in-app chips. "avoidance" has no tap — see notifications/router.py — so it never
 # appears here; it's silence-inferred only (IGNORED_STREAK_THRESHOLD below).
 EMOTION_TO_STATE = {
     "tired": "fatigue",

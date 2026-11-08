@@ -16,6 +16,7 @@ from auth import current_user, owned_or_404
 from brain.agent import run_turn
 from db import get_db
 from models import DeviceToken, EmotionLog, Task, User
+from notifications.service import quoted_title
 from tasks import _mark_done
 
 router = APIRouter()
@@ -34,7 +35,8 @@ class RegisterDeviceRequest(BaseModel):
 
 class CheckinActionRequest(BaseModel):
     task_id: int
-    stage: Literal["task_state", "emotion", "chat_opt_in"]  # Which step of the check-in flow.
+    # Which step of the check-in flow. "emotion_more" is the second set of reasons, behind "Something else".
+    stage: Literal["task_state", "emotion", "emotion_more", "chat_opt_in"]
     value: str  # The button value the user tapped.
 
 
@@ -71,47 +73,100 @@ def register_device(
 # POST /checkin/action
 # ---------------------------------------------------------------------------
 
-def _emotion_picker_response(task_id: int) -> dict[str, Any]:
-    """Returns the notification payload the client should re-present after task_state is submitted."""
+# The developer's wording (docs/notification_wording.md, approved 2026-11-08). Notifications sit on a public
+# lock screen, so they hint at a cause and never name it ("you're scared"). No guilt, no therapy phrases.
+# Button labels mirror the app's registered categories (src/lib/checkin-categories.ts), which draw them.
+
+# Each reason value maps straight to a playbook state: a direct self-report, trusted over any inference.
+# Android caps notification buttons at 3, so the 5 reasons come in two steps: the third button of the first
+# set, "Something else" (value "more"), opens the second set. Anything outside the 5: tapping the notification
+# itself opens the chat, where Buddy asks in the user's own words. "avoidance" has no button on purpose: it's
+# rarely self-admitted in the moment, and gets inferred from repeated silence instead.
+FIRST_REASONS = [
+    {"label": "😴 Tired", "value": "tired"},
+    {"label": "🤷 Where do I start?", "value": "unclear"},
+    {"label": "💭 Something else", "value": "more"},
+]
+MORE_REASONS = [
+    {"label": "😤 Too much", "value": "too_much"},
+    {"label": "😬 Scared it's not good", "value": "afraid"},
+    {"label": "🥱 Boring", "value": "bored"},
+]
+AFTER_STATUS = {
+    "not_started": ("Okay! What's in the way?", "Pick whichever feels closest."),
+    "in_progress": ("Ooh, you started! 🙌", "Anything slowing you down?"),
+}
+# One chat offer per reason. {task} is the quoted task title.
+CHAT_OFFERS = {
+    "tired": ("Tired, huh? 💛", "Want to chat about it, or rest for now?"),
+    "too_much": ("Let's make it smaller", "Want to shrink {task} down together?"),
+    "unclear": ("Let's find the start", "Want to figure out the first bit together?"),
+    "afraid": ("A rough start counts 💛", "Want to find a no-pressure first step together?"),
+    "bored": ("Let's make it less of a drag", "Want to find an easier way into {task} together?"),
+}
+DEFAULT_OFFER = ("Want to chat about it? 💬", "We can figure out {task} together.")
+CLOSING_TITLE = "Got it! 💛"
+
+
+def _name(task: Task) -> str:
+    return quoted_title(task.title) or "your task"
+
+
+def _reason_picker_response(task: Task, status: str) -> dict[str, Any]:
+    """After "Not yet" or "On it": what's in the way? The first set of reasons."""
+    title, body = AFTER_STATUS.get(status, AFTER_STATUS["not_started"])
     return {
         "next_stage": "emotion",
-        "task_id": task_id,
+        "task_id": task.id,
         "notification": {
-            "title": "How are you feeling? 😊",
-            "body": "Tap to log your emotion.",
-            "data": {
-                "stage": "emotion",
-                "task_id": task_id,
-                # Each value maps straight to a playbook state (fatigue/overwhelm/
-                # ambiguity) — a direct self-report, trusted over any inference.
-                # Android caps notification buttons at 3, so the other reasons
-                # ("afraid", "bored") are in-app chips sent to POST /chat as `reason`.
-                # "avoidance" has no button on purpose: it's rarely self-admitted
-                # in the moment, and gets inferred from repeated silence instead.
-                "actions": [
-                    {"label": "😴 Tired", "value": "tired"},
-                    {"label": "😤 Too much", "value": "too_much"},
-                    {"label": "🤷 Don't know where to start", "value": "unclear"},
-                ],
-            },
+            "title": title,
+            "body": body,
+            "data": {"stage": "emotion", "task_id": task.id, "actions": FIRST_REASONS},
         },
     }
 
 
-def _chat_opt_in_response(task_id: int) -> dict[str, Any]:
-    """Returns the notification payload the client should re-present after emotion is submitted."""
+def _more_reasons_response(task: Task) -> dict[str, Any]:
+    """After "Something else": the other three reasons."""
+    return {
+        "next_stage": "emotion_more",
+        "task_id": task.id,
+        "notification": {
+            "title": "Okay, which one?",
+            "body": "Pick the closest, or tap here to tell Buddy in your own words.",
+            "data": {"stage": "emotion_more", "task_id": task.id, "actions": MORE_REASONS},
+        },
+    }
+
+
+def _done_response(task: Task) -> dict[str, Any]:
+    """They finished: celebrate it and end the check-in. No buttons, and no "what's in the way?"."""
+    return {
+        "next_stage": "done",
+        "task_id": task.id,
+        "notification": {
+            "title": "Yay, you did it! 🎉",
+            "body": f"{_name(task)} is done. That's one off your plate!",
+            "data": {"stage": "done", "task_id": task.id},
+        },
+    }
+
+
+def _chat_opt_in_response(task: Task, reason: str) -> dict[str, Any]:
+    """After a reason: offer to figure it out together, worded for that reason."""
+    title, body = CHAT_OFFERS.get(reason, DEFAULT_OFFER)
     return {
         "next_stage": "chat_opt_in",
-        "task_id": task_id,
+        "task_id": task.id,
         "notification": {
-            "title": "Want to talk about it? 💬",
-            "body": "Buddy is here if you'd like to chat.",
+            "title": title,
+            "body": body.format(task=_name(task)),
             "data": {
                 "stage": "chat_opt_in",
-                "task_id": task_id,
+                "task_id": task.id,
                 "actions": [
-                    {"label": "Yes, let's chat", "value": "yes"},
-                    {"label": "No thanks", "value": "no"},
+                    {"label": "Let's chat", "value": "yes"},
+                    {"label": "Not now", "value": "no"},
                 ],
             },
         },
@@ -136,21 +191,26 @@ async def checkin_action(
     task = owned_or_404(db, Task, payload.task_id, user)
 
     if payload.stage == "task_state":
-        # Save what state the task is in, then prompt for emotion.
+        # Save what state the task is in, then ask what's in the way (or celebrate, if it's done).
         task.task_state = payload.value
         if payload.value == "done":
             # Keep status/completed_at in lockstep with task_state — state detection's
             # "task marked done" rule reads status, and cron must stop nudging about it.
             _mark_done(task, db)
+            db.commit()
+            return _done_response(task)
         db.commit()
-        return _emotion_picker_response(task.id)
+        return _reason_picker_response(task, payload.value)
 
-    if payload.stage == "emotion":
+    if payload.stage in ("emotion", "emotion_more"):
+        if payload.value == "more":
+            # "Something else" isn't a reason: show the other three, log nothing yet.
+            return _more_reasons_response(task)
         # Create a new emotion log row, then prompt for chat opt-in.
         log = EmotionLog(user_id=user.id, task_id=task.id, emotion=payload.value)
         db.add(log)
         db.commit()
-        return _chat_opt_in_response(task.id)
+        return _chat_opt_in_response(task, payload.value)
 
     if payload.stage == "chat_opt_in":
         # Update the most recent emotion log with the chat opt-in decision.
@@ -165,23 +225,15 @@ async def checkin_action(
             db.commit()
 
         if opted_in:
-            # Client should open a chat session.
-            return {
-                "next_stage": "chat",
-                "task_id": task.id,
-                "notification": {
-                    "title": "Opening chat… 💬",
-                    "body": "Buddy is ready to listen.",
-                    "data": {"stage": "chat", "task_id": task.id},
-                },
-            }
+            # The app opens the chat itself on "Let's chat", so there's no notification to show.
+            return {"next_stage": "chat", "task_id": task.id}
         # User declined chat: the brain still runs and writes ONE tailored closing note.
         closing = await run_turn(db, user.id, task, mode="closing")
         return {
             "next_stage": "done",
             "task_id": task.id,
             "notification": {
-                "title": "All done for now ✅",
+                "title": CLOSING_TITLE,
                 "body": closing["reply"],
                 "data": {"stage": "done", "task_id": task.id},
             },

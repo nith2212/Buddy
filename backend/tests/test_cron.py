@@ -156,13 +156,45 @@ def test_checkin_names_its_task_and_only_the_callers_task(api, db, monkeypatch):
     theirs = api.post("/tasks", json={"title": "Someone else's secret"}, headers=oh).json()["id"]
     sent = []
 
-    async def fake_push(*, body, **kw):
-        sent.append(body)
+    async def fake_push(*, title, body, **kw):
+        sent.append((title, body))
         return {"status": "ok"}
 
     monkeypatch.setattr(service, "send_push", fake_push)
     asyncio.run(service.send_daily_checkin(db, uid, mine))
     asyncio.run(service.send_daily_checkin(db, uid, theirs))   # not this user's task: no title leaks
-    assert sent == ["How's “Finish writing report for manager” going today?", "How's your task going today?"]
-    assert service.checkin_body("x" * 100).endswith("…” going today?")
-    assert len(service.checkin_body("x" * 100)) < 90
+    assert "“Finish writing report for manager”" in sent[0][1]
+    assert sent[1] == ("Hey! 🌟", "How's your task going today?")
+    assert "secret" not in str(sent)
+
+
+def test_checkin_wording_fits_the_situation_and_changes_day_to_day():
+    from notifications import service
+
+    now = datetime(2026, 11, 9, 6, 0, tzinfo=timezone.utc)
+
+    def task(due=None, title="Lab report"):
+        return models.Task(title=title, due_date=due)
+
+    assert service.checkin_situation(task(now - timedelta(hours=1)), now) == "past_due"
+    assert service.checkin_situation(task(now + timedelta(hours=5)), now) == "due_soon"
+    assert service.checkin_situation(task(now + timedelta(days=3)), now) == "waiting"
+    assert service.checkin_situation(task(), now) == "waiting"
+    # SQLite hands back naive datetimes: they're UTC.
+    assert service.checkin_situation(task((now - timedelta(hours=1)).replace(tzinfo=None)), now) == "past_due"
+
+    title, body = service.checkin_message(task(now + timedelta(hours=5)), now)
+    assert title == "Heads up 🌟" and "“Lab report”" in body
+
+    # Variants take turns by day: never the same line two days running.
+    days = [service.checkin_message(task(), now + timedelta(days=d))[1] for d in range(4)]
+    assert all(days[d] != days[d + 1] for d in range(3))
+
+    # Every line names the task and never counts anything (no "3 days", no ignored check-ins).
+    for _, bodies in service.CHECKIN_LINES.values():
+        for line in bodies:
+            filled = line.format(task="“X”")
+            assert "“X”" in filled and not any(ch.isdigit() for ch in filled)
+
+    long_body = service.checkin_message(task(title="x" * 100), now)[1]
+    assert "…”" in long_body and len(long_body) < 110

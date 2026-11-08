@@ -1,6 +1,6 @@
 // The rough reasons a user can tap when a task feels hard to start. The values are exactly what
-// POST /chat accepts as `reason` (backend/chat.py). The first three are also the notification
-// buttons (Android allows 3); "afraid" and "bored" only appear here, as in-app chips.
+// POST /chat accepts as `reason` (backend/chat.py). All five are also notification buttons, in two
+// sets because Android allows 3 per notification (src/lib/checkin-categories.ts).
 
 export type Reason = 'unclear' | 'too_much' | 'afraid' | 'bored' | 'tired';
 

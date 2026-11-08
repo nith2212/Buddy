@@ -128,6 +128,7 @@ def test_full_checkin_flow(api, users, db):
 
     r = api.post("/checkin/action", json={"task_id": t, "stage": "chat_opt_in", "value": "yes"}, headers=a_h)
     assert r.json()["next_stage"] == "chat"
+    assert "notification" not in r.json()  # the app opens the chat itself; nothing to show
     log = db.execute(select(models.EmotionLog).where(models.EmotionLog.task_id == t)).scalar_one()
     assert log.user_id == a_id and log.emotion == "low" and log.chat_opt_in is True
 
@@ -138,9 +139,66 @@ def test_declined_chat_completes_checkin(api, users):
     api.post("/checkin/action", json={"task_id": t, "stage": "emotion", "value": "good"}, headers=a_h)
     r = api.post("/checkin/action", json={"task_id": t, "stage": "chat_opt_in", "value": "no"}, headers=a_h)
     assert r.json()["next_stage"] == "done"
+    assert r.json()["notification"]["title"] == "Got it! 💛"
 
 
-@pytest.mark.parametrize("stage,value", [("task_state", "done"), ("emotion", "low"), ("chat_opt_in", "yes")])
+def _action(api, h, t, stage, value):
+    return api.post("/checkin/action", json={"task_id": t, "stage": stage, "value": value}, headers=h).json()
+
+
+def _buttons(body):
+    return [a["value"] for a in body["notification"]["data"]["actions"]]
+
+
+def test_checkin_done_celebrates_and_ends(api, users, db):
+    (_, a_h), _ = users
+    t = make_task(api, a_h)
+    body = _action(api, a_h, t, "task_state", "done")
+    assert body["next_stage"] == "done"
+    assert body["notification"]["title"] == "Yay, you did it! 🎉"
+    assert "actions" not in body["notification"]["data"]  # no "what's in the way?" after finishing
+    assert db.get(models.Task, t).status == "done"
+
+
+def test_checkin_status_asks_whats_in_the_way(api, users):
+    (_, a_h), _ = users
+    t = make_task(api, a_h)
+    not_yet = _action(api, a_h, t, "task_state", "not_started")
+    on_it = _action(api, a_h, t, "task_state", "in_progress")
+    assert not_yet["notification"]["title"] == "Okay! What's in the way?"
+    assert on_it["notification"]["title"] == "Ooh, you started! 🙌"
+    assert _buttons(not_yet) == _buttons(on_it) == ["tired", "unclear", "more"]
+
+
+def test_something_else_shows_the_other_reasons_and_logs_nothing(api, users, db):
+    (_, a_h), _ = users
+    t = make_task(api, a_h)
+    more = _action(api, a_h, t, "emotion", "more")
+    assert more["next_stage"] == "emotion_more"
+    assert _buttons(more) == ["too_much", "afraid", "bored"]
+    assert db.scalar(select(func.count()).select_from(models.EmotionLog)) == 0  # "Something else" isn't a reason
+
+    offer = _action(api, a_h, t, "emotion_more", "afraid")
+    assert offer["next_stage"] == "chat_opt_in"
+    assert offer["notification"]["title"] == "A rough start counts 💛"
+    assert _buttons(offer) == ["yes", "no"]
+    log = db.execute(select(models.EmotionLog).where(models.EmotionLog.task_id == t)).scalar_one()
+    assert log.emotion == "afraid"
+
+
+def test_chat_offers_hint_at_the_cause_without_naming_it():
+    # Notifications sit on a public lock screen: never spell out a fear.
+    from notifications.router import CHAT_OFFERS, DEFAULT_OFFER
+
+    assert set(CHAT_OFFERS) == {"tired", "too_much", "unclear", "afraid", "bored"}
+    for title, body in [*CHAT_OFFERS.values(), DEFAULT_OFFER]:
+        text = (title + " " + body).lower()
+        assert not any(word in text for word in ("scared", "afraid", "fear", "lazy", "anxious"))
+
+
+@pytest.mark.parametrize("stage,value", [
+    ("task_state", "done"), ("emotion", "low"), ("emotion", "more"), ("emotion_more", "afraid"), ("chat_opt_in", "yes"),
+])
 def test_cannot_check_in_on_other_users_task(api, users, db, stage, value):
     (_, a_h), (b_id, b_h) = users
     b_task = make_task(api, b_h)
