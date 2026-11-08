@@ -72,6 +72,48 @@ def test_cron_does_not_renudge_within_cooldown(api, db, monkeypatch):
     assert r.json() == {"attempted": 0, "sent": 0, "skipped": 0, "failed": 0}
 
 
+def test_cron_checks_in_at_most_once_a_day_per_person(api, db, monkeypatch):
+    # Nudged about one task today: their other waiting tasks wait too, but other people still get theirs.
+    me, h = register(api)
+    other, oh = register(api)
+    api.post("/devices/register", json={"expo_push_token": TOKEN}, headers=h)
+    api.post("/devices/register", json={"expo_push_token": "ExponentPushToken[eeeeeeeeeeeeeeeeeeeeee]"}, headers=oh)
+    first = api.post("/tasks", json={"title": "a", "due_date": "2020-01-01T00:00:00Z"}, headers=h).json()["id"]
+    api.post("/tasks", json={"title": "b", "due_date": "2020-01-02T00:00:00Z"}, headers=h)
+    api.post("/tasks", json={"title": "c", "due_date": "2020-01-03T00:00:00Z"}, headers=h)
+    theirs = api.post("/tasks", json={"title": "d", "due_date": "2020-01-01T00:00:00Z"}, headers=oh).json()["id"]
+    db.add(models.Event(user_id=me, task_id=first, type="checkin_sent"))
+    db.commit()
+
+    sent = []
+
+    async def fake_send(db_, uid, tid):
+        sent.append((uid, tid))
+        return {"status": "ok"}
+
+    monkeypatch.setattr("cron.send_daily_checkin", fake_send)
+
+    assert api.post("/cron/checkins", headers=CRON).json()["sent"] == 1
+    assert sent == [(other, theirs)]
+    # The next hourly run sends nothing new: both people have had today's check-in.
+    assert api.post("/cron/checkins", headers=CRON).json()["attempted"] == 0
+
+
+def test_cron_checks_in_again_after_the_cooldown(api, db, monkeypatch):
+    me, h = register(api)
+    api.post("/devices/register", json={"expo_push_token": TOKEN}, headers=h)
+    task_id = api.post("/tasks", json={"title": "a", "due_date": "2020-01-01T00:00:00Z"}, headers=h).json()["id"]
+    yesterday = datetime.now(timezone.utc) - timedelta(hours=21)
+    db.add(models.Event(user_id=me, task_id=task_id, type="checkin_sent", created_at=yesterday))
+    db.commit()
+
+    async def fake_send(db_, uid, tid):
+        return {"status": "ok"}
+
+    monkeypatch.setattr("cron.send_daily_checkin", fake_send)
+    assert api.post("/cron/checkins", headers=CRON).json()["sent"] == 1
+
+
 def test_cron_ignores_untouched_task_with_no_due_date_before_window(api, db):
     _, h = register(api)
     api.post("/tasks", json={"title": "fresh, no due date"}, headers=h)

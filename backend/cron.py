@@ -47,16 +47,17 @@ def _eligible_tasks(db: Session, now: datetime) -> list[Task]:
         .order_by(Task.user_id, Task.due_date.is_(None), Task.due_date.asc(), Task.created_at.asc())
     ).scalars().all()
 
-    # Skip tasks nudged within the cooldown window.
+    # At most one check-in per person per day: skip anyone nudged within the cooldown, whichever task it
+    # was about. (A per-task wait let someone with 3 waiting tasks get 3 pings in 3 hours.)
     cutoff = now - NUDGE_COOLDOWN
-    recent_ids = set(db.execute(
-        select(Event.task_id).where(Event.type == "checkin_sent", Event.created_at >= cutoff)
+    recent_users = set(db.execute(
+        select(Event.user_id).where(Event.type == "checkin_sent", Event.created_at >= cutoff)
     ).scalars().all())
 
-    # One task per user: keep the first (most urgent, per ordering above) not recently nudged.
+    # One task per person: keep their first (most urgent, per ordering above).
     picked: dict[str, Task] = {}
     for t in rows:
-        if t.id in recent_ids or t.user_id in picked:
+        if t.user_id in recent_users or t.user_id in picked:
             continue
         picked[t.user_id] = t
     return list(picked.values())
