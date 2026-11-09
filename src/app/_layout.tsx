@@ -2,6 +2,7 @@ import { Gaegu_400Regular, Gaegu_700Bold } from '@expo-google-fonts/gaegu';
 import { Nunito_400Regular, Nunito_600SemiBold, Nunito_700Bold, useFonts } from '@expo-google-fonts/nunito';
 import { DefaultTheme, Stack, ThemeProvider, useRootNavigationState, useRouter } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
+import { StatusBar } from 'expo-status-bar';
 import { useEffect, useState } from 'react';
 import * as Notifications from 'expo-notifications';
 
@@ -83,6 +84,8 @@ export default function RootLayout() {
 
   return (
     <ThemeProvider value={BuddyTheme}>
+      {/* Dark clock and battery on the cream background, even when the phone is in dark mode (the look is light-only). */}
+      <StatusBar style="dark" />
       {auth.status !== 'ready' ? (
         <BuddySplash failed={auth.status === 'error'} />
       ) : !auth.onboarded ? (
