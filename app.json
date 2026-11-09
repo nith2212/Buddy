@@ -19,7 +19,10 @@
       },
       "predictiveBackGestureEnabled": false,
       "package": "com.nithya22.buddy",
-      "googleServicesFile": "./google-services.json"
+      "googleServicesFile": "./google-services.json",
+      "runtimeVersion": {
+        "policy": "fingerprint"
+      }
     },
     "web": {
       "output": "static",
@@ -48,6 +51,9 @@
         "projectId": "cc46c583-0ae7-4c8b-8fe6-cddf3161db1b"
       }
     },
-    "owner": "nithya22"
+    "owner": "nithya22",
+    "updates": {
+      "url": "https://u.expo.dev/cc46c583-0ae7-4c8b-8fe6-cddf3161db1b"
+    }
   }
 }
