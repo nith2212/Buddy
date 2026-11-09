@@ -5,13 +5,13 @@
 import { useState } from 'react';
 import { Keyboard, KeyboardAvoidingView, Modal, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 import Animated, { FadeIn, SlideInDown, ZoomIn } from 'react-native-reanimated';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Path } from 'react-native-svg';
 
 import { BuddyBlob } from '@/components/buddy-blob';
 import { DuePicker } from '@/components/due-picker';
 import { Card, SketchButton, Txt } from '@/components/sketch';
 import { Border, Font, Wobble, type Colors } from '@/constants/sketch';
+import { useModalBottomInset } from '@/hooks/use-modal-inset';
 import { useColors, useThemedStyles } from '@/hooks/use-theme';
 import type { api, Task } from '@/lib/api';
 import { DayKey, dayKeyOfIso, dueDateFor } from '@/lib/dates';
@@ -28,7 +28,7 @@ type Props = {
 export function EditTaskSheet({ task, client, onClose, onSaved, onDeleted }: Props) {
   const styles = useThemedStyles(makeStyles);
   const c = useColors();
-  const insets = useSafeAreaInsets();
+  const bottomInset = useModalBottomInset();
   const initialDay = dayKeyOfIso(task.due_date);
   const [title, setTitle] = useState(task.title ?? '');
   const [day, setDay] = useState<DayKey | null>(initialDay);
@@ -133,7 +133,7 @@ export function EditTaskSheet({ task, client, onClose, onSaved, onDeleted }: Pro
           <Animated.View
             entering={SlideInDown.duration(240)}
             accessibilityViewIsModal
-            style={[styles.sheet, { paddingBottom: insets.bottom + 22 }]}>
+            style={[styles.sheet, { paddingBottom: bottomInset + 22 }]}>
             <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.sheetContent} bounces={false}>
               <View style={styles.grab} />
               <Txt variant="heading" style={styles.heading} accessibilityRole="header">Edit task</Txt>

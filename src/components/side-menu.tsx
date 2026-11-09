@@ -12,6 +12,7 @@ import Svg, { Circle, Path } from 'react-native-svg';
 import { BuddyBlob } from '@/components/buddy-blob';
 import { SketchButton, Txt } from '@/components/sketch';
 import { Border, Wobble, type Colors } from '@/constants/sketch';
+import { useModalBottomInset } from '@/hooks/use-modal-inset';
 import { useColors, useTheme, useThemedStyles } from '@/hooks/use-theme';
 import { useRestart, useToken } from '@/hooks/use-session';
 import { api } from '@/lib/api';
@@ -45,6 +46,7 @@ function SideMenu({ visible, onClose }: { visible: boolean; onClose: () => void 
   const router = useRouter();
   const path = usePathname();
   const insets = useSafeAreaInsets();
+  const bottomInset = useModalBottomInset();
   const token = useToken();
   const restart = useRestart();
   const client = useMemo(() => api(token), [token]);
@@ -89,7 +91,7 @@ function SideMenu({ visible, onClose }: { visible: boolean; onClose: () => void 
       <Animated.View
         entering={SlideInLeft.duration(240)}
         accessibilityViewIsModal
-        style={[styles.panel, { paddingTop: insets.top + 16, paddingBottom: insets.bottom + 8 }]}>
+        style={[styles.panel, { paddingTop: insets.top + 16, paddingBottom: bottomInset + 8 }]}>
         <View style={styles.brandRow}>
           <Txt variant="title">
             buddy<Txt variant="title" style={{ color: c.deep }}>.</Txt>
@@ -122,14 +124,14 @@ function SideMenu({ visible, onClose }: { visible: boolean; onClose: () => void 
 
         <View style={styles.bottom}>
           <Txt variant="hand" style={styles.around}>I’m around if you get stuck!</Txt>
-          {/* Above Buddy, never last: on phones with on-screen nav buttons the menu's bottom edge can sit behind
-              them, and this is the link onboarding promises ("menu → Delete my data"). */}
-          <Pressable onPress={confirmDelete} disabled={deleting} accessibilityRole="button" style={styles.delete} hitSlop={8}>
-            <Txt variant="small" style={styles.deleteText}>{deleting ? 'Deleting…' : 'Delete my data'}</Txt>
-          </Pressable>
           <View style={styles.peek}>
             <BuddyBlob width={150} label="Buddy peeking up from the bottom of the menu" />
           </View>
+          {/* The link onboarding promises ("menu → Delete my data"). The panel's bottom padding keeps it clear of
+              on-screen nav buttons (hooks/use-modal-inset.ts). */}
+          <Pressable onPress={confirmDelete} disabled={deleting} accessibilityRole="button" style={styles.delete} hitSlop={8}>
+            <Txt variant="small" style={styles.deleteText}>{deleting ? 'Deleting…' : 'Delete my data'}</Txt>
+          </Pressable>
         </View>
       </Animated.View>
     </Modal>
