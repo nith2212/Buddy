@@ -7,10 +7,9 @@ import { Pressable, StyleSheet, View } from 'react-native';
 import Svg, { Path, Rect } from 'react-native-svg';
 
 import { Chip, Txt } from '@/components/sketch';
-import { Font, Ink, Palette, Wobble } from '@/constants/sketch';
+import { Font, Wobble, type Colors } from '@/constants/sketch';
+import { useColors, useThemedStyles } from '@/hooks/use-theme';
 import { dateOfKey, DayKey, daysFromToday, MONTHS, monthCells, prettyDay } from '@/lib/dates';
-
-const PAST_DAY = '#8A8296';
 
 type Props = {
   value: DayKey | null;
@@ -20,6 +19,8 @@ type Props = {
 };
 
 export function DuePicker({ value, onChange, onOpenCalendar }: Props) {
+  const c = useColors();
+  const styles = useThemedStyles(makeStyles);
   const today = daysFromToday(0);
   const tomorrow = daysFromToday(1);
   const [calendarOpen, setCalendarOpen] = useState(false);
@@ -46,7 +47,7 @@ export function DuePicker({ value, onChange, onOpenCalendar }: Props) {
           accessibilityLabel={custom ? `Due ${prettyDay(value)}. Change the date` : 'Pick a date'}
           selected={custom || calendarOpen}
           onPress={toggleCalendar}
-          icon={<CalendarIcon />}
+          icon={<CalendarIcon color={custom || calendarOpen ? c.onPop : c.ink} />}
         />
       </View>
       {calendarOpen ? <Calendar picked={value} today={today} onPick={pick} /> : null}
@@ -55,6 +56,8 @@ export function DuePicker({ value, onChange, onOpenCalendar }: Props) {
 }
 
 function Calendar({ picked, today, onPick }: { picked: DayKey | null; today: DayKey; onPick: (day: DayKey) => void }) {
+  const c = useColors();
+  const styles = useThemedStyles(makeStyles);
   const now = dateOfKey(today);
   // Open on the picked day's month, unless that's in the past: you can't go back before this month.
   const start = picked && picked >= today ? dateOfKey(picked) : now;
@@ -100,7 +103,7 @@ function Calendar({ picked, today, onPick }: { picked: DayKey | null; today: Day
                   isPicked && styles.picked,
                   pressed && !past && styles.dayPressed,
                 ]}>
-                <Txt style={[styles.dayText, past && { color: PAST_DAY }, isPicked && { fontFamily: Font.bold }]}>{n}</Txt>
+                <Txt style={[styles.dayText, past && { color: c.pastDay }, isPicked && { fontFamily: Font.bold, color: c.onPop }]}>{n}</Txt>
               </Pressable>
             </View>
           );
@@ -111,6 +114,8 @@ function Calendar({ picked, today, onPick }: { picked: DayKey | null; today: Day
 }
 
 function Arrow({ direction, label, onPress, disabled }: { direction: 'left' | 'right'; label: string; onPress: () => void; disabled?: boolean }) {
+  const styles = useThemedStyles(makeStyles);
+  const c = useColors();
   return (
     <Pressable
       onPress={onPress}
@@ -123,7 +128,7 @@ function Arrow({ direction, label, onPress, disabled }: { direction: 'left' | 'r
         <Path
           d={direction === 'left' ? 'M11.5 3 L5.5 9 L11.5 15' : 'M6.5 3 L12.5 9 L6.5 15'}
           fill="none"
-          stroke={Ink}
+          stroke={c.ink}
           strokeWidth={2.6}
           strokeLinecap="round"
           strokeLinejoin="round"
@@ -133,22 +138,23 @@ function Arrow({ direction, label, onPress, disabled }: { direction: 'left' | 'r
   );
 }
 
-function CalendarIcon() {
+function CalendarIcon({ color }: { color: string }) {
   return (
     <Svg width={18} height={18} viewBox="0 0 18 18">
-      <Rect x={2} y={3.5} width={14} height={12.5} rx={2.5} fill="none" stroke={Ink} strokeWidth={2} />
-      <Path d="M2 7.5 H16 M6 1.5 V5 M12 1.5 V5" stroke={Ink} strokeWidth={2} strokeLinecap="round" />
+      <Rect x={2} y={3.5} width={14} height={12.5} rx={2.5} fill="none" stroke={color} strokeWidth={2} />
+      <Path d="M2 7.5 H16 M6 1.5 V5 M12 1.5 V5" stroke={color} strokeWidth={2} strokeLinecap="round" />
     </Svg>
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (c: Colors) =>
+  StyleSheet.create({
   wrap: { gap: 10 },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   calendar: {
-    backgroundColor: Palette.bg,
+    backgroundColor: c.bg,
     borderWidth: 2,
-    borderColor: Ink,
+    borderColor: c.ink,
     paddingHorizontal: 10,
     paddingTop: 6,
     paddingBottom: 8,
@@ -159,7 +165,7 @@ const styles = StyleSheet.create({
   arrow: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center', borderRadius: 10 },
   grid: { flexDirection: 'row', flexWrap: 'wrap' },
   cell: { width: `${100 / 7}%`, padding: 1, alignItems: 'stretch' },
-  weekday: { textAlign: 'center', fontSize: 16, lineHeight: 22, color: Palette.muted },
+  weekday: { textAlign: 'center', fontSize: 16, lineHeight: 22, color: c.muted },
   day: {
     height: 40,
     alignItems: 'center',
@@ -171,8 +177,8 @@ const styles = StyleSheet.create({
     borderBottomRightRadius: 13,
     borderBottomLeftRadius: 7,
   },
-  today: { borderColor: Ink, borderStyle: 'dashed' },
-  picked: { backgroundColor: Palette.pop, borderColor: Ink, borderStyle: 'solid' },
-  dayPressed: { backgroundColor: Palette.soft },
+  today: { borderColor: c.ink, borderStyle: 'dashed' },
+  picked: { backgroundColor: c.pop, borderColor: c.ink, borderStyle: 'solid' },
+  dayPressed: { backgroundColor: c.soft },
   dayText: { fontFamily: Font.semi, fontSize: 15, lineHeight: 20 },
 });

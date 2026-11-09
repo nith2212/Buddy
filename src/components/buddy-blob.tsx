@@ -18,7 +18,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import Svg, { Circle, Ellipse, Path } from 'react-native-svg';
 
-import { Ink } from '@/constants/sketch';
+import { BuddyBody, BuddyInk } from '@/constants/sketch';
 
 const AnimatedPath = Animated.createAnimatedComponent(Path);
 const AnimatedEllipse = Animated.createAnimatedComponent(Ellipse);
@@ -103,37 +103,37 @@ export function BuddyBlob({ width, mood = 'default', animated = true, label = 'B
   return (
     <View accessible accessibilityRole="image" accessibilityLabel={label} style={[{ width, height }, style]}>
       <Svg width={width} height={height} viewBox="0 0 160 120">
-        <AnimatedPath animatedProps={bodyProps} d={REST_OUTLINE} fill="#FFFFFF" stroke={Ink} strokeWidth={stroke} strokeLinejoin="round" />
-        {width >= 80 ? <Path d={SKETCH} fill="none" stroke={Ink} strokeWidth={stroke * 0.45} strokeOpacity={0.55} /> : null}
+        <AnimatedPath animatedProps={bodyProps} d={REST_OUTLINE} fill={BuddyBody} stroke={BuddyInk} strokeWidth={stroke} strokeLinejoin="round" />
+        {width >= 80 ? <Path d={SKETCH} fill="none" stroke={BuddyInk} strokeWidth={stroke * 0.45} strokeOpacity={0.55} /> : null}
 
         {mood === 'default' ? (
           <>
-            <AnimatedEllipse animatedProps={leftEye} cx={60} cy={58} rx={7} ry={7} fill={Ink} />
-            <AnimatedEllipse animatedProps={rightEye} cx={102} cy={56} rx={7} ry={7} fill={Ink} />
+            <AnimatedEllipse animatedProps={leftEye} cx={60} cy={58} rx={7} ry={7} fill={BuddyInk} />
+            <AnimatedEllipse animatedProps={rightEye} cx={102} cy={56} rx={7} ry={7} fill={BuddyInk} />
             {width >= 60 ? (
               <>
                 <AnimatedCircle animatedProps={leftSparkle} cx={62.5} cy={55} r={2} fill="#FFFFFF" />
                 <AnimatedCircle animatedProps={rightSparkle} cx={104.5} cy={53} r={2} fill="#FFFFFF" />
               </>
             ) : null}
-            <Path d="M74 74 Q81 80 88 73" fill="none" stroke={Ink} strokeWidth={stroke * 0.9} strokeLinecap="round" />
+            <Path d="M74 74 Q81 80 88 73" fill="none" stroke={BuddyInk} strokeWidth={stroke * 0.9} strokeLinecap="round" />
           </>
         ) : null}
 
         {mood === 'happy' ? (
           <>
-            <Path d="M51 59 Q60 49 69 59 M93 57 Q102 47 111 57" fill="none" stroke={Ink} strokeWidth={stroke * 1.1} strokeLinecap="round" />
-            <Path d="M74 70 L88 70 Q88 83 81 83 Q74 83 74 70 Z" fill="#FFFFFF" stroke={Ink} strokeWidth={stroke * 0.9} strokeLinejoin="round" />
+            <Path d="M51 59 Q60 49 69 59 M93 57 Q102 47 111 57" fill="none" stroke={BuddyInk} strokeWidth={stroke * 1.1} strokeLinecap="round" />
+            <Path d="M74 70 L88 70 Q88 83 81 83 Q74 83 74 70 Z" fill={BuddyBody} stroke={BuddyInk} strokeWidth={stroke * 0.9} strokeLinejoin="round" />
           </>
         ) : null}
 
         {mood === 'worried' ? (
           <>
-            <AnimatedEllipse animatedProps={leftEye} cx={60} cy={56} rx={5.5} ry={10} fill={Ink} />
-            <AnimatedEllipse animatedProps={rightEye} cx={102} cy={54} rx={5.5} ry={10} fill={Ink} />
+            <AnimatedEllipse animatedProps={leftEye} cx={60} cy={56} rx={5.5} ry={10} fill={BuddyInk} />
+            <AnimatedEllipse animatedProps={rightEye} cx={102} cy={54} rx={5.5} ry={10} fill={BuddyInk} />
             <AnimatedCircle animatedProps={leftSparkle} cx={61} cy={65} r={2.2} fill="#FFFFFF" />
             <AnimatedCircle animatedProps={rightSparkle} cx={103} cy={63} r={2.2} fill="#FFFFFF" />
-            <Path d="M74 77 Q81 74 88 77" fill="none" stroke={Ink} strokeWidth={stroke * 0.9} strokeLinecap="round" />
+            <Path d="M74 77 Q81 74 88 77" fill="none" stroke={BuddyInk} strokeWidth={stroke * 0.9} strokeLinecap="round" />
           </>
         ) : null}
       </Svg>

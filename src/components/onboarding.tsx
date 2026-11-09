@@ -11,7 +11,8 @@ import Svg, { Path } from 'react-native-svg';
 import { BuddyBlob } from '@/components/buddy-blob';
 import { DuePicker } from '@/components/due-picker';
 import { Card, Chip, SketchButton, Txt } from '@/components/sketch';
-import { Font, Ink, Palette, Wobble } from '@/constants/sketch';
+import { Font, Wobble, type Colors } from '@/constants/sketch';
+import { useColors, useThemedStyles } from '@/hooks/use-theme';
 import { api, type OnboardingAnswers } from '@/lib/api';
 import { type DayKey, dueDateFor } from '@/lib/dates';
 import { registerPushToken } from '@/lib/push';
@@ -54,6 +55,8 @@ type Props = {
 };
 
 export function Onboarding({ token, onDone }: Props) {
+  const styles = useThemedStyles(makeStyles);
+  const c = useColors();
   const client = useMemo(() => api(token), [token]);
   const insets = useSafeAreaInsets();
   const [step, setStep] = useState(1);
@@ -155,7 +158,7 @@ export function Onboarding({ token, onDone }: Props) {
         <Card wobble="b" outerStyle={styles.mt6} style={styles.mondayCard}>
           <View style={styles.bars} importantForAccessibility="no-hide-descendants">
             {[22, 40, 30, 58].map((h, i) => (
-              <View key={i} style={[styles.bar, { height: h, backgroundColor: i % 2 ? Palette.pop : Palette.soft }]} />
+              <View key={i} style={[styles.bar, { height: h, backgroundColor: i % 2 ? c.pop : c.soft }]} />
             ))}
           </View>
           <View style={styles.mondayText}>
@@ -221,11 +224,11 @@ export function Onboarding({ token, onDone }: Props) {
                 <View style={styles.box}>
                   {on ? (
                     <Svg width={14} height={14} viewBox="0 0 14 14">
-                      <Path d="M2 7.5 L5.5 11 L12 3" fill="none" stroke={Ink} strokeWidth={2.6} strokeLinecap="round" strokeLinejoin="round" />
+                      <Path d="M2 7.5 L5.5 11 L12 3" fill="none" stroke={c.onPop} strokeWidth={2.6} strokeLinecap="round" strokeLinejoin="round" />
                     </Svg>
                   ) : null}
                 </View>
-                <Txt variant="hand" style={styles.wayText}>{o.label}</Txt>
+                <Txt variant="hand" style={[styles.wayText, on && { color: c.onPop }]}>{o.label}</Txt>
               </Pressable>
             );
           })}
@@ -245,7 +248,7 @@ export function Onboarding({ token, onDone }: Props) {
           </Txt>
         </View>
         <Card wobble="b" style={styles.privacy}>
-          <Txt variant="heading" style={styles.h2Small}>About your chats</Txt>
+          <Txt variant="heading" style={[styles.h2Small, { color: c.onPop }]}>About your chats</Txt>
           <Txt style={styles.privacyText}>
             Your chats are saved so I can learn what helps you. While Buddy is in testing, Nithya (who made me) can read them. Delete everything anytime: menu → Delete my data.
           </Txt>
@@ -270,7 +273,7 @@ export function Onboarding({ token, onDone }: Props) {
             value={title}
             onChangeText={setTitle}
             placeholder="e.g. start my DBMS assignment"
-            placeholderTextColor={Palette.muted}
+            placeholderTextColor={c.muted}
             accessibilityLabel="Your task"
             maxLength={200}
             returnKeyType="done"
@@ -315,12 +318,14 @@ export function Onboarding({ token, onDone }: Props) {
 }
 
 function Primary({ label, onPress, disabled }: { label: string; onPress: () => void; disabled?: boolean }) {
+  const styles = useThemedStyles(makeStyles);
   return (
     <SketchButton label={label} wobble="b" onPress={onPress} disabled={disabled} style={styles.primary} textStyle={styles.primaryText} />
   );
 }
 
 function TextLink({ label, onPress, disabled, small }: { label: string; onPress: () => void; disabled?: boolean; small?: boolean }) {
+  const styles = useThemedStyles(makeStyles);
   return (
     <Pressable onPress={onPress} disabled={disabled} accessibilityRole="button" hitSlop={8} style={small ? styles.skipLink : styles.link}>
       <Txt variant="hand" style={[styles.linkText, small && { fontSize: 20 }]}>{label}</Txt>
@@ -330,6 +335,8 @@ function TextLink({ label, onPress, disabled, small }: { label: string; onPress:
 
 /** What a check-in looks like, in the developer's wording (backend/notifications/service.py). */
 function SampleCheckin() {
+  const styles = useThemedStyles(makeStyles);
+  const c = useColors();
   return (
     <Card wobble="c" style={styles.sample} outerStyle={styles.full}>
       <View
@@ -339,7 +346,7 @@ function SampleCheckin() {
         <View style={styles.sampleHead}>
           <BuddyBlob width={26} animated={false} label="" />
           <Txt variant="small" style={styles.bold}>Buddy</Txt>
-          <Txt variant="small" style={{ color: Palette.muted }}>· now</Txt>
+          <Txt variant="small" style={{ color: c.muted }}>· now</Txt>
         </View>
         <View>
           <Txt variant="semi" style={styles.bold}>Hey! 🌟</Txt>
@@ -357,13 +364,14 @@ function SampleCheckin() {
   );
 }
 
-const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: Palette.bg },
+const makeStyles = (c: Colors) =>
+  StyleSheet.create({
+  screen: { flex: 1, backgroundColor: c.bg },
   content: { flexGrow: 1, paddingHorizontal: 24, gap: 18 },
   top: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', minHeight: 44 },
   dots: { flexDirection: 'row', gap: 7 },
-  dot: { width: 10, height: 10, borderRadius: 5, borderWidth: 2, borderColor: Ink },
-  dotOn: { backgroundColor: Ink },
+  dot: { width: 10, height: 10, borderRadius: 5, borderWidth: 2, borderColor: c.ink },
+  dotOn: { backgroundColor: c.ink },
   step: { flexGrow: 1, gap: 18 },
   grow: { flexGrow: 1 },
   flex1: { flex: 1 },
@@ -382,15 +390,15 @@ const styles = StyleSheet.create({
   h2: { fontSize: 25, lineHeight: 28 },
   h2Small: { fontSize: 23, lineHeight: 26 },
   p: { fontSize: 17, lineHeight: 25 },
-  small: { fontSize: 15, lineHeight: 22, color: Palette.muted },
+  small: { fontSize: 15, lineHeight: 22, color: c.muted },
   bold: { fontFamily: Font.bold },
   label: { fontSize: 22, lineHeight: 26, marginBottom: -6 },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 9 },
-  staticChip: { borderWidth: 2, borderColor: Ink, backgroundColor: Palette.bg, paddingHorizontal: 12, paddingVertical: 4, ...Wobble.c },
+  staticChip: { borderWidth: 2, borderColor: c.ink, backgroundColor: c.bg, paddingHorizontal: 12, paddingVertical: 4, ...Wobble.c },
   staticChipText: { fontSize: 19, lineHeight: 24 },
   mondayCard: { padding: 18, flexDirection: 'row', alignItems: 'center', gap: 16 },
   bars: { flexDirection: 'row', alignItems: 'flex-end', gap: 6, height: 64 },
-  bar: { width: 26, borderWidth: 2, borderColor: Ink, borderTopLeftRadius: 6, borderTopRightRadius: 6, borderBottomLeftRadius: 3, borderBottomRightRadius: 3 },
+  bar: { width: 26, borderWidth: 2, borderColor: c.ink, borderTopLeftRadius: 6, borderTopRightRadius: 6, borderBottomLeftRadius: 3, borderBottomRightRadius: 3 },
   mondayText: { flex: 1, gap: 6 },
   wayHead: { flexDirection: 'row', alignItems: 'flex-end', gap: 12 },
   wayList: { padding: 18, gap: 10 },
@@ -402,18 +410,18 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 8,
     borderWidth: 2,
-    borderColor: Ink,
-    backgroundColor: Palette.bg,
+    borderColor: c.ink,
+    backgroundColor: c.bg,
     ...Wobble.c,
   },
-  wayRowOn: { backgroundColor: Palette.soft },
+  wayRowOn: { backgroundColor: c.soft },
   pressed: { transform: [{ translateX: 2 }, { translateY: 2 }] },
   box: {
     width: 22,
     height: 22,
     borderWidth: 2.5,
-    borderColor: Ink,
-    backgroundColor: Palette.card,
+    borderColor: c.ink,
+    backgroundColor: c.card,
     alignItems: 'center',
     justifyContent: 'center',
     borderTopLeftRadius: 6,
@@ -425,24 +433,24 @@ const styles = StyleSheet.create({
   sample: { padding: 14 },
   sampleHead: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   sampleButtons: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
-  sampleButton: { borderWidth: 1.5, borderColor: Ink, borderRadius: 999, paddingHorizontal: 10, paddingVertical: 3, backgroundColor: Palette.bg },
-  privacy: { padding: 16, gap: 6, backgroundColor: Palette.soft },
-  privacyText: { fontSize: 14.5, lineHeight: 21 },
+  sampleButton: { borderWidth: 1.5, borderColor: c.ink, borderRadius: 999, paddingHorizontal: 10, paddingVertical: 3, backgroundColor: c.bg },
+  privacy: { padding: 16, gap: 6, backgroundColor: c.soft },
+  privacyText: { fontSize: 14.5, lineHeight: 21, color: c.onPop },
   input: {
     minHeight: 50,
     paddingHorizontal: 14,
     fontFamily: Font.semi,
     fontSize: 17,
-    color: Ink,
-    backgroundColor: Palette.bg,
+    color: c.ink,
+    backgroundColor: c.bg,
     borderWidth: 2,
-    borderColor: Ink,
+    borderColor: c.ink,
     ...Wobble.c,
   },
-  error: { color: Palette.danger },
+  error: { color: c.danger },
   primary: { minHeight: 58 },
   primaryText: { fontSize: 27, lineHeight: 31 },
   link: { minHeight: 44, alignItems: 'center', justifyContent: 'center' },
   skipLink: { minHeight: 44, justifyContent: 'center', paddingHorizontal: 4 },
-  linkText: { fontSize: 21, lineHeight: 25, color: Palette.muted, textDecorationLine: 'underline' },
+  linkText: { fontSize: 21, lineHeight: 25, color: c.muted, textDecorationLine: 'underline' },
 });

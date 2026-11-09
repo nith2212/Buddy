@@ -9,13 +9,15 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BuddyBlob } from '@/components/buddy-blob';
 import { BrandHeader } from '@/components/side-menu';
 import { Bubble, Chip, SketchButton, Txt } from '@/components/sketch';
-import { Palette } from '@/constants/sketch';
+import { type Colors } from '@/constants/sketch';
+import { useColors, useThemedStyles } from '@/hooks/use-theme';
 import { useToken } from '@/hooks/use-session';
 import { api, Task } from '@/lib/api';
 
 const MAX_CHOICES = 8;
 
 export default function ChatPickerScreen() {
+  const styles = useThemedStyles(makeStyles);
   const token = useToken();
   const client = useMemo(() => api(token), [token]);
   const router = useRouter();
@@ -77,8 +79,9 @@ export default function ChatPickerScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: Palette.bg },
+const makeStyles = (c: Colors) =>
+  StyleSheet.create({
+  screen: { flex: 1, backgroundColor: c.bg },
   content: { paddingHorizontal: 16, paddingTop: 16 },
   turn: { flexDirection: 'row', alignItems: 'flex-start', gap: 8 },
   avatar: { marginTop: 4 },

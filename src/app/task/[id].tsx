@@ -10,13 +10,16 @@ import Svg, { Path } from 'react-native-svg';
 import { BuddyBlob } from '@/components/buddy-blob';
 import { Checkbox } from '@/components/checkbox';
 import { Bubble, Chip, SketchButton, Txt } from '@/components/sketch';
-import { Border, Font, Ink, Palette, Wobble } from '@/constants/sketch';
+import { Border, Font, Wobble, type Colors } from '@/constants/sketch';
+import { useColors, useThemedStyles } from '@/hooks/use-theme';
 import { useToken } from '@/hooks/use-session';
 import { api, ChatTurn, Subtask, Task } from '@/lib/api';
 import { formatDue, isOverdue } from '@/lib/dates';
 import { Reason, REASONS } from '@/lib/reasons';
 
 export default function TaskChatScreen() {
+  const styles = useThemedStyles(makeStyles);
+  const c = useColors();
   const { id, from, ask } = useLocalSearchParams<{ id: string; from?: string; ask?: string }>();
   const taskId = Number(id);
   const token = useToken();
@@ -151,14 +154,14 @@ export default function TaskChatScreen() {
       <View style={styles.titleRow}>
         <SketchButton tone="plain" wobble="round" lifted={false} onPress={goBack} accessibilityLabel="Back to tasks" style={styles.back}>
           <Svg width={18} height={16} viewBox="0 0 18 16">
-            <Path d="M9 2 L2 8 L9 14 M2 8 Q10 7.4 16 8" fill="none" stroke={Ink} strokeWidth={2.6} strokeLinecap="round" strokeLinejoin="round" />
+            <Path d="M9 2 L2 8 L9 14 M2 8 Q10 7.4 16 8" fill="none" stroke={c.ink} strokeWidth={2.6} strokeLinecap="round" strokeLinejoin="round" />
           </Svg>
         </SketchButton>
         <View style={styles.titleText}>
           <Txt variant="heading" numberOfLines={2} accessibilityRole="header">{task?.title ?? ''}</Txt>
           {dueLabel ? (
-            <View style={[styles.dueChip, { backgroundColor: task && isOverdue(task.due_date) ? Palette.soft : Palette.bg }]}>
-              <Txt variant="hand" style={styles.dueText}>{dueLabel}</Txt>
+            <View style={[styles.dueChip, { backgroundColor: task && isOverdue(task.due_date) ? c.soft : c.bg }]}>
+              <Txt variant="hand" style={[styles.dueText, task && isOverdue(task.due_date) && { color: c.onPop }]}>{dueLabel}</Txt>
             </View>
           ) : null}
         </View>
@@ -188,7 +191,7 @@ export default function TaskChatScreen() {
                   value={newStep}
                   onChangeText={setNewStep}
                   placeholder="Add a step…"
-                  placeholderTextColor={Palette.muted}
+                  placeholderTextColor={c.muted}
                   accessibilityLabel="Add a step"
                   maxLength={200}
                   returnKeyType="done"
@@ -302,7 +305,7 @@ export default function TaskChatScreen() {
             value={input}
             onChangeText={setInput}
             placeholder={fresh ? 'Or just tell Buddy…' : 'Message Buddy…'}
-            placeholderTextColor={Palette.muted}
+            placeholderTextColor={c.muted}
             accessibilityLabel="Message Buddy about this task"
             maxLength={1000}
             multiline
@@ -310,7 +313,7 @@ export default function TaskChatScreen() {
           />
           <SketchButton onPress={send} disabled={!input.trim() || sending} accessibilityLabel="Send message" style={styles.send}>
             <Svg width={22} height={20} viewBox="0 0 22 20">
-              <Path d="M2 10 L20 2 L14 18 L11 11 Z" fill="none" stroke={Ink} strokeWidth={2.4} strokeLinejoin="round" />
+              <Path d="M2 10 L20 2 L14 18 L11 11 Z" fill="none" stroke={c.ink} strokeWidth={2.4} strokeLinejoin="round" />
             </Svg>
           </SketchButton>
         </View>
@@ -319,23 +322,24 @@ export default function TaskChatScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: Palette.bg },
+const makeStyles = (c: Colors) =>
+  StyleSheet.create({
+  screen: { flex: 1, backgroundColor: c.bg },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12 },
   centerText: { textAlign: 'center' },
   topBar: {
     paddingHorizontal: 18,
     paddingBottom: 12,
     gap: 10,
-    backgroundColor: Palette.card,
+    backgroundColor: c.card,
     borderBottomWidth: Border,
     borderStyle: 'dashed',
-    borderColor: Ink,
+    borderColor: c.ink,
   },
   titleRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   back: { width: 44, height: 44, minHeight: 44, paddingHorizontal: 0 },
   titleText: { flex: 1, gap: 4 },
-  dueChip: { alignSelf: 'flex-start', borderWidth: 2, borderColor: Ink, paddingHorizontal: 9, ...Wobble.c },
+  dueChip: { alignSelf: 'flex-start', borderWidth: 2, borderColor: c.ink, paddingHorizontal: 9, ...Wobble.c },
   dueText: { fontSize: 15, lineHeight: 20 },
   steps: { gap: 8 },
   stepsToggle: { minHeight: 44, flexDirection: 'row', justifyContent: 'space-between', borderWidth: 2 },
@@ -346,10 +350,10 @@ const styles = StyleSheet.create({
   input: {
     fontFamily: Font.semi,
     fontSize: 16,
-    color: Ink,
-    backgroundColor: Palette.white,
+    color: c.ink,
+    backgroundColor: c.white,
     borderWidth: Border,
-    borderColor: Ink,
+    borderColor: c.ink,
     paddingHorizontal: 14,
   },
   stepInput: { flex: 1, minHeight: 44, borderWidth: 2, ...Wobble.c },
@@ -357,7 +361,7 @@ const styles = StyleSheet.create({
   freshBody: { flex: 1, alignItems: 'center', paddingHorizontal: 22, paddingTop: 20, gap: 10 },
   freshSub: { maxWidth: 290, marginBottom: 6 },
   reasonList: { alignSelf: 'stretch', gap: 10 },
-  reasonButton: { backgroundColor: Palette.white, boxShadow: `4px 4px 0px ${Palette.deep}` },
+  reasonButton: { backgroundColor: c.white, boxShadow: `4px 4px 0px ${c.deep}` },
   content: { paddingHorizontal: 16, paddingTop: 16, paddingBottom: 16 },
   turn: { flexDirection: 'row', alignItems: 'flex-start', gap: 8 },
   turnMine: { justifyContent: 'flex-end' },
@@ -366,15 +370,15 @@ const styles = StyleSheet.create({
   askAgain: { marginTop: 14, gap: 8 },
   footerGap: { marginTop: 12 }, // same gap as between messages (the separator only sits between items)
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  error: { color: Palette.danger, paddingHorizontal: 16, paddingBottom: 4 },
+  error: { color: c.danger, paddingHorizontal: 16, paddingBottom: 4 },
   inputArea: {
     paddingHorizontal: 16,
     paddingTop: 10,
     gap: 10,
-    backgroundColor: Palette.card,
+    backgroundColor: c.card,
     borderTopWidth: Border,
     borderStyle: 'dashed',
-    borderColor: Ink,
+    borderColor: c.ink,
   },
   stuck: {
     alignSelf: 'center',
@@ -382,8 +386,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingHorizontal: 14,
     borderWidth: 2,
-    borderColor: Ink,
-    backgroundColor: Palette.bg,
+    borderColor: c.ink,
+    backgroundColor: c.bg,
     ...Wobble.c,
   },
   stuckText: { fontSize: 18 },

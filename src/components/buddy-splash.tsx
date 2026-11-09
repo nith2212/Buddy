@@ -15,9 +15,12 @@ import Animated, {
 
 import { BuddyBlob } from '@/components/buddy-blob';
 import { Txt } from '@/components/sketch';
-import { Palette } from '@/constants/sketch';
+import { type Colors } from '@/constants/sketch';
+import { useColors, useThemedStyles } from '@/hooks/use-theme';
 
 export function BuddySplash({ failed }: { failed?: boolean }) {
+  const styles = useThemedStyles(makeStyles);
+  const c = useColors();
   const reduceMotion = useReducedMotion();
   const float = useSharedValue(0);
   useEffect(() => {
@@ -31,7 +34,7 @@ export function BuddySplash({ failed }: { failed?: boolean }) {
   return (
     <Animated.View exiting={FadeOut.duration(250)} style={styles.screen} accessibilityLiveRegion="polite">
       <Txt variant="title" style={styles.brand}>
-        buddy<Txt variant="title" style={[styles.brand, { color: Palette.deep }]}>.</Txt>
+        buddy<Txt variant="title" style={[styles.brand, { color: c.deep }]}>.</Txt>
       </Txt>
       <Animated.View style={bob}>
         <BuddyBlob width={220} mood={failed ? 'worried' : 'default'} label={failed ? 'Buddy, worried' : 'Buddy, floating while the app wakes up'} />
@@ -52,21 +55,22 @@ export function BuddySplash({ failed }: { failed?: boolean }) {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (c: Colors) =>
+  StyleSheet.create({
   screen: {
     position: 'absolute',
     top: 0,
     right: 0,
     bottom: 0,
     left: 0,
-    backgroundColor: Palette.bg,
+    backgroundColor: c.bg,
     alignItems: 'center',
     justifyContent: 'center',
     padding: 32,
     gap: 8,
   },
   brand: { fontSize: 68, lineHeight: 72, marginBottom: 20 },
-  floor: { width: 130, height: 16, borderRadius: 8, backgroundColor: Palette.deep, marginTop: 4 },
+  floor: { width: 130, height: 16, borderRadius: 8, backgroundColor: c.deep, marginTop: 4 },
   text: { marginTop: 36, gap: 6, maxWidth: 280 },
   center: { textAlign: 'center' },
 });

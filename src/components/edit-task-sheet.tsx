@@ -11,7 +11,8 @@ import Svg, { Path } from 'react-native-svg';
 import { BuddyBlob } from '@/components/buddy-blob';
 import { DuePicker } from '@/components/due-picker';
 import { Card, SketchButton, Txt } from '@/components/sketch';
-import { Border, Font, Ink, Palette, Wobble } from '@/constants/sketch';
+import { Border, Font, Wobble, type Colors } from '@/constants/sketch';
+import { useColors, useThemedStyles } from '@/hooks/use-theme';
 import type { api, Task } from '@/lib/api';
 import { DayKey, dayKeyOfIso, dueDateFor } from '@/lib/dates';
 
@@ -25,6 +26,8 @@ type Props = {
 
 /** Mount it only while editing (`{editing ? <EditTaskSheet task={editing} … /> : null}`), so it starts fresh. */
 export function EditTaskSheet({ task, client, onClose, onSaved, onDeleted }: Props) {
+  const styles = useThemedStyles(makeStyles);
+  const c = useColors();
   const insets = useSafeAreaInsets();
   const initialDay = dayKeyOfIso(task.due_date);
   const [title, setTitle] = useState(task.title ?? '');
@@ -110,7 +113,7 @@ export function EditTaskSheet({ task, client, onClose, onSaved, onDeleted }: Pro
                     disabled={busy}
                     accessibilityLabel={`Delete ${shownTitle} for good`}
                     style={styles.dialogButton}
-                    textStyle={[styles.dialogButtonText, { color: Palette.danger }]}
+                    textStyle={[styles.dialogButtonText, { color: c.danger }]}
                   />
                   <SketchButton
                     label="keep it"
@@ -140,7 +143,7 @@ export function EditTaskSheet({ task, client, onClose, onSaved, onDeleted }: Pro
                 value={title}
                 onChangeText={setTitle}
                 placeholder="What's the task?"
-                placeholderTextColor={Palette.muted}
+                placeholderTextColor={c.muted}
                 accessibilityLabel="Task"
                 maxLength={200}
                 returnKeyType="done"
@@ -161,7 +164,7 @@ export function EditTaskSheet({ task, client, onClose, onSaved, onDeleted }: Pro
                     <Path
                       d="M3 5 H15 M7 5 V3 H11 V5 M4.5 5 L5.5 16 H12.5 L13.5 5"
                       fill="none"
-                      stroke={Palette.danger}
+                      stroke={c.danger}
                       strokeWidth={2}
                       strokeLinecap="round"
                       strokeLinejoin="round"
@@ -186,20 +189,21 @@ export function EditTaskSheet({ task, client, onClose, onSaved, onDeleted }: Pro
   );
 }
 
-const styles = StyleSheet.create({
-  scrim: { flex: 1, backgroundColor: 'rgba(42, 34, 56, 0.42)' },
+const makeStyles = (c: Colors) =>
+  StyleSheet.create({
+  scrim: { flex: 1, backgroundColor: c.scrim },
   bottom: { flex: 1, justifyContent: 'flex-end' },
   sheet: {
     maxHeight: '92%',
-    backgroundColor: Palette.card,
+    backgroundColor: c.card,
     borderWidth: Border,
     borderBottomWidth: 0,
-    borderColor: Ink,
+    borderColor: c.ink,
     borderTopLeftRadius: 26,
     borderTopRightRadius: 18,
   },
   sheetContent: { paddingHorizontal: 22, paddingTop: 14, gap: 12 },
-  grab: { width: 56, height: 6, borderRadius: 3, backgroundColor: Ink, opacity: 0.5, alignSelf: 'center' },
+  grab: { width: 56, height: 6, borderRadius: 3, backgroundColor: c.ink, opacity: 0.5, alignSelf: 'center' },
   heading: { fontSize: 30, lineHeight: 32 },
   label: { fontSize: 21, lineHeight: 25, marginBottom: -4 },
   input: {
@@ -207,16 +211,16 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     fontFamily: Font.semi,
     fontSize: 17,
-    color: Ink,
-    backgroundColor: Palette.bg,
+    color: c.ink,
+    backgroundColor: c.bg,
     borderWidth: 2,
-    borderColor: Ink,
+    borderColor: c.ink,
     ...Wobble.c,
   },
-  error: { color: Palette.danger },
+  error: { color: c.danger },
   actions: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 4 },
   deleteLink: { flexDirection: 'row', alignItems: 'center', gap: 6, minHeight: 44 },
-  deleteText: { fontSize: 21, lineHeight: 25, color: Palette.danger, textDecorationLine: 'underline' },
+  deleteText: { fontSize: 21, lineHeight: 25, color: c.danger, textDecorationLine: 'underline' },
   save: { minHeight: 54, paddingHorizontal: 26 },
   saveText: { fontSize: 26, lineHeight: 30 },
   center: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, alignItems: 'center', justifyContent: 'center', padding: 28 },
