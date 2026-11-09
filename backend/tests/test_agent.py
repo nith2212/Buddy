@@ -408,6 +408,19 @@ def test_the_reading_moves_the_stage_and_notes_their_words(api, db, monkeypatch)
     assert causes_of(db, user_id) == {}  # an answer is not a confirmation
 
 
+
+def test_buddy_knows_their_name_but_is_told_to_use_it_sparingly(api, db, monkeypatch):
+    fake = FakeLLM(reads=[{"kind": "answer"}])
+    monkeypatch.setattr(llm, "complete", fake)
+    user_id, h = register(api)
+    api.post("/me/onboarding", json={"name": "Nithya"}, headers=h)
+    t = make_task(api, h)
+    start(api, h, t, "afraid")
+    system = system_of(fake.write_calls[-1])
+    assert 'Their name: "Nithya"' in system and "not in every reply" in system
+    assert "profile.name" not in system   # never as a raw memory row
+
+
 def test_confirming_saves_the_cause_once(api, db, monkeypatch):
     fake = FakeLLM(reads=[{"kind": "answer"}, {"kind": "confirm", "cause": "afraid"}, {"kind": "confirm"}])
     monkeypatch.setattr(llm, "complete", fake)

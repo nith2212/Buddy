@@ -205,3 +205,31 @@ def test_checkin_wording_fits_the_situation_and_changes_day_to_day():
 
     long_body = service.checkin_message(task(title="x" * 100), now)[1]
     assert "…”" in long_body and len(long_body) < 110
+
+
+def test_checkin_greets_them_by_name_and_only_their_own(api, db, monkeypatch):
+    import asyncio
+    from notifications import service
+
+    now = datetime(2026, 11, 9, 6, 0, tzinfo=timezone.utc)
+    task = models.Task(title="Lab report", due_date=now + timedelta(hours=5))
+    assert service.checkin_message(task, now, "Nithya Sri")[0] == "Heads up, Nithya 🌟"   # first word only
+    assert service.checkin_message(models.Task(title="Lab report"), now, "Nithya")[0] == "Hey Nithya! 🌟"
+    assert service.checkin_message(task, now, None)[0] == "Heads up 🌟"                  # no name: as before
+    assert service.checkin_message(None, now, "Nithya")[0] == "Hey Nithya! 🌟"
+
+    uid, h = register(api)
+    other, oh = register(api)
+    api.post("/me/onboarding", json={"name": "Nithya"}, headers=h)
+    mine = api.post("/tasks", json={"title": "a"}, headers=h).json()["id"]
+    theirs = api.post("/tasks", json={"title": "b"}, headers=oh).json()["id"]
+    sent = []
+
+    async def fake_push(*, title, body, **kw):
+        sent.append(title)
+        return {"status": "ok"}
+
+    monkeypatch.setattr(service, "send_push", fake_push)
+    asyncio.run(service.send_daily_checkin(db, uid, mine))
+    asyncio.run(service.send_daily_checkin(db, other, theirs))
+    assert sent == ["Hey Nithya! 🌟", "Hey! 🌟"]

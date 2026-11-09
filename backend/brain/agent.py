@@ -90,9 +90,18 @@ CAUSE_WORDS = {
     "bored": "it feels boring or pointless",
     "tired": "being tired or drained",
 }
-# memory rows never shown to the writer as rows: causes come through the one pattern line, and Echo's
-# weekly facts (echo.week.*) are for Buddy's judgment only, through _context_line
-_CAUSE_KEYS = ("blocker.", "pattern.", "echo.")
+# memory rows never shown to the writer as rows: causes come through the one pattern line, Echo's
+# weekly facts (echo.week.*) are for Buddy's judgment only, through _context_line, and the name comes through
+# _name_line, which says how sparingly to use it
+_CAUSE_KEYS = ("blocker.", "pattern.", "echo.", "profile.")
+
+
+def _name_line(name: Optional[str]) -> Optional[str]:
+    """How Buddy may use the person's name: like a friend would, now and then. Said in every reply it grates."""
+    if not name:
+        return None
+    return (f'Their name: "{name}". Use it now and then, like a friend would: at most once in a reply, not in '
+            "every reply, and never to open every message.")
 
 # After these, a polite "okay" is more likely avoidance than agreement.
 _NO_RELEASE_STATES = {"avoidance", "commitment_drift"}
@@ -142,6 +151,9 @@ async def run_turn(
     pattern = _context_line(db, user_id, task_id, all_memory)
     if pattern:
         situation += f"\n{pattern}"
+    name_line = _name_line(tools.get_name(db, user_id))
+    if name_line:
+        situation += f"\n{name_line}"
 
     recent = _recent_interventions(memory)
     candidates = interventions_for(top_state)
@@ -241,6 +253,7 @@ async def _flow_turn(
     saved = tools.get_memory_entry(db, user_id, f"blocker.task.{task_id}")
     already_saved = bool(saved and as_utc(saved.updated_at) > as_utc(since))
     pattern = _context_line(db, user_id, task_id, tools.get_user_memory(db, user_id))
+    name = tools.get_name(db, user_id)
     known = echo.profile(db, user_id, datetime.now(timezone.utc))  # E3: how they've reacted before
     steps = _load_steps(db, task)
     open_steps = [s.title for s in steps if not s.done][:FLOW_OPEN_STEPS]
@@ -281,7 +294,7 @@ async def _flow_turn(
 
     system = _flow_prompt(step, title=title, timing=timing, first_turn=first_turn, open_steps=open_steps,
                           done_steps=done_steps, tapped=tapped, notes=notes, last_time=last_time,
-                          pattern=pattern)
+                          pattern=pattern, name=name)
     limits = (3, 0) if step.stage in flow.NO_QUESTION else (3, 1)
     check_phase = "offer" if step.stage == "offer" else (
         "guess" if step.stage == "narrow" or step.modifier == "idk" else step.stage)
@@ -350,6 +363,7 @@ async def _ask_reason_turn(db: Session, user_id: str, task: Task, user_message: 
     done_steps = [s.title for s in steps if s.done][:FLOW_OPEN_STEPS]
     timing = _due_phrase(task.due_date, datetime.now(timezone.utc))
     context = _context_line(db, user_id, task_id, tools.get_user_memory(db, user_id))
+    name_line = _name_line(tools.get_name(db, user_id))
     title = task.title or "untitled"
     anchors = salient_words(task.title, *open_steps) if first_turn else set()
     db.rollback()  # read-only so far: give the connection back before waiting on the model
@@ -364,6 +378,8 @@ async def _ask_reason_turn(db: Session, user_id: str, task: Task, user_message: 
              f"Done so far (the only progress you may praise): {'; '.join(done_steps) or 'nothing yet'}"]
     if context:
         facts.append(context)
+    if name_line:
+        facts.append(name_line)
     system = (f"{framework_section('shared', 'Voice')}\n\n" + "\n".join(facts)
               + f"\n\nWhat to do now:\n{card}\n\nRules:\n" + _flow_rules(asks=not bigger))
 
@@ -398,7 +414,7 @@ def _flow_rules(asks: bool) -> str:
 
 def _flow_prompt(
     step: "flow.Step", *, title: str, timing: str, first_turn: bool, open_steps: list[str], done_steps: list[str],
-    tapped: str, notes: dict, last_time: Optional[dict], pattern: Optional[str],
+    tapped: str, notes: dict, last_time: Optional[dict], pattern: Optional[str], name: Optional[str] = None,
 ) -> str:
     """The writer's whole prompt for one framework turn: voice, this stage, the facts, this stage's rules."""
     generic = step.stage in flow.GENERIC
@@ -425,6 +441,8 @@ def _flow_prompt(
         facts.append("Last time on this task: " + "; ".join(f"{k}: {v}" for k, v in last_time.items()))
     if pattern:
         facts.append(pattern)
+    if _name_line(name):
+        facts.append(_name_line(name))
 
     what = f"{card}\n{modifier}" if modifier else card
     return (

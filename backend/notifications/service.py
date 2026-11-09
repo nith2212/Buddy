@@ -11,6 +11,7 @@ from typing import Any
 import httpx
 from sqlalchemy.orm import Session
 
+from brain import tools
 from brain.state_detection import as_utc
 from models import DeviceToken, Task
 
@@ -113,13 +114,22 @@ def checkin_situation(task: Task, now: datetime) -> str:
     return "waiting"
 
 
-def checkin_message(task: Task | None, now: datetime) -> tuple[str, str]:
+# With their name (onboarding), the title greets them by it: "Hey Nithya! 🌟".
+NAMED_TITLES = {"past_due": "Hey {name}! 🌟", "due_soon": "Heads up, {name} 🌟", "waiting": "Hey {name}! 🌟"}
+
+
+def checkin_message(task: Task | None, now: datetime, person: str | None = None) -> tuple[str, str]:
     """Title and body of the daily check-in. It names the task: a check-in that doesn't say which task gets
-    ignored (and Echo counts it as ignored). Variants take turns by day, so the line changes day to day."""
+    ignored (and Echo counts it as ignored). Variants take turns by day, so the line changes day to day.
+    `person` is their name, if they gave one: only its first word goes in the title, to keep it short."""
+    first = tools.short_name(person)
     name = quoted_title(task.title if task else None)
     if task is None or name is None:
-        return "Hey! 🌟", "How's your task going today?"
-    title, bodies = CHECKIN_LINES[checkin_situation(task, now)]
+        return (f"Hey {first}! 🌟" if first else "Hey! 🌟"), "How's your task going today?"
+    situation = checkin_situation(task, now)
+    title, bodies = CHECKIN_LINES[situation]
+    if first:
+        title = NAMED_TITLES[situation].format(name=first)
     return title, bodies[now.date().toordinal() % len(bodies)].format(task=name)
 
 
@@ -128,7 +138,7 @@ async def send_daily_checkin(db: Session, user_id: str, task_id: int, now: datet
     Scheduler entry point. Sends the initial task-state check-in notification.
     """
     task = db.query(Task).filter(Task.id == task_id, Task.user_id == user_id).first()
-    title, body = checkin_message(task, now or datetime.now(timezone.utc))
+    title, body = checkin_message(task, now or datetime.now(timezone.utc), tools.get_name(db, user_id))
     return await send_push(
         db=db,
         user_id=user_id,

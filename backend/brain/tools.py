@@ -173,6 +173,33 @@ def forget_task_causes(db: Session, user_id: str, task_id: int,
             db.delete(row)
     db.execute(delete(Memory).where(Memory.user_id == user_id, Memory.key == f"blocker.task.{task_id}"))
 
+
+# ── The person's name (onboarding screen 2, optional) ─────────────────────────
+# Kept as a memory row so DELETE /me and the isolation rules cover it. It never reaches the writer as a raw row
+# (agent._CAUSE_KEYS skips "profile."): one controlled line says how to use it (agent._name_line).
+
+NAME_KEY = "profile.name"
+NAME_MAX = 30
+
+
+def clean_name(raw: Optional[str]) -> Optional[str]:
+    """What they want to be called: one line, plain spaces, at most NAME_MAX characters. None when empty."""
+    if not raw:
+        return None
+    name = " ".join("".join(ch for ch in raw if ch.isprintable()).split())[:NAME_MAX].strip()
+    return name or None
+
+
+def get_name(db: Session, user_id: str) -> Optional[str]:
+    row = get_memory_entry(db, user_id, NAME_KEY)
+    return clean_name(row.value) if row else None
+
+
+def short_name(name: Optional[str]) -> Optional[str]:
+    """For tight spots like a notification title: the first word, at most 15 characters."""
+    return name.split()[0][:15] if name else None
+
+
 # ── Event logging ─────────────────────────────────────────────────────────────
 
 def log_event(

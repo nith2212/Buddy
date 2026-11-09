@@ -1,5 +1,5 @@
 # DELETE /me — wipes every row belonging to the caller, then the user itself, in one transaction.
-# POST /me/onboarding — saves (or replaces) the caller's first-launch answers. Every answer is optional.
+# POST /me/onboarding — saves (or replaces) the caller's first-launch answers, name included. Every answer is optional.
 
 from typing import Literal, Optional
 
@@ -9,6 +9,7 @@ from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
 from auth import current_user
+from brain import tools
 from db import get_db
 from models import (
     DeviceToken, EmotionLog, Event, Memory, Message, Onboarding, Subtask, Task, User,
@@ -37,6 +38,7 @@ _WAY_ORDER = ["unclear", "too_much", "afraid", "bored", "tired", "not_sure"]
 
 
 class OnboardingAnswers(BaseModel):
+    name: Optional[str] = Field(default=None, max_length=60)  # what Buddy calls them; cleaned and capped on save
     days: Optional[Days] = None
     click_time: Optional[ClickTime] = None
     gets_in_way: list[GetsInWay] = Field(default_factory=list, max_length=len(_WAY_ORDER))
@@ -53,6 +55,12 @@ def save_onboarding(answers: OnboardingAnswers, user: User = Depends(current_use
     picked = set(answers.gets_in_way)
     row.days, row.click_time = answers.days, answers.click_time
     row.gets_in_way = ",".join(w for w in _WAY_ORDER if w in picked) or None
+    # The name is a memory row (so Buddy can use it, sparingly); sent again without one, it's forgotten.
+    name = tools.clean_name(answers.name)
+    if name:
+        tools.update_memory(db, user.id, tools.NAME_KEY, name, confidence=1.0, source="onboarding", commit=False)
+    else:
+        db.execute(delete(Memory).where(Memory.user_id == user.id, Memory.key == tools.NAME_KEY))
     db.commit()
-    return OnboardingAnswers(days=row.days, click_time=row.click_time,
+    return OnboardingAnswers(name=name, days=row.days, click_time=row.click_time,
                              gets_in_way=row.gets_in_way.split(",") if row.gets_in_way else [])

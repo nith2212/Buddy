@@ -1,5 +1,6 @@
-// First launch only (approved mockup, 2026-11-07): Hi → How it works → About you → What gets in your way →
-// Check-ins + privacy → First task. "skip" on screens 1–4 jumps to 5, so everyone sees the privacy line.
+// First launch only (approved mockup, 2026-11-07): Hi → Your name (developer, 2026-11-09) → How it works → About you →
+// What gets in your way → Check-ins + privacy → First task. "skip" on screens 1–5 jumps to 6, so everyone sees the
+// privacy line.
 // The answers are "you said" (POST /me/onboarding): they set check-in hours, and are never confirmed causes.
 
 import { type ReactNode, useEffect, useMemo, useState } from 'react';
@@ -46,7 +47,7 @@ const WAYS: { value: Way; label: string }[] = [
 ];
 
 const HOW_CHIPS = ['don’t know where to start', 'feels too big', 'scared it won’t be good', 'boring', 'too tired'];
-const STEPS = 6;
+const STEPS = 7;
 
 type Props = {
   token: string;
@@ -61,6 +62,7 @@ export function Onboarding({ token, onDone }: Props) {
   const insets = useSafeAreaInsets();
   const [step, setStep] = useState(1);
 
+  const [name, setName] = useState('');
   const [days, setDays] = useState<Days | null>(null);
   const [clickTime, setClickTime] = useState<ClickTime | null>(null);
   const [ways, setWays] = useState<Way[]>([]);
@@ -83,12 +85,17 @@ export function Onboarding({ token, onDone }: Props) {
 
   function toCheckins() {
     // Whatever they picked so far; every answer is optional, and a failed save mustn't block onboarding.
-    if (days || clickTime || ways.length) {
+    if (name.trim() || days || clickTime || ways.length) {
       client
-        .saveOnboarding({ days: days ?? undefined, click_time: clickTime ?? undefined, gets_in_way: ways })
+        .saveOnboarding({
+          name: name.trim() || undefined,
+          days: days ?? undefined,
+          click_time: clickTime ?? undefined,
+          gets_in_way: ways,
+        })
         .catch(() => {});
     }
-    setStep(5);
+    setStep(6);
   }
 
   function toggleWay(way: Way) {
@@ -105,7 +112,7 @@ export function Onboarding({ token, onDone }: Props) {
       // No check-ins for now; they can still use everything else.
     } finally {
       setAsking(false);
-      setStep(6);
+      setStep(7);
     }
   }
 
@@ -139,6 +146,43 @@ export function Onboarding({ token, onDone }: Props) {
       </>
     );
   } else if (step === 2) {
+    const first = name.trim().split(/\s+/)[0]?.slice(0, 12);
+    body = (
+      <>
+        <View style={styles.centerRow}>
+          <BuddyBlob width={150} label="Buddy, curious" />
+        </View>
+        <View style={styles.gap8}>
+          <Txt variant="title" style={styles.h1} accessibilityRole="header">What should I call you?</Txt>
+          <Txt style={styles.small}>A first name or a nickname is perfect.</Txt>
+        </View>
+        <Card style={styles.cardGap14}>
+          <Txt variant="hand" style={styles.label}>Your name</Txt>
+          <TextInput
+            value={name}
+            onChangeText={setName}
+            placeholder="Your name"
+            placeholderTextColor={c.muted}
+            accessibilityLabel="Your name"
+            maxLength={30}
+            autoCapitalize="words"
+            autoComplete="name"
+            returnKeyType="next"
+            onSubmitEditing={() => setStep(3)}
+            style={styles.input}
+          />
+        </Card>
+        <View style={styles.grow} />
+        <Primary
+          label={first ? `Nice to meet you, ${first}!` : 'Next'}
+          onPress={() => {
+            Keyboard.dismiss();
+            setStep(3);
+          }}
+        />
+      </>
+    );
+  } else if (step === 3) {
     body = (
       <>
         <Txt variant="title" style={styles.h1} accessibilityRole="header">Stuck? Tell me why.</Txt>
@@ -167,10 +211,10 @@ export function Onboarding({ token, onDone }: Props) {
           </View>
         </Card>
         <View style={styles.grow} />
-        <Primary label="Got it" onPress={() => setStep(3)} />
+        <Primary label="Got it" onPress={() => setStep(4)} />
       </>
     );
-  } else if (step === 3) {
+  } else if (step === 4) {
     body = (
       <>
         <View style={styles.gap8}>
@@ -200,10 +244,10 @@ export function Onboarding({ token, onDone }: Props) {
           <Txt style={styles.small}>I’ll send check-ins around then.</Txt>
         </Card>
         <View style={styles.grow} />
-        <Primary label="Next" onPress={() => setStep(4)} />
+        <Primary label="Next" onPress={() => setStep(5)} />
       </>
     );
-  } else if (step === 4) {
+  } else if (step === 5) {
     body = (
       <>
         <View style={styles.wayHead}>
@@ -237,7 +281,7 @@ export function Onboarding({ token, onDone }: Props) {
         <Primary label="Next" onPress={toCheckins} />
       </>
     );
-  } else if (step === 5) {
+  } else if (step === 6) {
     body = (
       <>
         <SampleCheckin />
@@ -256,7 +300,7 @@ export function Onboarding({ token, onDone }: Props) {
         <View style={styles.grow} />
         <View style={styles.gap6}>
           <Primary label={asking ? '…' : 'Turn on check-ins'} onPress={turnOnCheckins} disabled={asking} />
-          <TextLink label="maybe later" onPress={() => setStep(6)} disabled={asking} />
+          <TextLink label="maybe later" onPress={() => setStep(7)} disabled={asking} />
         </View>
       </>
     );
@@ -307,7 +351,7 @@ export function Onboarding({ token, onDone }: Props) {
               <View key={i} style={[styles.dot, i < step && styles.dotOn]} />
             ))}
           </View>
-          {step <= 4 ? <TextLink label="skip" onPress={toCheckins} small /> : null}
+          {step <= 5 ? <TextLink label="skip" onPress={toCheckins} small /> : null}
         </View>
         <Animated.View key={step} entering={FadeIn.duration(220)} style={styles.step}>
           {body}

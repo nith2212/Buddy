@@ -369,13 +369,13 @@ def test_onboarding_saves_the_answers_and_replaces_them(api, users, db):
     r = api.post("/me/onboarding", json={"days": "school", "click_time": "evening",
                                          "gets_in_way": ["tired", "afraid", "tired"]}, headers=a_h)
     assert r.status_code == 200
-    assert r.json() == {"days": "school", "click_time": "evening", "gets_in_way": ["afraid", "tired"]}
+    assert r.json() == {"name": None, "days": "school", "click_time": "evening", "gets_in_way": ["afraid", "tired"]}
     row = onboarding_of(db, a_id)
     assert (row.days, row.click_time, row.gets_in_way) == ("school", "evening", "afraid,tired")
 
     # Sent again (say, after a reinstall): one row, the new answers. Every answer is optional.
     assert api.post("/me/onboarding", json={"click_time": "morning"}, headers=a_h).json() == \
-        {"days": None, "click_time": "morning", "gets_in_way": []}
+        {"name": None, "days": None, "click_time": "morning", "gets_in_way": []}
     assert db.query(models.Onboarding).filter_by(user_id=a_id).count() == 1
     row = onboarding_of(db, a_id)
     assert (row.days, row.click_time, row.gets_in_way) == (None, "morning", None)
@@ -400,6 +400,26 @@ def test_onboarding_answers_are_you_said_never_causes(api, users, db):
     db.expire_all()
     assert db.query(models.Memory).filter_by(user_id=a_id).count() == 0
     assert db.query(models.EmotionLog).filter_by(user_id=a_id).count() == 0
+
+
+def test_onboarding_keeps_the_name_cleaned_and_forgets_it_when_left_out(api, users, db):
+    (a_id, a_h), (b_id, b_h) = users
+
+    def name_of(uid):
+        db.expire_all()
+        row = db.query(models.Memory).filter_by(user_id=uid, key="profile.name").one_or_none()
+        return row.value if row else None
+
+    r = api.post("/me/onboarding", json={"name": "  Nithya \n  Sri\t", "click_time": "evening"}, headers=a_h)
+    assert r.json()["name"] == "Nithya Sri" and name_of(a_id) == "Nithya Sri"
+    assert name_of(b_id) is None                                   # only ever the caller's
+    api.post("/me/onboarding", json={"name": "x" * 50}, headers=a_h)
+    assert name_of(a_id) == "x" * 30                               # capped
+    assert api.post("/me/onboarding", json={"name": "x" * 61}, headers=a_h).status_code == 422
+    api.post("/me/onboarding", json={"click_time": "morning"}, headers=a_h)
+    assert name_of(a_id) is None                                   # sent again without a name: forgotten
+    api.post("/me/onboarding", json={"name": "   "}, headers=a_h)
+    assert name_of(a_id) is None
 
 
 def test_onboarding_is_only_ever_the_callers(api, users, db):

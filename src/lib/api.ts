@@ -41,6 +41,7 @@ export type EchoWeek = EchoWeekSummary & {
 
 // POST /me/onboarding: what the person said about themselves. Every answer is optional; "you said", never a cause.
 export type OnboardingAnswers = {
+  name?: string; // what Buddy calls them (check-in titles, now and then in chat)
   days?: 'school' | 'work' | 'own_projects' | 'mix';
   click_time?: 'morning' | 'afternoon' | 'evening' | 'late_night' | 'changes';
   gets_in_way?: ('unclear' | 'too_much' | 'afraid' | 'bored' | 'tired' | 'not_sure')[];
