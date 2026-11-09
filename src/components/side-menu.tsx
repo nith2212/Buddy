@@ -122,12 +122,14 @@ function SideMenu({ visible, onClose }: { visible: boolean; onClose: () => void 
 
         <View style={styles.bottom}>
           <Txt variant="hand" style={styles.around}>I’m around if you get stuck!</Txt>
-          <View style={styles.peek}>
-            <BuddyBlob width={150} label="Buddy peeking up from the bottom of the menu" />
-          </View>
+          {/* Above Buddy, never last: on phones with on-screen nav buttons the menu's bottom edge can sit behind
+              them, and this is the link onboarding promises ("menu → Delete my data"). */}
           <Pressable onPress={confirmDelete} disabled={deleting} accessibilityRole="button" style={styles.delete} hitSlop={8}>
             <Txt variant="small" style={styles.deleteText}>{deleting ? 'Deleting…' : 'Delete my data'}</Txt>
           </Pressable>
+          <View style={styles.peek}>
+            <BuddyBlob width={150} label="Buddy peeking up from the bottom of the menu" />
+          </View>
         </View>
       </Animated.View>
     </Modal>
