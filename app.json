@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "buddy-app",
+    "name": "Buddy",
     "slug": "buddy-app",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -30,7 +30,14 @@
     },
     "plugins": [
       "expo-router",
-      "expo-notifications",
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/images/notification-icon.png",
+          "color": "#2A2238",
+          "defaultChannel": "buddy-checkin"
+        }
+      ],
       [
         "expo-splash-screen",
         {
