@@ -39,6 +39,13 @@ export type EchoWeek = EchoWeekSummary & {
   last_week: EchoWeekSummary | null; // saved by the Sunday 23:00 cron; null until the first one
 };
 
+// POST /me/onboarding: what the person said about themselves. Every answer is optional; "you said", never a cause.
+export type OnboardingAnswers = {
+  days?: 'school' | 'work' | 'own_projects' | 'mix';
+  click_time?: 'morning' | 'afternoon' | 'evening' | 'late_night' | 'changes';
+  gets_in_way?: ('unclear' | 'too_much' | 'afraid' | 'bored' | 'tired' | 'not_sure')[];
+};
+
 export class ApiError extends Error {
   constructor(public status: number) {
     super(`Request failed with status ${status}`);
@@ -87,5 +94,7 @@ export function api(token: string) {
     initiate: (taskId: number) => request<BuddyReply>(token, '/initiate', 'POST', { task_id: taskId }),
     echoWeek: () => request<EchoWeek>(token, '/echo/week'),
     deleteMe: () => request<void>(token, '/me', 'DELETE'),
+    saveOnboarding: (answers: OnboardingAnswers) =>
+      request<OnboardingAnswers>(token, '/me/onboarding', 'POST', answers),
   };
 }
