@@ -164,7 +164,8 @@ const makeStyles = (c: Colors) =>
   around: { textAlign: 'center', fontSize: 21 },
   peek: { height: 84, overflow: 'hidden' },
   delete: { minHeight: 44, justifyContent: 'center', paddingHorizontal: 12 },
-  deleteText: { textDecorationLine: 'underline', color: c.muted },
+  // Quiet (it's destructive) but findable: onboarding promises it. 13px was too small to spot (developer, 2026-11-09).
+  deleteText: { fontSize: 15, lineHeight: 20, textDecorationLine: 'underline', color: c.muted },
 });
 
 /** The header on top-level screens: menu button, "buddy." in the middle. */
