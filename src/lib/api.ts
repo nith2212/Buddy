@@ -45,7 +45,7 @@ export class ApiError extends Error {
   }
 }
 
-// Render's free tier can take ~50s to wake from sleep; don't hang past a minute.
+// Don't hang past a minute on a bad connection.
 const TIMEOUT_MS = 60_000;
 
 async function request<T>(token: string, path: string, method = 'GET', body?: unknown): Promise<T> {
@@ -71,8 +71,11 @@ export function api(token: string) {
     getTask: (id: number) => request<Task>(token, `/tasks/${id}`),
     createTask: (title: string, due_date: string | null) =>
       request<Task>(token, '/tasks', 'POST', { title, due_date }),
-    updateTask: (id: number, patch: { status?: 'open' | 'done' }) =>
+    // due_date: null clears it; leave a field out to keep it as it is.
+    updateTask: (id: number, patch: { status?: 'open' | 'done'; title?: string; due_date?: string | null }) =>
       request<Task>(token, `/tasks/${id}`, 'PATCH', patch),
+    // For good: the server also deletes its steps, chat, check-ins and what Buddy learned from it.
+    deleteTask: (id: number) => request<void>(token, `/tasks/${id}`, 'DELETE'),
     createSubtask: (taskId: number, title: string) =>
       request<Subtask>(token, `/tasks/${taskId}/subtasks`, 'POST', { title }),
     updateSubtask: (taskId: number, subtaskId: number, patch: { done?: boolean }) =>

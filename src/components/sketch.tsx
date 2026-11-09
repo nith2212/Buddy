@@ -112,7 +112,17 @@ export function SketchButton({ label, children, tone = 'pop', wobble = 'c', styl
   );
 }
 
-export function Chip({ label, selected, onPress, disabled }: { label: string; selected?: boolean; onPress?: () => void; disabled?: boolean }) {
+type ChipProps = {
+  label: string;
+  selected?: boolean;
+  onPress?: () => void;
+  disabled?: boolean;
+  /** a small drawn icon before the label */
+  icon?: ReactNode;
+  accessibilityLabel?: string;
+};
+
+export function Chip({ label, selected, onPress, disabled, icon, accessibilityLabel }: ChipProps) {
   return (
     <SketchButton
       label={label}
@@ -120,10 +130,17 @@ export function Chip({ label, selected, onPress, disabled }: { label: string; se
       lifted={false}
       onPress={onPress}
       disabled={disabled}
+      accessibilityLabel={accessibilityLabel}
       accessibilityState={{ selected: !!selected, disabled: !!disabled }}
       style={styles.chip}
-      textStyle={styles.chipText}
-    />
+      textStyle={styles.chipText}>
+      {icon ? (
+        <View style={styles.chipRow}>
+          {icon}
+          <Txt variant="hand" style={styles.chipText}>{label}</Txt>
+        </View>
+      ) : undefined}
+    </SketchButton>
   );
 }
 
@@ -156,6 +173,7 @@ const styles = StyleSheet.create({
   disabled: { opacity: 0.45 },
   chip: { minHeight: 44, paddingHorizontal: 12, borderWidth: 2 },
   chipText: { fontSize: 17, lineHeight: 21 },
+  chipRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   bubble: { maxWidth: '82%', paddingHorizontal: 14, paddingVertical: 10, borderWidth: Border, borderColor: Ink },
   theirs: { backgroundColor: Palette.card, boxShadow: `4px 4px 0px ${Palette.deep}` },
   mine: { backgroundColor: Palette.pop },
