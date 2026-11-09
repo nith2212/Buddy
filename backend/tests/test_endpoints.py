@@ -40,6 +40,7 @@ def make_task(api, headers, title="write report", **extra):
     ("get", "/tasks", None),
     ("delete", "/me", None),
     ("delete", "/tasks/1", None),
+    ("post", "/me/onboarding", {"click_time": "evening"}),
 ])
 def test_protected_endpoints_need_token(api, method, path, body):
     r = getattr(api, method)(path, **({"json": body} if body else {}))
@@ -235,7 +236,7 @@ def seed_everything(api, db, user_id, headers, token):
         models.Event(user_id=user_id, task_id=t, type="checkin_sent"),
         models.Message(user_id=user_id, task_id=t, role="user", content="hi"),
         models.Memory(user_id=user_id, key="onboarding.x", value="v"),
-        models.Onboarding(user_id=user_id, preferred_work_time="evening"),
+        models.Onboarding(user_id=user_id, click_time="evening"),
     ])
     db.commit()
 
@@ -354,6 +355,60 @@ def test_cannot_delete_someone_elses_task(api, users):
     assert r.status_code == 404 and "secret" not in r.text
     assert api.get(f"/tasks/{theirs}", headers=b_h).json()["title"] == "Their secret plan"
     assert api.delete("/tasks/999999", headers=a_h).status_code == 404
+
+
+# ── onboarding ──────────────────────────────────────────────────────────────
+
+def onboarding_of(db, user_id):
+    db.expire_all()
+    return db.query(models.Onboarding).filter_by(user_id=user_id).one_or_none()
+
+
+def test_onboarding_saves_the_answers_and_replaces_them(api, users, db):
+    (a_id, a_h), _ = users
+    r = api.post("/me/onboarding", json={"days": "school", "click_time": "evening",
+                                         "gets_in_way": ["tired", "afraid", "tired"]}, headers=a_h)
+    assert r.status_code == 200
+    assert r.json() == {"days": "school", "click_time": "evening", "gets_in_way": ["afraid", "tired"]}
+    row = onboarding_of(db, a_id)
+    assert (row.days, row.click_time, row.gets_in_way) == ("school", "evening", "afraid,tired")
+
+    # Sent again (say, after a reinstall): one row, the new answers. Every answer is optional.
+    assert api.post("/me/onboarding", json={"click_time": "morning"}, headers=a_h).json() == \
+        {"days": None, "click_time": "morning", "gets_in_way": []}
+    assert db.query(models.Onboarding).filter_by(user_id=a_id).count() == 1
+    row = onboarding_of(db, a_id)
+    assert (row.days, row.click_time, row.gets_in_way) == (None, "morning", None)
+    assert api.post("/me/onboarding", json={}, headers=a_h).status_code == 200
+
+
+@pytest.mark.parametrize("body", [
+    {"click_time": "3am"},
+    {"days": "everything"},
+    {"gets_in_way": ["lazy"]},
+    {"gets_in_way": "tired"},
+])
+def test_onboarding_only_takes_the_offered_choices(api, users, body):
+    (_, a_h), _ = users
+    assert api.post("/me/onboarding", json=body, headers=a_h).status_code == 422
+
+
+def test_onboarding_answers_are_you_said_never_causes(api, users, db):
+    # Picking "scared" in the questionnaire is not a confirmed cause: no cause memory, nothing for Echo.
+    (a_id, a_h), _ = users
+    api.post("/me/onboarding", json={"gets_in_way": ["afraid", "too_much"]}, headers=a_h)
+    db.expire_all()
+    assert db.query(models.Memory).filter_by(user_id=a_id).count() == 0
+    assert db.query(models.EmotionLog).filter_by(user_id=a_id).count() == 0
+
+
+def test_onboarding_is_only_ever_the_callers(api, users, db):
+    (a_id, a_h), (b_id, b_h) = users
+    api.post("/me/onboarding", json={"click_time": "late_night"}, headers=b_h)
+    # Identity comes only from the token: a user_id in the body is ignored.
+    api.post("/me/onboarding", json={"click_time": "morning", "user_id": b_id}, headers=a_h)
+    assert onboarding_of(db, b_id).click_time == "late_night"
+    assert onboarding_of(db, a_id).click_time == "morning"
 
 
 # ── keep-warm ping ──────────────────────────────────────────────────────────

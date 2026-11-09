@@ -15,6 +15,13 @@ def cron_secret(monkeypatch):
     monkeypatch.setenv("CRON_SECRET", "test-cron-secret")
 
 
+@pytest.fixture(autouse=True)
+def any_hour(monkeypatch):
+    # These hit the real endpoint on the real clock, so they'd fail at night. The hours themselves are
+    # tested with a fixed clock in test_checkin_windows.py.
+    monkeypatch.setattr("cron.in_checkin_window", lambda click_time, now: True)
+
+
 def register(api):
     body = api.post("/auth/anonymous", headers=INVITE).json()
     return body["user_id"], {"Authorization": f"Bearer {body['token']}"}
