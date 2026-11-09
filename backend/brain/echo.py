@@ -303,22 +303,44 @@ def run_echo(db: Session, user_id: str, now: datetime) -> str:
     return "saved"
 
 
-def forget_task(db: Session, user_id: str, task_id: int) -> None:
-    """A task was deleted: drop its row (open_tasks, by id) from every week Echo saved. Doesn't commit.
-    The week's totals stay: they're about the person, and name no task."""
+def forget_task(db: Session, user_id: str, task_id: int,
+                confirmations: list[tuple[str, datetime]] = ()) -> None:
+    """A task was deleted: take it out of every week Echo saved. Doesn't commit.
+    - Its row in open_tasks (by id) goes.
+    - Its confirmed causes come out of causes_confirmed (the week they happened) and cause_totals (that week
+      and every later one). Next week's causes_confirmed is "totals now minus last week's totals", so
+      leaving them in last week's totals would hide that many new confirmations.
+    The week's other totals stay (check-ins sent, taps): they name no task."""
     rows = db.execute(select(Memory).where(Memory.user_id == user_id, Memory.key.startswith(KEY_PREFIX))
                       ).scalars().all()
     for row in rows:
         try:
             facts = json.loads(row.value)
-            tasks = facts["open_tasks"]
-        except (TypeError, ValueError, KeyError):
+        except (TypeError, ValueError):
             continue
-        kept = [t for t in tasks if t.get("id") != task_id]
-        if len(kept) != len(tasks):
-            facts["open_tasks"] = kept
-            row.value = json.dumps(facts)
+        if not isinstance(facts, dict):
+            continue
+        facts["open_tasks"] = [t for t in facts.get("open_tasks", []) if t.get("id") != task_id]
+        try:
+            start, end = datetime.fromisoformat(facts["start"]), datetime.fromisoformat(facts["end"])
+        except (TypeError, ValueError, KeyError):
+            start = end = None
+        if start and end:
+            for cause, at in confirmations:
+                if as_utc(at) < end:
+                    _lower(facts.setdefault("cause_totals", {}), cause)
+                if _in(at, start, end):
+                    _lower(facts.setdefault("causes_confirmed", {}), cause)
+        value = json.dumps(facts)
+        if value != row.value:
+            row.value = value
 
+
+def _lower(counts: dict, key: str) -> None:
+    if counts.get(key, 0) > 1:
+        counts[key] -= 1
+    else:
+        counts.pop(key, None)
 
 def latest(db: Session, user_id: str, now: datetime) -> Optional[dict]:
     """The newest saved week, if it's fresh enough to use."""

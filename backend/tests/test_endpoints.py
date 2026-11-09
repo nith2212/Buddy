@@ -1,9 +1,12 @@
 import json
+from datetime import datetime, timezone
 
 import pytest
 from sqlalchemy import func, select
 
 import models
+
+UTC = timezone.utc
 
 INVITE = {"X-Invite-Code": "test-invite"}
 TOKEN_A = "ExponentPushToken[aaaaaaaaaaaaaaaaaaaaaa]"
@@ -274,12 +277,23 @@ def test_delete_task_removes_everything_about_it_and_nothing_else(api, users, db
             models.Message(user_id=uid, task_id=t, role="user", content="hi"),
             models.Memory(user_id=uid, key=f"blocker.task.{t}", value="afraid"),
         ])
-    week = {"end": "2026-11-01T17:30:00+00:00", "checkins": {"sent": 3},
+    # The deleted task had two causes confirmed in chat: afraid inside Echo's saved week, tired after it.
+    # (Every task's blocker.task row says afraid; the turns are what was counted.)
+    db.add_all([
+        models.Message(user_id=a_id, task_id=gone, role="assistant", content="ok",
+                       reasoning=json.dumps({"saved_cause": "afraid"}), created_at=datetime(2026, 10, 30, 9, tzinfo=UTC)),
+        models.Message(user_id=a_id, task_id=gone, role="assistant", content="ok",
+                       reasoning=json.dumps({"saved_cause": "tired"}), created_at=datetime(2026, 11, 5, 9, tzinfo=UTC)),
+    ])
+    week = {"start": "2026-10-25T17:30:00+00:00", "end": "2026-11-01T17:30:00+00:00", "checkins": {"sent": 3},
+            "cause_totals": {"afraid": 2}, "causes_confirmed": {"afraid": 1},
             "open_tasks": [{"id": gone, "checkins_ignored": 2}, {"id": kept, "checkins_ignored": 0}]}
     db.add_all([
         models.Memory(user_id=a_id, key="pattern.blocker.afraid", value="2"),
+        models.Memory(user_id=a_id, key="pattern.blocker.tired", value="1"),
         models.Memory(user_id=a_id, key="echo.week.2026-11-01", value=json.dumps(week)),
         models.Message(user_id=a_id, task_id=None, role="user", content="not about a task"),
+        models.Memory(user_id=b_id, key="pattern.blocker.afraid", value="1"),
     ])
     db.commit()
     task_tables = [models.EmotionLog, models.Subtask, models.Event, models.Message]
@@ -302,15 +316,35 @@ def test_delete_task_removes_everything_about_it_and_nothing_else(api, users, db
 
     memory = {r.key: r.value for r in db.query(models.Memory).filter_by(user_id=a_id)}
     assert f"blocker.task.{gone}" not in memory and memory[f"blocker.task.{kept}"] == "afraid"
-    assert memory["pattern.blocker.afraid"] == "2"   # the person's own count stays; it names no task
+    # Its confirmations come out of the counts: afraid 2 -> 1 (the other task's), tired 1 -> gone.
+    assert memory["pattern.blocker.afraid"] == "1" and "pattern.blocker.tired" not in memory
+    # Echo's week: its row goes, and its afraid comes out of that week's totals, so next week's
+    # "totals minus last week's" still counts new confirmations. Totals that name no task stay.
     saved = json.loads(memory["echo.week.2026-11-01"])
     assert [t["id"] for t in saved["open_tasks"]] == [kept] and saved["checkins"] == {"sent": 3}
+    assert saved["cause_totals"] == {"afraid": 1} and saved["causes_confirmed"] == {}
     assert db.query(models.Message).filter_by(user_id=a_id, task_id=None).count() == 1
     assert {m.__tablename__: count(db, m, b_id) for m in USER_TABLES} == b_before
 
     # A check-in still sitting in the notification tray for the deleted task: nothing to act on.
     r = api.post("/checkin/action", json={"task_id": gone, "stage": "task_state", "value": "done"}, headers=a_h)
     assert r.status_code == 404
+
+
+def test_delete_task_uncounts_a_cause_from_before_turns_recorded_it(api, users, db):
+    # Turns saved before 2026-11-09 don't say which cause they counted: the task's blocker row stands in.
+    (a_id, a_h), _ = users
+    t = make_task(api, a_h)
+    db.add_all([
+        models.Message(user_id=a_id, task_id=t, role="assistant", content="ok", reasoning=json.dumps({"mode": "chat"})),
+        models.Memory(user_id=a_id, key=f"blocker.task.{t}", value="bored"),
+        models.Memory(user_id=a_id, key="pattern.blocker.bored", value="3"),
+    ])
+    db.commit()
+    assert api.delete(f"/tasks/{t}", headers=a_h).status_code == 204
+    db.expire_all()
+    memory = {r.key: r.value for r in db.query(models.Memory).filter_by(user_id=a_id)}
+    assert memory == {"pattern.blocker.bored": "2"}
 
 
 def test_cannot_delete_someone_elses_task(api, users):

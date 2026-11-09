@@ -25,8 +25,9 @@ from sqlalchemy.orm import Session, selectinload
 
 from auth import current_user, owned_or_404
 from brain.echo import forget_task
+from brain.tools import forget_task_causes, task_confirmations
 from db import get_db
-from models import EmotionLog, Event, Memory, Message, Subtask, Task, User
+from models import EmotionLog, Event, Message, Subtask, Task, User
 
 router = APIRouter(prefix="/tasks", tags=["tasks"])
 
@@ -150,14 +151,15 @@ def update_task(
 @router.delete("/{task_id}", status_code=204)
 def delete_task(task_id: int, user: User = Depends(current_user), db: Session = Depends(get_db)):
     """Delete a task and everything about it, in one transaction: its steps, chat, check-ins, tapped
-    reasons, the cause Buddy saved for it, and its row in Echo's saved weeks. There's no undo.
-    The person's own counts stay (pattern.blocker.*, Echo's weekly totals): they name no task."""
+    reasons, the cause Buddy saved for it, its confirmations in the pattern counts (pattern.blocker.*), and
+    its traces in Echo's saved weeks. There's no undo. Echo's other weekly totals stay: they name no task."""
     task = owned_or_404(db, Task, task_id, user)
+    confirmations = task_confirmations(db, user.id, task.id)  # read from its chat, before the chat goes
+    forget_task_causes(db, user.id, task.id, confirmations)
+    forget_task(db, user.id, task.id, confirmations)
     # Children before the task, so foreign keys hold.
     for model in (EmotionLog, Subtask, Event, Message):
         db.execute(delete(model).where(model.user_id == user.id, model.task_id == task.id))
-    db.execute(delete(Memory).where(Memory.user_id == user.id, Memory.key == f"blocker.task.{task.id}"))
-    forget_task(db, user.id, task.id)
     db.execute(delete(Task).where(Task.id == task.id, Task.user_id == user.id))
     db.commit()
     return Response(status_code=204)

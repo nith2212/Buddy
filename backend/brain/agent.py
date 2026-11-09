@@ -790,6 +790,8 @@ def _learn(
     recent: list[str],
     confirmed_cause: Optional[str] = None,
 ) -> None:
+    if confirmed_cause:
+        reasoning = {**reasoning, "saved_cause": confirmed_cause}  # so deleting the task can un-count it
     try:
         if user_message:
             tools.save_conversation_turn(db, user_id, "user", user_message, task_id=task_id, commit=False)

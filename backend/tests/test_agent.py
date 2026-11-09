@@ -421,6 +421,28 @@ def test_confirming_saves_the_cause_once(api, db, monkeypatch):
     assert causes_of(db, user_id)["pattern.blocker.afraid"] == "1"  # not counted twice
 
 
+
+def test_deleting_the_task_uncounts_its_confirmed_cause(api, db, monkeypatch):
+    # The turn that counted a cause says so, so deleting the task can take exactly that back out.
+    fake = FakeLLM(reads=[{"kind": "answer"}, {"kind": "confirm", "cause": "afraid"}, {"kind": "confirm"}])
+    monkeypatch.setattr(llm, "complete", fake)
+    user_id, h = register(api)
+    t = make_task(api, h)
+    start(api, h, t, "afraid")
+    say(api, h, t, "people will think it's messy")
+    say(api, h, t, "yeah that's it")
+    say(api, h, t, "haha okay")
+    saved = [json.loads(m.reasoning).get("saved_cause") for m in db.query(models.Message).filter_by(task_id=t)
+             if m.reasoning]
+    assert saved.count("afraid") == 1 and len([c for c in saved if c]) == 1
+    # Say two more were confirmed on other tasks, which stay.
+    db.query(models.Memory).filter_by(user_id=user_id, key="pattern.blocker.afraid").one().value = "3"
+    db.commit()
+
+    assert api.delete(f"/tasks/{t}", headers=h).status_code == 204
+    db.expire_all()
+    assert causes_of(db, user_id) == {"pattern.blocker.afraid": "2"}
+
 def test_their_own_plan_is_released_and_backed_as_said(api, db, monkeypatch):
     fake = FakeLLM(reads=[{"kind": "own_plan", "fact": "polish the README first"}])
     monkeypatch.setattr(llm, "complete", fake)
