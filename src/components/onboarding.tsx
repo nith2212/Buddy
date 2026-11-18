@@ -46,7 +46,7 @@ const WAYS: { value: Way; label: string }[] = [
   { value: 'not_sure', label: 'Not sure yet' },
 ];
 
-const HOW_CHIPS = ['don’t know where to start', 'feels too big', 'scared it won’t be good', 'boring', 'too tired'];
+const HOW_REASONS = ['don’t know where to start', 'feels too big', 'scared it won’t be good', 'boring', 'too tired'];
 const STEPS = 7;
 
 type Props = {
@@ -187,11 +187,15 @@ export function Onboarding({ token, onDone }: Props) {
       <>
         <Txt variant="title" style={styles.h1} accessibilityRole="header">Stuck? Tell me why.</Txt>
         <Card style={styles.cardGap14}>
-          <Txt style={styles.p}>When a task feels hard to start, pick what’s closest:</Txt>
-          <View style={styles.chips} accessibilityLabel="The five reasons">
-            {HOW_CHIPS.map((c) => (
-              <View key={c} style={styles.staticChip}>
-                <Txt variant="hand" style={styles.staticChipText}>{c}</Txt>
+          <Txt style={styles.p}>When a task feels hard to start, you’ll pick what’s closest:</Txt>
+          {/* A doodle list, not chips: friends kept tapping chip-shaped reasons here (2026-11-18). */}
+          <View style={styles.doodleList} accessibilityLabel="The five reasons">
+            {HOW_REASONS.map((r) => (
+              <View key={r} style={styles.doodleRow}>
+                <Svg width={18} height={10} viewBox="0 0 18 10" importantForAccessibility="no">
+                  <Path d="M1.5 6 Q4.5 1.5 7.5 5.5 T13.5 5 L16.5 4" fill="none" stroke={c.ink} strokeWidth={2.2} strokeLinecap="round" />
+                </Svg>
+                <Txt variant="hand" style={styles.doodleText}>{r}</Txt>
               </View>
             ))}
           </View>
@@ -438,8 +442,9 @@ const makeStyles = (c: Colors) =>
   bold: { fontFamily: Font.bold },
   label: { fontSize: 22, lineHeight: 26, marginBottom: -6 },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 9 },
-  staticChip: { borderWidth: 2, borderColor: c.ink, backgroundColor: c.bg, paddingHorizontal: 12, paddingVertical: 4, ...Wobble.c },
-  staticChipText: { fontSize: 19, lineHeight: 24 },
+  doodleList: { gap: 4, paddingLeft: 4 },
+  doodleRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  doodleText: { fontSize: 20, lineHeight: 26 },
   mondayCard: { padding: 18, flexDirection: 'row', alignItems: 'center', gap: 16 },
   bars: { flexDirection: 'row', alignItems: 'flex-end', gap: 6, height: 64 },
   bar: { width: 26, borderWidth: 2, borderColor: c.ink, borderTopLeftRadius: 6, borderTopRightRadius: 6, borderBottomLeftRadius: 3, borderBottomRightRadius: 3 },
