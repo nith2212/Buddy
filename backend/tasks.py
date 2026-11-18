@@ -25,7 +25,7 @@ from sqlalchemy.orm import Session, selectinload
 
 from auth import current_user, owned_or_404
 from brain.echo import forget_task
-from brain.tools import forget_task_causes, task_confirmations
+from brain.tools import forget_task_causes, mark_task_done, task_confirmations
 from db import get_db
 from models import EmotionLog, Event, Message, Subtask, Task, User
 
@@ -33,15 +33,6 @@ router = APIRouter(prefix="/tasks", tags=["tasks"])
 
 MAX_LIST = 100
 MAX_SUBTASKS_PER_TASK = 50
-
-
-def _mark_done(task: Task, db: Session) -> None:
-    """Shared by PATCH /tasks/{id} and the check-in flow's task_state="done" tap."""
-    if task.status == "done":
-        return
-    task.status = "done"
-    task.completed_at = datetime.now(timezone.utc)
-    db.add(Event(user_id=task.user_id, task_id=task.id, type="completed", source="user"))
 
 
 class TaskCreate(BaseModel):
@@ -139,7 +130,7 @@ def update_task(
                          payload=json.dumps({"from": old_due.isoformat(), "to": new_due.isoformat()})))
         task.due_date = new_due
     if payload.status == "done":
-        _mark_done(task, db)
+        mark_task_done(db, task)
     elif payload.status == "open":
         task.status, task.completed_at = "open", None
 

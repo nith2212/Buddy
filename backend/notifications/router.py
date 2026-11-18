@@ -17,7 +17,7 @@ from brain.agent import run_turn
 from db import get_db
 from models import DeviceToken, EmotionLog, Task, User
 from notifications.service import quoted_title
-from tasks import _mark_done
+from brain.tools import mark_task_done
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -196,7 +196,7 @@ async def checkin_action(
         if payload.value == "done":
             # Keep status/completed_at in lockstep with task_state — state detection's
             # "task marked done" rule reads status, and cron must stop nudging about it.
-            _mark_done(task, db)
+            mark_task_done(db, task)
             db.commit()
             return _done_response(task)
         db.commit()

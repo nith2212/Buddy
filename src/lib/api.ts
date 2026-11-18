@@ -22,6 +22,8 @@ export type BuddyReply = {
   state: string | null;
   intervention: string | null;
   ask_reason?: boolean; // Buddy asked what's in the way: show the reason chips under its reply
+  offer_done?: boolean; // Buddy asked "Want me to mark it done?": show Yes / Not yet under its reply
+  task_status?: 'open' | 'done' | null; // this turn changed (or kept) the task's status
 };
 
 // GET /echo/week (backend brain/echo.py "The user's Echo page"): kind, earned things only.
@@ -89,8 +91,9 @@ export function api(token: string) {
     updateSubtask: (taskId: number, subtaskId: number, patch: { done?: boolean }) =>
       request<Subtask>(token, `/tasks/${taskId}/subtasks/${subtaskId}`, 'PATCH', patch),
     chatHistory: (taskId: number) => request<ChatTurn[]>(token, `/chat/history?task_id=${taskId}`),
-    // A typed message, a tapped reason, or both (the backend needs at least one).
-    chat: (taskId: number, input: { message?: string; reason?: Reason }) =>
+    // A typed message, a tapped reason, or both (the backend needs at least one). Or, on its own, the answer
+    // to "Want me to mark it done?" (mark_done: true = "Yes, mark it done", false = "Not yet").
+    chat: (taskId: number, input: { message?: string; reason?: Reason } | { mark_done: boolean }) =>
       request<BuddyReply>(token, '/chat', 'POST', { task_id: taskId, ...input }),
     initiate: (taskId: number) => request<BuddyReply>(token, '/initiate', 'POST', { task_id: taskId }),
     echoWeek: () => request<EchoWeek>(token, '/echo/week'),

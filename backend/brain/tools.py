@@ -36,6 +36,17 @@ VALID_EMOTIONS = set(EMOTION_TO_STATE)  # the reasons a user can tap
 
 # ── Task history ──────────────────────────────────────────────────────────────
 
+
+def mark_task_done(db: Session, task: Task) -> None:
+    """The one way a task gets marked done: the checkbox (PATCH /tasks/{id}), the check-in's "done" tap and
+    "Yes, mark it done" in chat. Sets status and completed_at together and logs a "completed" event, which
+    state detection and Echo count. The caller commits."""
+    if task.status == "done":
+        return
+    task.status = "done"
+    task.completed_at = datetime.now(timezone.utc)
+    db.add(Event(user_id=task.user_id, task_id=task.id, type="completed", source="user"))
+
 def get_task_history(db: Session, user_id: str, task_id: int) -> dict:
     """Return the task row (scoped to user_id) and its events, oldest first."""
     task = db.execute(

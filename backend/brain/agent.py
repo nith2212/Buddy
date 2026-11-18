@@ -118,12 +118,20 @@ async def run_turn(
 ) -> dict:
     """Run one Buddy turn for `task` (already ownership-checked by the caller)."""
     task_id = task.id
+    caught = flow.pattern_read(user_message) if mode == "chat" and user_message else None
+    if mode == "chat" and user_message and task.status != "done" and not (caught and caught.kind == "bigger"):
+        # "I finished it!" (developer, 2026-11-18): ask before marking it done, never mark on a guess.
+        if _last_reasoning(db, user_id, task_id).get("phase") == "offer_done":
+            answer = flow.answer_to_done_offer(user_message)
+            if answer is not None:  # a typed "yes" / "not yet" works like the buttons
+                return answer_done_offer(db, user_id, task, answer, typed=user_message)
+        if flow.is_finished(user_message):
+            return await _offer_done_turn(db, user_id, task, user_message)
     emotion_row = _fresh_emotion(db, user_id, task_id)
     emotion = emotion_row.emotion if emotion_row else None
     if mode != "closing" and emotion in EMOTION_TO_STATE and has_framework(EMOTION_TO_STATE[emotion]):
         # A reason was tapped this check-in cycle: the state's framework runs the conversation.
         return await _flow_turn(db, user_id, task, mode, user_message, emotion_row)
-    caught = flow.pattern_read(user_message) if mode == "chat" and user_message else None
     if caught and caught.kind == "signoff":
         # Leaving for now with no reason tapped: the same short goodbye, never "what's in the way?".
         return await _goodbye_turn(db, user_id, task, user_message)
@@ -414,8 +422,8 @@ async def _ask_reason_turn(db: Session, user_id: str, task: Task, user_message: 
     return {"reply": reply, "state": None, "intervention": reason, "fallback": fallback, "ask_reason": not bigger}
 
 
-def _stepped_back_last(db: Session, user_id: str, task_id: int) -> bool:
-    """Was Buddy's last message on this task a step-back (or a goodbye said after one)?"""
+def _last_reasoning(db: Session, user_id: str, task_id: int) -> dict:
+    """The saved reasoning of Buddy's last message on this task ({} if none)."""
     last = db.execute(
         select(Message).where(Message.user_id == user_id, Message.task_id == task_id, Message.role == "assistant")
         .order_by(Message.id.desc()).limit(1)
@@ -423,7 +431,13 @@ def _stepped_back_last(db: Session, user_id: str, task_id: int) -> bool:
     try:
         r = json.loads(last.reasoning or "{}") if last else {}
     except (TypeError, ValueError):
-        return False
+        return {}
+    return r if isinstance(r, dict) else {}
+
+
+def _stepped_back_last(db: Session, user_id: str, task_id: int) -> bool:
+    """Was Buddy's last message on this task a step-back (or a goodbye said after one)?"""
+    r = _last_reasoning(db, user_id, task_id)
     return r.get("phase") == "step_back" or bool(r.get("stepped_back"))
 
 
@@ -465,6 +479,63 @@ async def _goodbye_turn(db: Session, user_id: str, task: Task, user_message: str
                  "stepped_back": stepped_back, "fallback": fallback, "checks": checks}
     _learn(db, user_id, task_id, user_message, reply, reasoning, None, None, [], None)
     return {"reply": reply, "state": None, "intervention": "goodbye", "fallback": fallback}
+
+
+# ── "I finished it!" → "Want me to mark it done?" (developer, 2026-11-18) ──────────
+
+DONE_QUESTION = "Want me to mark it done?"
+FINISHED_LINES = ("Ooh, you finished it!", "Yay, you did it!", "Look at you, all done!", "Wooo, that's done!")
+MARKED_DONE_LINES = ("Ticked it off!", "Done and dusted!", "Marked it done. Well earned!", "All ticked off!")
+KEPT_OPEN_LINES = ("Okie, it stays open.", "Got it, I'll leave it open.", "Alright, it stays on your list.")
+
+
+async def _offer_done_turn(db: Session, user_id: str, task: Task, user_message: str) -> dict:
+    """They say they finished the task: one glad line from the model, then the fixed question. The app
+    shows "Yes, mark it done" / "Not yet" under it. Nothing is marked until they answer."""
+    task_id = task.id
+    history = tools.get_conversation_history(db, user_id, limit=FLOW_HISTORY, task_id=task_id)
+    previous = next((h["content"] for h in reversed(history) if h["role"] == "assistant"), None)
+    name_line = _name_line(tools.get_name(db, user_id))
+    title = task.title or "untitled"
+    db.rollback()  # read-only so far: give the connection back before waiting on the model
+
+    facts = [f'Task: "{title}"']
+    if name_line:
+        facts.append(name_line)
+    system = (f"{framework_section('shared', 'Voice')}\n\n" + "\n".join(facts)
+              + f"\n\nWhat to do now:\n{framework_section('shared', 'Finished') or ''}\n\nRules:\n{_GOODBYE_RULES}")
+
+    fallback, checks = False, {}
+    try:
+        line, checks = await _write_checked(
+            "chat", None, None, "", [], history, user_message, set(), "release", previous_reply=previous,
+            system=system, limits=(1, 0))
+        line = _without_questions(line) if line else None
+        if not line:
+            raise llm.LLMError(f"no usable line: {checks.get('hard')}")
+    except llm.LLMError as e:
+        logger.warning("Buddy offer-done turn fell back (task_id=%s): %s", task_id, e)
+        fallback, line = True, random.choice(FINISHED_LINES)
+
+    reply = f"{line} {DONE_QUESTION}"
+    reasoning = {"mode": "chat", "phase": "offer_done", "top_state": None, "intervention": None,
+                 "reason": "offer_done", "fallback": fallback, "checks": checks}
+    _learn(db, user_id, task_id, user_message, reply, reasoning, None, None, [], None)
+    return {"reply": reply, "state": None, "intervention": "offer_done", "fallback": fallback, "offer_done": True}
+
+
+def answer_done_offer(db: Session, user_id: str, task: Task, yes: bool, typed: Optional[str] = None) -> dict:
+    """Their answer to "Want me to mark it done?", tapped (typed=None: nothing saved as if they'd typed it)
+    or typed. Yes goes through the same path as the checkbox, so Echo counts it and they can untick it.
+    No model call."""
+    if yes:
+        tools.mark_task_done(db, task)
+    reply = random.choice(MARKED_DONE_LINES if yes else KEPT_OPEN_LINES)
+    phase = "marked_done" if yes else "kept_open"
+    reasoning = {"mode": "chat", "phase": phase, "top_state": None, "intervention": None, "reason": phase,
+                 "fallback": False}
+    _learn(db, user_id, task.id, typed, reply, reasoning, None, None, [], None)  # one commit with the status
+    return {"reply": reply, "state": None, "intervention": phase, "fallback": False, "task_status": task.status}
 
 
 def _flow_rules(asks: bool) -> str:
@@ -563,13 +634,18 @@ def _goodbye_line(stepped_back: bool, previous: Optional[str] = None) -> str:
     return random.choice([line for line in lines if line != previous] or lines)
 
 
+def _without_questions(reply: str) -> Optional[str]:
+    """The reply minus any sentence that asks something; None when (almost) nothing is left."""
+    kept = " ".join(s.strip() for s in re.findall(r"[^.!?]+[.!?]*", reply) if "?" not in s and s.strip())
+    return kept if len(kept.split()) >= 2 else None
+
+
 def _goodbye_or_fallback(reply: str, stepped_back: bool, previous: Optional[str] = None) -> tuple[str, bool]:
     """A goodbye never asks anything. The model may still add a question ("how do you think it'll go?"):
     drop just that sentence and keep its own words; a fixed line only when nothing is left."""
     if "?" not in reply:
         return reply, False
-    kept = " ".join(s.strip() for s in re.findall(r"[^.!?]+[.!?]*", reply) if "?" not in s and s.strip())
-    return (kept, True) if len(kept.split()) >= 2 else (_goodbye_line(stepped_back, previous), True)
+    return _without_questions(reply) or _goodbye_line(stepped_back, previous), True
 
 
 def _session_messages(db: Session, user_id: str, task_id: int, since: datetime) -> list[dict]:

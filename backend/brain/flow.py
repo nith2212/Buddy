@@ -254,6 +254,44 @@ def is_sign_off(message: str) -> bool:
     return bool(_LEAVING.search(message)) and not _STILL_IN_IT.search(message)
 
 
+# They say the whole task is finished (developer, 2026-11-18): Buddy asks before marking it done, and only
+# on a clear claim. "kinda finished", "finished some exercises" or "almost done" never get the offer.
+_FINISHED = re.compile(
+    r"\b(?:i\s+(?:have\s+|'ve\s+|just\s+|finally\s+)*(?:finished|completed|done)|(?:finished|completed|did|nailed)\s+it|"
+    r"it'?s\s+(?:all\s+)?(?:done|finished|complete)|all\s+done|"
+    r"done\s+with\s+\w+|"
+    r"task\s+(?:is\s+)?(?:done|complete)|submitted\s+it)\b", re.IGNORECASE)
+# (A bare "done!" isn't enough: after Buddy's tiny move it usually means "did that step".)
+_NOT_ALL_OF_IT = re.compile(
+    r"\?|n't\b|\b(?:not|no|nothing|never|kinda|kind of|sort of|sorta|almost|nearly|mostly|half|partly|"
+    r"partially|some|part|bit|first|one of|few|yet|if|when|will|gonna|going to|should|maybe|might|hope|"
+    r"tomorrow|later|for (?:today|now|the day|tonight))\b", re.IGNORECASE)
+FINISHED_MAX_WORDS = 25
+
+
+def is_finished(message: str) -> bool:
+    """A clear 'I finished the task'. Read by code: marking done must never hang on a model's guess."""
+    if len(message.split()) > FINISHED_MAX_WORDS:
+        return False
+    return bool(_FINISHED.search(message)) and not _NOT_ALL_OF_IT.search(message)
+
+
+# Typed answers to "Want me to mark it done?" (the buttons send the same thing).
+_YES = re.compile(r"^\W*(?:yes+|yep|yeah|ya+|yup|sure|ok(?:ay|ie)?|please|pls|do it|mark it(?: done)?|go ahead)"
+                  r"(?:\W+(?:please|pls|yes|mark it(?: done)?|do it))*\W*$", re.IGNORECASE)
+_NOT_YET = re.compile(r"^\W*(?:no+|nope|nah|not yet|wait|not really|leave it(?: open)?)(?:\W+\w+){0,3}\W*$",
+                      re.IGNORECASE)
+
+
+def answer_to_done_offer(message: str) -> Optional[bool]:
+    """True for a clear yes, False for a clear not-yet, None for anything else (then it's a normal message)."""
+    if _YES.match(message):
+        return True
+    if _NOT_YET.match(message):
+        return False
+    return None
+
+
 def pattern_read(message: str, buddy_said: Optional[str] = None, state: Optional[str] = None) -> Optional[Reading]:
     """The easy cases, no model call."""
     if _DISTRESS.search(message):

@@ -195,3 +195,32 @@ def test_a_signoff_after_a_step_back_stays_stepped_back_but_says_goodbye():
 def test_the_goodbye_cards_exist():
     assert "No question" in framework_section("shared", "Goodbye")
     assert "someone you trust" in framework_section("shared", "Goodbye after a step back")
+
+
+# ── "I finished it!" → ask before marking it done (developer, 2026-11-18) ─────────
+
+@pytest.mark.parametrize("message", [
+    "I finished it!", "I finally finished the report", "I've completed it", "it's done!!", "all done :)",
+    "done with the report!", "done with python basics finally", "Submitted it", "I did it!!", "Finished it, yayyy",
+])
+def test_a_clear_finish_is_read_by_code(message):
+    assert flow.is_finished(message)
+
+
+@pytest.mark.parametrize("message", [
+    "kinda finished", "I did 1 sprint and finished some exercises. Now going to sleep!", "almost done",
+    "I'm not done", "I haven't finished it", "I finished the first part", "done!", "finished?",
+    "I'll be done tomorrow", "I'm done for today", "I have done nothing", "maybe I finished it",
+    "is it done if I skip the intro?",
+])
+def test_a_vague_or_partial_finish_is_not(message):
+    assert not flow.is_finished(message)
+
+
+@pytest.mark.parametrize("message,answer", [
+    ("yes", True), ("Yesss please", True), ("yep, mark it", True), ("ok", True), ("sure!", True),
+    ("not yet", False), ("nah", False), ("no wait", False), ("no, still fixing a bug", None),  # stays open; Buddy hears about the bug
+    ("yes but the intro still needs work", None), ("what do you mean?", None), ("I finished the slides", None),
+])
+def test_typed_answers_to_mark_it_done(message, answer):
+    assert flow.answer_to_done_offer(message) is answer

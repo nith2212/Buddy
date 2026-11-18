@@ -980,3 +980,97 @@ def test_an_all_question_goodbye_gets_a_fixed_line_that_never_repeats_the_last_o
             assert line in agent.GOODBYE_LINES and line != previous
     assert agent._goodbye_or_fallback("Ok?", True)[0] in agent.GOODBYE_LIGHT_LINES
     assert all("?" not in line for line in agent.GOODBYE_LINES + agent.GOODBYE_LIGHT_LINES)
+
+
+# ── "I finished it!" → "Want me to mark it done?" (developer, 2026-11-18) ─────────
+
+def events_of(db, task_id):
+    return [e.type for e in db.query(models.Event).filter(models.Event.task_id == task_id)]
+
+
+def test_finishing_gets_a_glad_line_and_the_question_but_marks_nothing(api, db, fake_llm):
+    fake_llm.reply = "Yay, the whole report is done! How does it feel?"
+    _, h = register(api)
+    t = make_task(api, h)
+    body = say(api, h, t, "I finished it!")
+    assert body["offer_done"] is True and body["intervention"] == "offer_done"
+    assert body["reply"] == f"Yay, the whole report is done! {agent.DONE_QUESTION}"  # its question is cut
+    assert api.get(f"/tasks/{t}", headers=h).json()["status"] == "open"
+    assert fake_llm.read_calls == [] and fake_llm.decide_calls == []
+
+
+def test_finishing_inside_a_tapped_reason_still_asks(api, db, fake_llm):
+    _, h = register(api)
+    t = make_task(api, h)
+    start(api, h, t, "afraid")
+    assert say(api, h, t, "lol nvm I finished it")["offer_done"] is True
+
+
+def test_yes_button_marks_it_done_like_the_checkbox_and_saves_no_user_turn(api, db, fake_llm):
+    _, h = register(api)
+    t = make_task(api, h)
+    say(api, h, t, "I finished it!")
+    calls = len(fake_llm.calls)
+    r = api.post("/chat", json={"task_id": t, "mark_done": True}, headers=h)
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["task_status"] == "done" and body["reply"] in agent.MARKED_DONE_LINES
+    assert len(fake_llm.calls) == calls  # no model call
+    assert api.get(f"/tasks/{t}", headers=h).json()["status"] == "done"
+    assert events_of(db, t).count("completed") == 1  # what Echo and state detection count
+    history = api.get(f"/chat/history?task_id={t}", headers=h).json()
+    assert [m["role"] for m in history] == ["user", "assistant", "assistant"]
+    # and the checkbox can still undo it
+    api.patch(f"/tasks/{t}", json={"status": "open"}, headers=h)
+    assert api.get(f"/tasks/{t}", headers=h).json()["status"] == "open"
+
+
+def test_not_yet_keeps_it_open(api, db, fake_llm):
+    _, h = register(api)
+    t = make_task(api, h)
+    say(api, h, t, "I finished it!")
+    body = api.post("/chat", json={"task_id": t, "mark_done": False}, headers=h).json()
+    assert body["task_status"] == "open" and body["reply"] in agent.KEPT_OPEN_LINES
+    assert "completed" not in events_of(db, t)
+
+
+def test_typed_yes_after_the_offer_works_like_the_button(api, db, fake_llm):
+    _, h = register(api)
+    t = make_task(api, h)
+    say(api, h, t, "it's done!!")
+    body = say(api, h, t, "yesss")
+    assert body["task_status"] == "done"
+    history = api.get(f"/chat/history?task_id={t}", headers=h).json()
+    assert history[-2] == {"role": "user", "content": "yesss"}
+
+
+def test_yes_without_an_offer_is_just_a_message(api, db, fake_llm):
+    _, h = register(api)
+    t = make_task(api, h)
+    say(api, h, t, "ugh I keep putting this off")
+    assert say(api, h, t, "yes")["intervention"] != "marked_done"
+    assert api.get(f"/tasks/{t}", headers=h).json()["status"] == "open"
+
+
+def test_vague_finish_never_gets_the_offer(api, db, fake_llm):
+    _, h = register(api)
+    t = make_task(api, h)
+    assert not say(api, h, t, "kinda finished").get("offer_done")
+
+
+def test_mark_done_must_come_alone_and_only_for_your_own_task(api, db, fake_llm):
+    _, h = register(api)
+    t = make_task(api, h)
+    assert api.post("/chat", json={"task_id": t, "mark_done": True, "message": "yes"}, headers=h).status_code == 422
+    _, other = register(api)
+    assert api.post("/chat", json={"task_id": t, "mark_done": True}, headers=other).status_code == 404
+    assert api.get(f"/tasks/{t}", headers=h).json()["status"] == "open"
+
+
+def test_a_failed_model_still_asks_with_a_fixed_glad_line(api, db, monkeypatch):
+    monkeypatch.setattr(llm, "complete", FakeLLM(fail=True))
+    _, h = register(api)
+    t = make_task(api, h)
+    body = say(api, h, t, "I finished it!")
+    line = body["reply"].removesuffix(f" {agent.DONE_QUESTION}")
+    assert body["offer_done"] is True and line in agent.FINISHED_LINES

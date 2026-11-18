@@ -1,5 +1,6 @@
 // One task's own chat (mockup 2a/2b): its steps strip, its whole conversation, and the reason chips.
 // No chat yet: Buddy asks "What's in the way?". Chat exists: "stuck again? tell Buddy why" reopens the chips.
+// "I finished it!": Buddy asks "Want me to mark it done?" and shows Yes / Not yet under its reply.
 
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -36,6 +37,7 @@ export default function TaskChatScreen() {
   const [newStep, setNewStep] = useState('');
   const [stepsOpen, setStepsOpen] = useState(false);
   const [askAgain, setAskAgain] = useState(ask === '1'); // the reason chips, once a chat exists
+  const [offerDone, setOfferDone] = useState(false); // Buddy asked "Want me to mark it done?"
 
   const listRef = useRef<FlatList<ChatTurn>>(null);
   const stickToEnd = useRef(true);
@@ -76,7 +78,7 @@ export default function TaskChatScreen() {
   // Scroll to the newest message once the list has actually laid it out.
   useEffect(() => {
     stickToEnd.current = true;
-  }, [turns.length, sending, askAgain]);
+  }, [turns.length, sending, askAgain, offerDone]);
 
   function goBack() {
     if (router.canGoBack()) router.back();
@@ -90,14 +92,37 @@ export default function TaskChatScreen() {
     setSendFailed(false);
     setSending(true);
     setAskAgain(false);
+    setOfferDone(false); // typing instead of tapping answers it ("yes" works too)
     setTurns((prev) => [...prev, { role: 'user', content: text }]);
     try {
       const res = await client.chat(taskId, { message: text });
       setTurns((prev) => [...prev, { role: 'assistant', content: res.reply }]);
       if (res.ask_reason) setAskAgain(true); // typed without a tap: Buddy asked why, so offer the reasons
+      if (res.offer_done) setOfferDone(true);
+      if (res.task_status) setStatus(res.task_status);
     } catch {
       setTurns((prev) => prev.slice(0, -1)); // take the unsent message back out…
       setInput(text); // …and give it back to the user to resend
+      setSendFailed(true);
+    } finally {
+      setSending(false);
+    }
+  }
+
+  const setStatus = (status: 'open' | 'done') => setTask((prev) => (prev ? { ...prev, status } : prev));
+
+  async function answerDone(yes: boolean) {
+    if (sending) return;
+    setSendFailed(false);
+    setSending(true);
+    setOfferDone(false);
+    try {
+      // The tap isn't a typed message: it marks the task done the same way the checkbox does.
+      const res = await client.chat(taskId, { mark_done: yes });
+      setTurns((prev) => [...prev, { role: 'assistant', content: res.reply }]);
+      if (res.task_status) setStatus(res.task_status);
+    } catch {
+      setOfferDone(true); // buttons come back, so they can tap again
       setSendFailed(true);
     } finally {
       setSending(false);
@@ -108,6 +133,7 @@ export default function TaskChatScreen() {
     if (sending) return;
     setSendFailed(false);
     setSending(true);
+    setOfferDone(false);
     try {
       // The tap isn't a typed message: Buddy answers it by asking its first question.
       const res = await client.chat(taskId, { reason });
@@ -270,6 +296,11 @@ export default function TaskChatScreen() {
                 <BuddyBlob width={38} animated={false} style={styles.avatar} />
                 <Bubble from="buddy">Buddy is typing…</Bubble>
               </View>
+            ) : offerDone ? (
+              <View style={[styles.chips, styles.askAgain]} accessibilityLabel="Mark this task done?">
+                <Chip label="Yes, mark it done" onPress={() => answerDone(true)} disabled={sending} />
+                <Chip label="Not yet" onPress={() => answerDone(false)} disabled={sending} />
+              </View>
             ) : askAgain ? (
               <View style={styles.askAgain}>
                 <Txt variant="hand">What’s in the way right now?</Txt>
@@ -295,7 +326,7 @@ export default function TaskChatScreen() {
         </Txt>
       ) : null}
       <View style={[styles.inputArea, { paddingBottom: insets.bottom + 14 }]}>
-        {!fresh && !sending && !askAgain ? (
+        {!fresh && !sending && !askAgain && !offerDone ? (
           <Pressable onPress={() => setAskAgain(true)} accessibilityRole="button" style={({ pressed }) => [styles.stuck, pressed && styles.pressed]}>
             <Txt variant="hand" style={styles.stuckText}>stuck again? tell Buddy why</Txt>
           </Pressable>
