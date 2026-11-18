@@ -12,7 +12,8 @@
 #   own_plan   states what THEY will do, their own idea
 #   accept     agrees to the step Buddy just offered ("okay I can do that")
 #   wants_move asks Buddy for a step / help choosing
-#   ack        a bare thanks / sign-off, nothing to answer
+#   ack        a bare thanks / okay, nothing to answer
+#   signoff    leaving for now: bye, later / tomorrow, going to sleep
 #   new_cause  reveals a different cause than the one being discussed (cause = the key)
 #   bigger     distress beyond work: step back, stop probing
 #
@@ -132,8 +133,13 @@ READ_CASES = [
     ("fatigue", "Rest up, I'm here when you're ready.", "Thanks bye", "ack", None),
     ("overwhelm", RELEASE, "Ohhh okay, thanks!", "ack", None),
     ("low_interest", RELEASE, "ok", "ack", None),
-    ("low_interest", RELEASE, "ok bye", "ack", None),
-    ("perfectionism", RELEASE, "Fine bro I'll do that. Bye", "ack", None),
+    ("low_interest", RELEASE, "ok bye", "signoff", None),
+    ("perfectionism", RELEASE, "Fine bro I'll do that. Bye", "signoff", None),
+
+    # signoff: leaving for now (phone test, 2026-11-18)
+    ("ambiguity", RELEASE, "Okieee, I'll update tomo!", "signoff", None),
+    ("ambiguity", RELEASE, "I did 1 sprint and finished some exercises. Now going to sleep!", "signoff", None),
+    ("fatigue", ASK_TIRED, "Hey I'm going to do this tomo, I'm very tired", "signoff", None),
 
     # new_cause
     ("ambiguity", ASK_GOAL, "honestly I'm just exhausted today, I worked all day", "new_cause", "tired"),

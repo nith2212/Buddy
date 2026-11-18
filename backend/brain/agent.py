@@ -24,6 +24,7 @@ from __future__ import annotations
 import dataclasses
 import json
 import logging
+import random
 import re
 from datetime import datetime, timedelta, timezone
 from typing import Literal, Optional
@@ -122,6 +123,10 @@ async def run_turn(
     if mode != "closing" and emotion in EMOTION_TO_STATE and has_framework(EMOTION_TO_STATE[emotion]):
         # A reason was tapped this check-in cycle: the state's framework runs the conversation.
         return await _flow_turn(db, user_id, task, mode, user_message, emotion_row)
+    caught = flow.pattern_read(user_message) if mode == "chat" and user_message else None
+    if caught and caught.kind == "signoff":
+        # Leaving for now with no reason tapped: the same short goodbye, never "what's in the way?".
+        return await _goodbye_turn(db, user_id, task, user_message)
     if (mode == "chat" and user_message and task.status != "done" and not is_ack(user_message)
             and not _asked_reason_last(db, user_id, task.id)):
         # Typed without tapping a reason: find out why first (root cause before advice) instead of
@@ -295,8 +300,9 @@ async def _flow_turn(
     system = _flow_prompt(step, title=title, timing=timing, first_turn=first_turn, open_steps=open_steps,
                           done_steps=done_steps, tapped=tapped, notes=notes, last_time=last_time,
                           pattern=pattern, name=name)
-    limits = (3, 0) if step.stage in flow.NO_QUESTION else (3, 1)
-    check_phase = "offer" if step.stage == "offer" else (
+    goodbye = step.modifier == "signoff"
+    limits = GOODBYE_LIMITS if goodbye else (3, 0) if step.stage in flow.NO_QUESTION else (3, 1)
+    check_phase = "release" if goodbye else "offer" if step.stage == "offer" else (
         "guess" if step.stage == "narrow" or step.modifier == "idk" else step.stage)
 
     fallback, checks = False, {}
@@ -304,16 +310,23 @@ async def _flow_turn(
         reply, checks = await _write_checked(
             mode, None, step.state, "", [], history, user_message, anchors, check_phase,
             previous_reply=buddy_said, system=system, limits=limits,
-            require_question=step.stage in flow.ASKS)
+            require_question=step.stage in flow.ASKS and not goodbye)
         if reply is None:
             raise llm.LLMError(f"reply rejected by checks: {checks['hard']}")
+        if goodbye:
+            reply, trimmed = _goodbye_or_fallback(reply, step.stage == "step_back", buddy_said)
+            if trimmed:
+                checks["goodbye_trimmed"] = True
         if step.stage == "offer" and "offer_shape" in checks["soft"]:
             # The small model tends to hand out a step here; the choice is too important to leave to it.
             reply, checks["offer_template"] = OFFER_FALLBACK, True
     except llm.LLMError as e:
         logger.warning("Buddy flow turn fell back (task_id=%s): %s", task_id, e)
-        fallback, reply, save_cause, rule = True, FALLBACK_REPLY[mode], None, None
-        step, new_tries = flow.Step(state, stage or flow.FRAMEWORKS[state].first), tries  # don't advance on a failure
+        if goodbye:  # they're leaving either way: say a fixed goodbye rather than "try me again"
+            fallback, reply, rule = True, _goodbye_line(step.stage == "step_back", buddy_said), None
+        else:
+            fallback, reply, save_cause, rule = True, FALLBACK_REPLY[mode], None, None
+            step, new_tries = flow.Step(state, stage or flow.FRAMEWORKS[state].first), tries  # don't advance
 
     reasoning = {
         "mode": mode,
@@ -401,6 +414,59 @@ async def _ask_reason_turn(db: Session, user_id: str, task: Task, user_message: 
     return {"reply": reply, "state": None, "intervention": reason, "fallback": fallback, "ask_reason": not bigger}
 
 
+def _stepped_back_last(db: Session, user_id: str, task_id: int) -> bool:
+    """Was Buddy's last message on this task a step-back (or a goodbye said after one)?"""
+    last = db.execute(
+        select(Message).where(Message.user_id == user_id, Message.task_id == task_id, Message.role == "assistant")
+        .order_by(Message.id.desc()).limit(1)
+    ).scalar_one_or_none()
+    try:
+        r = json.loads(last.reasoning or "{}") if last else {}
+    except (TypeError, ValueError):
+        return False
+    return r.get("phase") == "step_back" or bool(r.get("stepped_back"))
+
+
+async def _goodbye_turn(db: Session, user_id: str, task: Task, user_message: str) -> dict:
+    """They're signing off and no reason was tapped: one short goodbye, no question."""
+    task_id = task.id
+    history = tools.get_conversation_history(db, user_id, limit=FLOW_HISTORY, task_id=task_id)
+    previous = next((h["content"] for h in reversed(history) if h["role"] == "assistant"), None)
+    stepped_back = _stepped_back_last(db, user_id, task_id)
+    steps = _load_steps(db, task)
+    done_steps = [s.title for s in steps if s.done][:FLOW_OPEN_STEPS]
+    name_line = _name_line(tools.get_name(db, user_id))
+    title = task.title or "untitled"
+    db.rollback()  # read-only so far: give the connection back before waiting on the model
+
+    facts = [f'Task: "{title}"', "Timing: already mentioned, don't bring it up again.",
+             f"Done so far (the only progress you may praise besides what they just told you): "
+             f"{'; '.join(done_steps) or 'nothing yet'}"]
+    if name_line:
+        facts.append(name_line)
+    system = (f"{framework_section('shared', 'Voice')}\n\n" + "\n".join(facts)
+              + f"\n\nWhat to do now:\n{_goodbye_card(stepped_back)}\n\nRules:\n{_GOODBYE_RULES}")
+
+    fallback, checks = False, {}
+    try:
+        reply, checks = await _write_checked(
+            "chat", None, None, "", [], history, user_message, set(), "release", previous_reply=previous,
+            system=system, limits=GOODBYE_LIMITS)
+        if reply is None:
+            raise llm.LLMError(f"reply rejected by checks: {checks['hard']}")
+        reply, trimmed = _goodbye_or_fallback(reply, stepped_back, previous)
+        if trimmed:
+            checks["goodbye_trimmed"] = True
+    except llm.LLMError as e:
+        logger.warning("Buddy goodbye turn fell back (task_id=%s): %s", task_id, e)
+        fallback, reply = True, _goodbye_line(stepped_back, previous)
+
+    reasoning = {"mode": "chat", "phase": "goodbye", "top_state": None, "intervention": None, "reason": "goodbye",
+                 "stepped_back": stepped_back, "fallback": fallback, "checks": checks}
+    _learn(db, user_id, task_id, user_message, reply, reasoning, None, None, [], None)
+    return {"reply": reply, "state": None, "intervention": "goodbye", "fallback": fallback}
+
+
 def _flow_rules(asks: bool) -> str:
     return (("- At most 3 short sentences and exactly ONE question.\n" if asks
              else "- At most 3 short sentences and no question.\n")
@@ -417,12 +483,17 @@ def _flow_prompt(
     tapped: str, notes: dict, last_time: Optional[dict], pattern: Optional[str], name: Optional[str] = None,
 ) -> str:
     """The writer's whole prompt for one framework turn: voice, this stage, the facts, this stage's rules."""
+    goodbye = step.modifier == "signoff"
     generic = step.stage in flow.GENERIC
-    card = (framework_section("shared", _GENERIC_HEADINGS[step.stage]) if generic
-            else framework_section(step.state, step.stage)) or ""
-    modifier = framework_section("shared", _MODIFIER_HEADINGS[step.modifier]) if step.modifier else None
+    if goodbye:
+        card = _goodbye_card(stepped_back=step.stage == "step_back")
+    else:
+        card = (framework_section("shared", _GENERIC_HEADINGS[step.stage]) if generic
+                else framework_section(step.state, step.stage)) or ""
+    modifier = framework_section("shared", _MODIFIER_HEADINGS[step.modifier]) if step.modifier in _MODIFIER_HEADINGS \
+        else None
     never = framework_section(step.state, "Never")
-    asks = step.stage not in flow.NO_QUESTION
+    asks = step.stage not in flow.NO_QUESTION and not goodbye
 
     facts = [f'Task: "{title}"']
     if first_turn:
@@ -449,10 +520,56 @@ def _flow_prompt(
         f"{framework_section('shared', 'Voice')}\n\n"
         + "\n".join(facts)
         + f"\n\nWhat to do now ({_FRAMEWORK_TITLES.get(step.state, step.state)}, stage: {step.stage}):\n{what}\n"
-        + (f"Never: {never}\n" if never and step.stage != "step_back" else "")
+        + (f"Never: {never}\n" if never and step.stage != "step_back" and not goodbye else "")
         + "\nRules:\n"
-        + _flow_rules(asks)
+        + (_GOODBYE_RULES if goodbye else _flow_rules(asks))
     )
+
+
+# ── goodbyes (phone test, 2026-11-18) ─────────────────────────────────────
+# "I'll update tomo" got a question back; after a step-back, "Okie byee" got the step-back again.
+# A goodbye is one or two short lines with no question, checked in code, with a fixed line as the fallback.
+
+GOODBYE_LIMITS = (2, 0)
+# Only when the model's goodbye was all question, or the model is down. Picked at random, never the last
+# thing Buddy said, so it doesn't read as canned. The developer may rewrite these in her voice.
+GOODBYE_LINES = (
+    "Sounds good! I'm around whenever you want me.",
+    "Okie, talk soon!",
+    "Got it. I'm here whenever you're ready.",
+    "Sounds like a plan. See you around!",
+    "Alright! I'm around if you need me.",
+)
+GOODBYE_LIGHT_LINES = (  # after a step-back: soft, no task
+    "Take it easy. I'm here whenever you want me.",
+    "Rest up. I'm around whenever.",
+    "Take care. I'm here whenever.",
+    "Be gentle with yourself today. I'm around.",
+)
+_GOODBYE_RULES = ("- One short line, two at most, and no question at all.\n"
+                  "- Plain text, no lists or markdown.\n"
+                  "- Never state a clock time or a date.\n"
+                  "- Use only what's above and what they said. Never invent facts, tools, buttons or features.")
+
+
+def _goodbye_card(stepped_back: bool) -> str:
+    card = framework_section("shared", "Goodbye") or ""
+    light = framework_section("shared", "Goodbye after a step back") if stepped_back else None
+    return f"{card}\n{light}" if light else card
+
+
+def _goodbye_line(stepped_back: bool, previous: Optional[str] = None) -> str:
+    lines = GOODBYE_LIGHT_LINES if stepped_back else GOODBYE_LINES
+    return random.choice([line for line in lines if line != previous] or lines)
+
+
+def _goodbye_or_fallback(reply: str, stepped_back: bool, previous: Optional[str] = None) -> tuple[str, bool]:
+    """A goodbye never asks anything. The model may still add a question ("how do you think it'll go?"):
+    drop just that sentence and keep its own words; a fixed line only when nothing is left."""
+    if "?" not in reply:
+        return reply, False
+    kept = " ".join(s.strip() for s in re.findall(r"[^.!?]+[.!?]*", reply) if "?" not in s and s.strip())
+    return (kept, True) if len(kept.split()) >= 2 else (_goodbye_line(stepped_back, previous), True)
 
 
 def _session_messages(db: Session, user_id: str, task_id: int, since: datetime) -> list[dict]:

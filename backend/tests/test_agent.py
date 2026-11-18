@@ -891,9 +891,92 @@ def test_something_bigger_than_work_gets_the_step_back_not_the_chips(api, db, fa
     assert "Stop working on the task" in system_of(fake_llm.write_calls[-1])
 
 
+def test_a_goodbye_without_a_tapped_reason_is_short_and_asks_nothing(api, db, fake_llm):
+    fake_llm.reply = "Night, sleep well! How do you think it'll go tomorrow?"
+    _, h = register(api)
+    t = make_task(api, h)
+    body = say(api, h, t, "Okieee, I'll update tomo!")
+    assert body["intervention"] == "goodbye" and body["reply"] == "Night, sleep well!"  # only the question goes
+    assert fake_llm.read_calls == [] and fake_llm.decide_calls == []
+    assert "Let them go" in system_of(fake_llm.write_calls[-1])
+
+
+def test_a_goodbye_after_a_step_back_is_light(api, db, fake_llm):
+    _, h = register(api)
+    t = make_task(api, h)
+    assert say(api, h, t, "honestly I feel hopeless about everything")["intervention"] == "step_back"
+    fake_llm.reply = "Rest up, take it easy."
+    body = say(api, h, t, "Okie byee")
+    system = system_of(fake_llm.write_calls[-1])
+    assert body["intervention"] == "goodbye" and body["reply"] == "Rest up, take it easy."
+    assert "Keep this goodbye light" in system
+    assert "Stop working on the task" not in system  # not the step-back again
+
+
 def test_ask_reason_falls_back_to_a_gentle_question_when_the_model_fails(api, db, monkeypatch):
     monkeypatch.setattr(llm, "complete", FakeLLM(fail=True))
     _, h = register(api)
     t = make_task(api, h)
     body = say(api, h, t, "ugh I keep putting this off")
     assert body["reply"] == agent.ASK_FALLBACK and body["ask_reason"] is True
+
+
+# ── phone test, 2026-11-18: goodbyes inside a tapped reason ───────────────────────
+
+def test_ill_update_tomo_gets_a_goodbye_not_a_question(api, db, monkeypatch):
+    fake = FakeLLM(reads=[{"kind": "own_plan", "fact": "two pomodoros today"}],
+                   reply="Sounds good! Good luck with your two sprints today. How do you think the variables will go?")
+    monkeypatch.setattr(llm, "complete", fake)
+    user_id, h = register(api)
+    t = make_task(api, h)
+    start(api, h, t, "unclear")
+    say(api, h, t, "I'll do two pomodoros on variables today")
+    reads = len(fake.read_calls)
+    body = say(api, h, t, "Okieee, I'll update tomo!")
+    assert len(fake.read_calls) == reads  # read by code, no model call
+    assert body["reply"] == "Sounds good! Good luck with your two sprints today."
+    assert flow_of(db, t)["stage"] == "release" and flow_of(db, t)["modifier"] == "signoff"
+    assert "Let them go" in system_of(fake.write_calls[-1])
+
+    fake.reply = "Yay, one sprint and some exercises done! Sleep well."
+    body = say(api, h, t, "I did 1 sprint and finished some exercises. Now going to sleep!")
+    assert body["reply"] == "Yay, one sprint and some exercises done! Sleep well."
+
+
+def test_okie_bye_after_a_step_back_in_a_tapped_reason_is_light(api, db, monkeypatch):
+    fake = FakeLLM(reads=[{"kind": "bigger"}], reply="That sounds like more than a task thing.")
+    monkeypatch.setattr(llm, "complete", fake)
+    _, h = register(api)
+    t = make_task(api, h)
+    start(api, h, t, "tired")
+    say(api, h, t, "I'm on my period and I need someone to take care of me, I don't want to go out")
+    assert flow_of(db, t)["stage"] == "step_back"
+    fake.reply = "Will you lean on someone you trust today?"  # all question: a fixed light line instead
+    body = say(api, h, t, "Okie byee")
+    system = system_of(fake.write_calls[-1])
+    assert (flow_of(db, t)["stage"], flow_of(db, t)["modifier"]) == ("step_back", "signoff")
+    assert "Keep this goodbye light" in system and "Stop working on the task" not in system
+    assert body["reply"] in agent.GOODBYE_LIGHT_LINES
+    # still stepped back: a later task message doesn't restart the coaching
+    fake.reply = "Rest up."
+    say(api, h, t, "Hey I'm going to do this tomo, I'm very tired")
+    assert flow_of(db, t)["stage"] == "step_back"
+
+
+@pytest.mark.parametrize("reply,expected", [
+    ("Sounds good, Nith! Good luck with your two sprints today. How do you think the variables will go?",
+     "Sounds good, Nith! Good luck with your two sprints today."),
+    ("Rest up! Want me to check in tomorrow? Sleep well.", "Rest up! Sleep well."),
+    ("Night, sleep well!", "Night, sleep well!"),
+])
+def test_a_goodbye_keeps_its_own_words_and_loses_only_the_question(reply, expected):
+    assert agent._goodbye_or_fallback(reply, stepped_back=False)[0] == expected
+
+
+def test_an_all_question_goodbye_gets_a_fixed_line_that_never_repeats_the_last_one():
+    for previous in agent.GOODBYE_LINES:
+        for _ in range(20):
+            line, _trimmed = agent._goodbye_or_fallback("How did it go?", False, previous)
+            assert line in agent.GOODBYE_LINES and line != previous
+    assert agent._goodbye_or_fallback("Ok?", True)[0] in agent.GOODBYE_LIGHT_LINES
+    assert all("?" not in line for line in agent.GOODBYE_LINES + agent.GOODBYE_LIGHT_LINES)
