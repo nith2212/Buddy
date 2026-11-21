@@ -47,8 +47,8 @@ app.include_router(chat_router)
 app.include_router(echo_router)
 
 
-# Keep-warm ping: cron-job.org calls this every 10 minutes during the day so Render's free server doesn't
-# fall asleep and make the hourly check-in cron time out. No auth and no database: it must stay cheap.
+# Liveness check: is the API up? No auth and no database, so it stays cheap. (It was a keep-warm ping
+# while the API was on Render's free tier; Vercel doesn't sleep that way, so nothing needs to call it now.)
 @app.get("/health")
 def health():
     return {"ok": True}

@@ -74,7 +74,7 @@ async def send_push(
 TITLE_IN_BODY = 60  # characters of the task title shown in a check-in
 DUE_SOON = timedelta(hours=24)
 
-# The developer's wording (docs/notification_wording.md, approved 2026-11-08). Each line asks where they are,
+# The developer's wording (approved 2026-11-08; the draft notes are local only). Each line asks where they are,
 # because the buttons (Not yet / On it / Done!) answer that. Only true things: "due soon" means due within a
 # day, and nothing ever counts days or ignored check-ins (no guilt). {task} is the quoted task title.
 CHECKIN_LINES: dict[str, tuple[str, list[str]]] = {

@@ -73,7 +73,7 @@ def register_device(
 # POST /checkin/action
 # ---------------------------------------------------------------------------
 
-# The developer's wording (docs/notification_wording.md, approved 2026-11-08). Notifications sit on a public
+# The developer's wording (approved 2026-11-08; the draft notes are local only). Notifications sit on a public
 # lock screen, so they hint at a cause and never name it ("you're scared"). No guilt, no therapy phrases.
 # Button labels mirror the app's registered categories (src/lib/checkin-categories.ts), which draw them.
 

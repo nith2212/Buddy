@@ -1,5 +1,5 @@
-// The loading screen (mockup screen 1): Buddy floating while the app gets ready. Render's free tier
-// naps when idle, so a first launch can take a while: say so honestly instead of a bare spinner.
+// The loading screen (mockup screen 1): Buddy floating while the app gets ready. The server (Vercel
+// serverless) can take a moment on a cold start: say so honestly instead of a bare spinner.
 
 import { useEffect } from 'react';
 import { StyleSheet, View } from 'react-native';

@@ -11,7 +11,7 @@ import * as Notifications from 'expo-notifications';
 const BACKGROUND = { opensAppToForeground: false } as const;
 const OPEN_APP = { opensAppToForeground: true } as const;
 
-// Labels are the developer's wording (docs/notification_wording.md, 2026-11-08). The server's `actions`
+// Labels are the developer's wording (approved 2026-11-08). The server's `actions`
 // lists in backend/notifications/ mirror them; keep both in step. Short labels: Android cuts long ones.
 export const CHECKIN_CATEGORIES = {
   task_state: [

@@ -1,5 +1,6 @@
 # Cron-triggered endpoints, called by an external scheduler (cron-job.org).
-# Render free has no in-process scheduler and an ephemeral disk, so all scheduling lives outside the app.
+# The API runs as Vercel serverless functions: no in-process scheduler and no background work, so all
+# scheduling lives outside the app.
 #
 #   POST /cron/checkins — gated by X-Cron-Secret; runs hourly. Sends the daily check-in push to users with a
 #                          due-soon/overdue task or an untouched one, at most once a day per person, and only
