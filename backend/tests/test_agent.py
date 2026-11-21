@@ -408,6 +408,19 @@ def test_the_reading_moves_the_stage_and_notes_their_words(api, db, monkeypatch)
     assert causes_of(db, user_id) == {}  # an answer is not a confirmation
 
 
+
+def test_buddy_knows_their_name_but_is_told_to_use_it_sparingly(api, db, monkeypatch):
+    fake = FakeLLM(reads=[{"kind": "answer"}])
+    monkeypatch.setattr(llm, "complete", fake)
+    user_id, h = register(api)
+    api.post("/me/onboarding", json={"name": "Nithya"}, headers=h)
+    t = make_task(api, h)
+    start(api, h, t, "afraid")
+    system = system_of(fake.write_calls[-1])
+    assert 'Their name: "Nithya"' in system and "not in every reply" in system
+    assert "profile.name" not in system   # never as a raw memory row
+
+
 def test_confirming_saves_the_cause_once(api, db, monkeypatch):
     fake = FakeLLM(reads=[{"kind": "answer"}, {"kind": "confirm", "cause": "afraid"}, {"kind": "confirm"}])
     monkeypatch.setattr(llm, "complete", fake)
@@ -420,6 +433,28 @@ def test_confirming_saves_the_cause_once(api, db, monkeypatch):
     assert say(api, h, t, "haha okay")["intervention"] == "perfectionism:release"
     assert causes_of(db, user_id)["pattern.blocker.afraid"] == "1"  # not counted twice
 
+
+
+def test_deleting_the_task_uncounts_its_confirmed_cause(api, db, monkeypatch):
+    # The turn that counted a cause says so, so deleting the task can take exactly that back out.
+    fake = FakeLLM(reads=[{"kind": "answer"}, {"kind": "confirm", "cause": "afraid"}, {"kind": "confirm"}])
+    monkeypatch.setattr(llm, "complete", fake)
+    user_id, h = register(api)
+    t = make_task(api, h)
+    start(api, h, t, "afraid")
+    say(api, h, t, "people will think it's messy")
+    say(api, h, t, "yeah that's it")
+    say(api, h, t, "haha okay")
+    saved = [json.loads(m.reasoning).get("saved_cause") for m in db.query(models.Message).filter_by(task_id=t)
+             if m.reasoning]
+    assert saved.count("afraid") == 1 and len([c for c in saved if c]) == 1
+    # Say two more were confirmed on other tasks, which stay.
+    db.query(models.Memory).filter_by(user_id=user_id, key="pattern.blocker.afraid").one().value = "3"
+    db.commit()
+
+    assert api.delete(f"/tasks/{t}", headers=h).status_code == 204
+    db.expire_all()
+    assert causes_of(db, user_id) == {"pattern.blocker.afraid": "2"}
 
 def test_their_own_plan_is_released_and_backed_as_said(api, db, monkeypatch):
     fake = FakeLLM(reads=[{"kind": "own_plan", "fact": "polish the README first"}])
@@ -856,9 +891,186 @@ def test_something_bigger_than_work_gets_the_step_back_not_the_chips(api, db, fa
     assert "Stop working on the task" in system_of(fake_llm.write_calls[-1])
 
 
+def test_a_goodbye_without_a_tapped_reason_is_short_and_asks_nothing(api, db, fake_llm):
+    fake_llm.reply = "Night, sleep well! How do you think it'll go tomorrow?"
+    _, h = register(api)
+    t = make_task(api, h)
+    body = say(api, h, t, "Okieee, I'll update tomo!")
+    assert body["intervention"] == "goodbye" and body["reply"] == "Night, sleep well!"  # only the question goes
+    assert fake_llm.read_calls == [] and fake_llm.decide_calls == []
+    assert "Let them go" in system_of(fake_llm.write_calls[-1])
+
+
+def test_a_goodbye_after_a_step_back_is_light(api, db, fake_llm):
+    _, h = register(api)
+    t = make_task(api, h)
+    assert say(api, h, t, "honestly I feel hopeless about everything")["intervention"] == "step_back"
+    fake_llm.reply = "Rest up, take it easy."
+    body = say(api, h, t, "Okie byee")
+    system = system_of(fake_llm.write_calls[-1])
+    assert body["intervention"] == "goodbye" and body["reply"] == "Rest up, take it easy."
+    assert "Keep this goodbye light" in system
+    assert "Stop working on the task" not in system  # not the step-back again
+
+
 def test_ask_reason_falls_back_to_a_gentle_question_when_the_model_fails(api, db, monkeypatch):
     monkeypatch.setattr(llm, "complete", FakeLLM(fail=True))
     _, h = register(api)
     t = make_task(api, h)
     body = say(api, h, t, "ugh I keep putting this off")
     assert body["reply"] == agent.ASK_FALLBACK and body["ask_reason"] is True
+
+
+# ── phone test, 2026-11-18: goodbyes inside a tapped reason ───────────────────────
+
+def test_ill_update_tomo_gets_a_goodbye_not_a_question(api, db, monkeypatch):
+    fake = FakeLLM(reads=[{"kind": "own_plan", "fact": "two pomodoros today"}],
+                   reply="Sounds good! Good luck with your two sprints today. How do you think the variables will go?")
+    monkeypatch.setattr(llm, "complete", fake)
+    user_id, h = register(api)
+    t = make_task(api, h)
+    start(api, h, t, "unclear")
+    say(api, h, t, "I'll do two pomodoros on variables today")
+    reads = len(fake.read_calls)
+    body = say(api, h, t, "Okieee, I'll update tomo!")
+    assert len(fake.read_calls) == reads  # read by code, no model call
+    assert body["reply"] == "Sounds good! Good luck with your two sprints today."
+    assert flow_of(db, t)["stage"] == "release" and flow_of(db, t)["modifier"] == "signoff"
+    assert "Let them go" in system_of(fake.write_calls[-1])
+
+    fake.reply = "Yay, one sprint and some exercises done! Sleep well."
+    body = say(api, h, t, "I did 1 sprint and finished some exercises. Now going to sleep!")
+    assert body["reply"] == "Yay, one sprint and some exercises done! Sleep well."
+
+
+def test_okie_bye_after_a_step_back_in_a_tapped_reason_is_light(api, db, monkeypatch):
+    fake = FakeLLM(reads=[{"kind": "bigger"}], reply="That sounds like more than a task thing.")
+    monkeypatch.setattr(llm, "complete", fake)
+    _, h = register(api)
+    t = make_task(api, h)
+    start(api, h, t, "tired")
+    say(api, h, t, "I'm on my period and I need someone to take care of me, I don't want to go out")
+    assert flow_of(db, t)["stage"] == "step_back"
+    fake.reply = "Will you lean on someone you trust today?"  # all question: a fixed light line instead
+    body = say(api, h, t, "Okie byee")
+    system = system_of(fake.write_calls[-1])
+    assert (flow_of(db, t)["stage"], flow_of(db, t)["modifier"]) == ("step_back", "signoff")
+    assert "Keep this goodbye light" in system and "Stop working on the task" not in system
+    assert body["reply"] in agent.GOODBYE_LIGHT_LINES
+    # still stepped back: a later task message doesn't restart the coaching
+    fake.reply = "Rest up."
+    say(api, h, t, "Hey I'm going to do this tomo, I'm very tired")
+    assert flow_of(db, t)["stage"] == "step_back"
+
+
+@pytest.mark.parametrize("reply,expected", [
+    ("Sounds good, Nith! Good luck with your two sprints today. How do you think the variables will go?",
+     "Sounds good, Nith! Good luck with your two sprints today."),
+    ("Rest up! Want me to check in tomorrow? Sleep well.", "Rest up! Sleep well."),
+    ("Night, sleep well!", "Night, sleep well!"),
+])
+def test_a_goodbye_keeps_its_own_words_and_loses_only_the_question(reply, expected):
+    assert agent._goodbye_or_fallback(reply, stepped_back=False)[0] == expected
+
+
+def test_an_all_question_goodbye_gets_a_fixed_line_that_never_repeats_the_last_one():
+    for previous in agent.GOODBYE_LINES:
+        for _ in range(20):
+            line, _trimmed = agent._goodbye_or_fallback("How did it go?", False, previous)
+            assert line in agent.GOODBYE_LINES and line != previous
+    assert agent._goodbye_or_fallback("Ok?", True)[0] in agent.GOODBYE_LIGHT_LINES
+    assert all("?" not in line for line in agent.GOODBYE_LINES + agent.GOODBYE_LIGHT_LINES)
+
+
+# ── "I finished it!" → "Want me to mark it done?" (developer, 2026-11-18) ─────────
+
+def events_of(db, task_id):
+    return [e.type for e in db.query(models.Event).filter(models.Event.task_id == task_id)]
+
+
+def test_finishing_gets_a_glad_line_and_the_question_but_marks_nothing(api, db, fake_llm):
+    fake_llm.reply = "Yay, the whole report is done! How does it feel?"
+    _, h = register(api)
+    t = make_task(api, h)
+    body = say(api, h, t, "I finished it!")
+    assert body["offer_done"] is True and body["intervention"] == "offer_done"
+    assert body["reply"] == f"Yay, the whole report is done! {agent.DONE_QUESTION}"  # its question is cut
+    assert api.get(f"/tasks/{t}", headers=h).json()["status"] == "open"
+    assert fake_llm.read_calls == [] and fake_llm.decide_calls == []
+
+
+def test_finishing_inside_a_tapped_reason_still_asks(api, db, fake_llm):
+    _, h = register(api)
+    t = make_task(api, h)
+    start(api, h, t, "afraid")
+    assert say(api, h, t, "lol nvm I finished it")["offer_done"] is True
+
+
+def test_yes_button_marks_it_done_like_the_checkbox_and_saves_no_user_turn(api, db, fake_llm):
+    _, h = register(api)
+    t = make_task(api, h)
+    say(api, h, t, "I finished it!")
+    calls = len(fake_llm.calls)
+    r = api.post("/chat", json={"task_id": t, "mark_done": True}, headers=h)
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["task_status"] == "done" and body["reply"] in agent.MARKED_DONE_LINES
+    assert len(fake_llm.calls) == calls  # no model call
+    assert api.get(f"/tasks/{t}", headers=h).json()["status"] == "done"
+    assert events_of(db, t).count("completed") == 1  # what Echo and state detection count
+    history = api.get(f"/chat/history?task_id={t}", headers=h).json()
+    assert [m["role"] for m in history] == ["user", "assistant", "assistant"]
+    # and the checkbox can still undo it
+    api.patch(f"/tasks/{t}", json={"status": "open"}, headers=h)
+    assert api.get(f"/tasks/{t}", headers=h).json()["status"] == "open"
+
+
+def test_not_yet_keeps_it_open(api, db, fake_llm):
+    _, h = register(api)
+    t = make_task(api, h)
+    say(api, h, t, "I finished it!")
+    body = api.post("/chat", json={"task_id": t, "mark_done": False}, headers=h).json()
+    assert body["task_status"] == "open" and body["reply"] in agent.KEPT_OPEN_LINES
+    assert "completed" not in events_of(db, t)
+
+
+def test_typed_yes_after_the_offer_works_like_the_button(api, db, fake_llm):
+    _, h = register(api)
+    t = make_task(api, h)
+    say(api, h, t, "it's done!!")
+    body = say(api, h, t, "yesss")
+    assert body["task_status"] == "done"
+    history = api.get(f"/chat/history?task_id={t}", headers=h).json()
+    assert history[-2] == {"role": "user", "content": "yesss"}
+
+
+def test_yes_without_an_offer_is_just_a_message(api, db, fake_llm):
+    _, h = register(api)
+    t = make_task(api, h)
+    say(api, h, t, "ugh I keep putting this off")
+    assert say(api, h, t, "yes")["intervention"] != "marked_done"
+    assert api.get(f"/tasks/{t}", headers=h).json()["status"] == "open"
+
+
+def test_vague_finish_never_gets_the_offer(api, db, fake_llm):
+    _, h = register(api)
+    t = make_task(api, h)
+    assert not say(api, h, t, "kinda finished").get("offer_done")
+
+
+def test_mark_done_must_come_alone_and_only_for_your_own_task(api, db, fake_llm):
+    _, h = register(api)
+    t = make_task(api, h)
+    assert api.post("/chat", json={"task_id": t, "mark_done": True, "message": "yes"}, headers=h).status_code == 422
+    _, other = register(api)
+    assert api.post("/chat", json={"task_id": t, "mark_done": True}, headers=other).status_code == 404
+    assert api.get(f"/tasks/{t}", headers=h).json()["status"] == "open"
+
+
+def test_a_failed_model_still_asks_with_a_fixed_glad_line(api, db, monkeypatch):
+    monkeypatch.setattr(llm, "complete", FakeLLM(fail=True))
+    _, h = register(api)
+    t = make_task(api, h)
+    body = say(api, h, t, "I finished it!")
+    line = body["reply"].removesuffix(f" {agent.DONE_QUESTION}")
+    assert body["offer_done"] is True and line in agent.FINISHED_LINES

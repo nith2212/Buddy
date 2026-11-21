@@ -4,6 +4,7 @@
 #   GET    /tasks                               — list the caller's tasks, newest first (capped)
 #   GET    /tasks/{task_id}                     — one task with its subtasks
 #   PATCH  /tasks/{task_id}                      — edit title/due_date, or mark status
+#   DELETE /tasks/{task_id}                      — delete a task and everything about it, for good
 #   POST   /tasks/{task_id}/subtasks             — add a subtask
 #   PATCH  /tasks/{task_id}/subtasks/{subtask_id} — edit title and/or toggle done
 #   DELETE /tasks/{task_id}/subtasks/{subtask_id} — remove a subtask
@@ -19,26 +20,19 @@ from typing import Literal, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from pydantic import BaseModel, Field
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.orm import Session, selectinload
 
 from auth import current_user, owned_or_404
+from brain.echo import forget_task
+from brain.tools import forget_task_causes, mark_task_done, task_confirmations
 from db import get_db
-from models import Event, Subtask, Task, User
+from models import EmotionLog, Event, Message, Subtask, Task, User
 
 router = APIRouter(prefix="/tasks", tags=["tasks"])
 
 MAX_LIST = 100
 MAX_SUBTASKS_PER_TASK = 50
-
-
-def _mark_done(task: Task, db: Session) -> None:
-    """Shared by PATCH /tasks/{id} and the check-in flow's task_state="done" tap."""
-    if task.status == "done":
-        return
-    task.status = "done"
-    task.completed_at = datetime.now(timezone.utc)
-    db.add(Event(user_id=task.user_id, task_id=task.id, type="completed", source="user"))
 
 
 class TaskCreate(BaseModel):
@@ -136,13 +130,30 @@ def update_task(
                          payload=json.dumps({"from": old_due.isoformat(), "to": new_due.isoformat()})))
         task.due_date = new_due
     if payload.status == "done":
-        _mark_done(task, db)
+        mark_task_done(db, task)
     elif payload.status == "open":
         task.status, task.completed_at = "open", None
 
     db.commit()
     db.refresh(task)
     return task
+
+
+@router.delete("/{task_id}", status_code=204)
+def delete_task(task_id: int, user: User = Depends(current_user), db: Session = Depends(get_db)):
+    """Delete a task and everything about it, in one transaction: its steps, chat, check-ins, tapped
+    reasons, the cause Buddy saved for it, its confirmations in the pattern counts (pattern.blocker.*), and
+    its traces in Echo's saved weeks. There's no undo. Echo's other weekly totals stay: they name no task."""
+    task = owned_or_404(db, Task, task_id, user)
+    confirmations = task_confirmations(db, user.id, task.id)  # read from its chat, before the chat goes
+    forget_task_causes(db, user.id, task.id, confirmations)
+    forget_task(db, user.id, task.id, confirmations)
+    # Children before the task, so foreign keys hold.
+    for model in (EmotionLog, Subtask, Event, Message):
+        db.execute(delete(model).where(model.user_id == user.id, model.task_id == task.id))
+    db.execute(delete(Task).where(Task.id == task.id, Task.user_id == user.id))
+    db.commit()
+    return Response(status_code=204)
 
 
 # ── Subtasks ─────────────────────────────────────────────────────────────────

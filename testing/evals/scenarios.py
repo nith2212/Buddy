@@ -298,4 +298,33 @@ SCENARIOS = [
         "note": "A must-do they dislike: accept the dislike, no moralizing ('you don't have to like it'), never tell "
                 "them what the report gives them. Make it lighter or smaller.",
     },
+
+    # ── From the developer's phone test, 2026-11-18 (Buddy didn't let them go) ──
+    {
+        "id": "phone_update_tomo", "state": "ambiguity", "chip": "unclear",
+        "task": {"title": "Python basics", "due_in_days": 4},
+        "user": [
+            "I need to learn variables, types and operators first",
+            "I'll do two Pomodoros on them today",
+            "Okieee, I'll update tomo!",
+            "Bye",
+            "I did 1 sprint and finished some exercises. Now going to sleep!",
+        ],
+        "expect_cause": "unclear", "ends_with_release": True,
+        "note": "\"I'll update tomo\" is a goodbye: one short line, no question (it asked how the variables "
+                "would go). Progress after the goodbye: glad about it in a line, no question.",
+    },
+    {
+        "id": "phone_bye_after_step_back", "state": "fatigue", "chip": "tired",
+        "task": {"title": "Buy groceries", "due_in_days": 0},
+        "user": [
+            "I don't want to go out and buy groceries today",
+            "I'm on my period and I need someone to take care of me. I don't want to go out",
+            "Okie byee",
+            "Hey I'm going to do this tomo, I'm very tired",
+        ],
+        "expect_cause": "tired", "ends_with_release": True,
+        "note": "Stepping back was right. The goodbyes after it must be light: no repeating 'lean on someone you "
+                "trust' or 'I hope you get the care you need', no task nudge.",
+    },
 ]

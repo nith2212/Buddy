@@ -1,7 +1,12 @@
+import json
+from datetime import datetime, timezone
+
 import pytest
 from sqlalchemy import func, select
 
 import models
+
+UTC = timezone.utc
 
 INVITE = {"X-Invite-Code": "test-invite"}
 TOKEN_A = "ExponentPushToken[aaaaaaaaaaaaaaaaaaaaaa]"
@@ -34,6 +39,8 @@ def make_task(api, headers, title="write report", **extra):
     ("post", "/tasks", {"title": "x"}),
     ("get", "/tasks", None),
     ("delete", "/me", None),
+    ("delete", "/tasks/1", None),
+    ("post", "/me/onboarding", {"click_time": "evening"}),
 ])
 def test_protected_endpoints_need_token(api, method, path, body):
     r = getattr(api, method)(path, **({"json": body} if body else {}))
@@ -128,6 +135,7 @@ def test_full_checkin_flow(api, users, db):
 
     r = api.post("/checkin/action", json={"task_id": t, "stage": "chat_opt_in", "value": "yes"}, headers=a_h)
     assert r.json()["next_stage"] == "chat"
+    assert "notification" not in r.json()  # the app opens the chat itself; nothing to show
     log = db.execute(select(models.EmotionLog).where(models.EmotionLog.task_id == t)).scalar_one()
     assert log.user_id == a_id and log.emotion == "low" and log.chat_opt_in is True
 
@@ -138,9 +146,66 @@ def test_declined_chat_completes_checkin(api, users):
     api.post("/checkin/action", json={"task_id": t, "stage": "emotion", "value": "good"}, headers=a_h)
     r = api.post("/checkin/action", json={"task_id": t, "stage": "chat_opt_in", "value": "no"}, headers=a_h)
     assert r.json()["next_stage"] == "done"
+    assert r.json()["notification"]["title"] == "Got it! 💛"
 
 
-@pytest.mark.parametrize("stage,value", [("task_state", "done"), ("emotion", "low"), ("chat_opt_in", "yes")])
+def _action(api, h, t, stage, value):
+    return api.post("/checkin/action", json={"task_id": t, "stage": stage, "value": value}, headers=h).json()
+
+
+def _buttons(body):
+    return [a["value"] for a in body["notification"]["data"]["actions"]]
+
+
+def test_checkin_done_celebrates_and_ends(api, users, db):
+    (_, a_h), _ = users
+    t = make_task(api, a_h)
+    body = _action(api, a_h, t, "task_state", "done")
+    assert body["next_stage"] == "done"
+    assert body["notification"]["title"] == "Yay, you did it! 🎉"
+    assert "actions" not in body["notification"]["data"]  # no "what's in the way?" after finishing
+    assert db.get(models.Task, t).status == "done"
+
+
+def test_checkin_status_asks_whats_in_the_way(api, users):
+    (_, a_h), _ = users
+    t = make_task(api, a_h)
+    not_yet = _action(api, a_h, t, "task_state", "not_started")
+    on_it = _action(api, a_h, t, "task_state", "in_progress")
+    assert not_yet["notification"]["title"] == "Okay! What's in the way?"
+    assert on_it["notification"]["title"] == "Ooh, you started! 🙌"
+    assert _buttons(not_yet) == _buttons(on_it) == ["tired", "unclear", "more"]
+
+
+def test_something_else_shows_the_other_reasons_and_logs_nothing(api, users, db):
+    (_, a_h), _ = users
+    t = make_task(api, a_h)
+    more = _action(api, a_h, t, "emotion", "more")
+    assert more["next_stage"] == "emotion_more"
+    assert _buttons(more) == ["too_much", "afraid", "bored"]
+    assert db.scalar(select(func.count()).select_from(models.EmotionLog)) == 0  # "Something else" isn't a reason
+
+    offer = _action(api, a_h, t, "emotion_more", "afraid")
+    assert offer["next_stage"] == "chat_opt_in"
+    assert offer["notification"]["title"] == "A rough start counts 💛"
+    assert _buttons(offer) == ["yes", "no"]
+    log = db.execute(select(models.EmotionLog).where(models.EmotionLog.task_id == t)).scalar_one()
+    assert log.emotion == "afraid"
+
+
+def test_chat_offers_hint_at_the_cause_without_naming_it():
+    # Notifications sit on a public lock screen: never spell out a fear.
+    from notifications.router import CHAT_OFFERS, DEFAULT_OFFER
+
+    assert set(CHAT_OFFERS) == {"tired", "too_much", "unclear", "afraid", "bored"}
+    for title, body in [*CHAT_OFFERS.values(), DEFAULT_OFFER]:
+        text = (title + " " + body).lower()
+        assert not any(word in text for word in ("scared", "afraid", "fear", "lazy", "anxious"))
+
+
+@pytest.mark.parametrize("stage,value", [
+    ("task_state", "done"), ("emotion", "low"), ("emotion", "more"), ("emotion_more", "afraid"), ("chat_opt_in", "yes"),
+])
 def test_cannot_check_in_on_other_users_task(api, users, db, stage, value):
     (_, a_h), (b_id, b_h) = users
     b_task = make_task(api, b_h)
@@ -171,7 +236,7 @@ def seed_everything(api, db, user_id, headers, token):
         models.Event(user_id=user_id, task_id=t, type="checkin_sent"),
         models.Message(user_id=user_id, task_id=t, role="user", content="hi"),
         models.Memory(user_id=user_id, key="onboarding.x", value="v"),
-        models.Onboarding(user_id=user_id, preferred_work_time="evening"),
+        models.Onboarding(user_id=user_id, click_time="evening"),
     ])
     db.commit()
 
@@ -197,3 +262,184 @@ def test_delete_me_wipes_caller_only(api, users, db):
     # A's token no longer works; B's still does.
     assert api.get("/tasks", headers=a_h).status_code == 401
     assert api.get("/tasks", headers=b_h).status_code == 200
+
+
+# ── delete a task ───────────────────────────────────────────────────────────
+
+def test_delete_task_removes_everything_about_it_and_nothing_else(api, users, db):
+    (a_id, a_h), (b_id, b_h) = users
+    gone, kept = make_task(api, a_h, "Lab report"), make_task(api, a_h, "Essay")
+    theirs = make_task(api, b_h, "Their task")
+    for uid, h, t in ((a_id, a_h, gone), (a_id, a_h, kept), (b_id, b_h, theirs)):
+        api.post("/checkin/action", json={"task_id": t, "stage": "emotion", "value": "afraid"}, headers=h)
+        db.add_all([
+            models.Subtask(user_id=uid, task_id=t, title="step 1"),
+            models.Event(user_id=uid, task_id=t, type="checkin_sent"),
+            models.Message(user_id=uid, task_id=t, role="user", content="hi"),
+            models.Memory(user_id=uid, key=f"blocker.task.{t}", value="afraid"),
+        ])
+    # The deleted task had two causes confirmed in chat: afraid inside Echo's saved week, tired after it.
+    # (Every task's blocker.task row says afraid; the turns are what was counted.)
+    db.add_all([
+        models.Message(user_id=a_id, task_id=gone, role="assistant", content="ok",
+                       reasoning=json.dumps({"saved_cause": "afraid"}), created_at=datetime(2026, 10, 30, 9, tzinfo=UTC)),
+        models.Message(user_id=a_id, task_id=gone, role="assistant", content="ok",
+                       reasoning=json.dumps({"saved_cause": "tired"}), created_at=datetime(2026, 11, 5, 9, tzinfo=UTC)),
+    ])
+    week = {"start": "2026-10-25T17:30:00+00:00", "end": "2026-11-01T17:30:00+00:00", "checkins": {"sent": 3},
+            "cause_totals": {"afraid": 2}, "causes_confirmed": {"afraid": 1},
+            "open_tasks": [{"id": gone, "checkins_ignored": 2}, {"id": kept, "checkins_ignored": 0}]}
+    db.add_all([
+        models.Memory(user_id=a_id, key="pattern.blocker.afraid", value="2"),
+        models.Memory(user_id=a_id, key="pattern.blocker.tired", value="1"),
+        models.Memory(user_id=a_id, key="echo.week.2026-11-01", value=json.dumps(week)),
+        models.Message(user_id=a_id, task_id=None, role="user", content="not about a task"),
+        models.Memory(user_id=b_id, key="pattern.blocker.afraid", value="1"),
+    ])
+    db.commit()
+    task_tables = [models.EmotionLog, models.Subtask, models.Event, models.Message]
+
+    def rows_of(t):
+        return {m.__tablename__: db.scalar(select(func.count()).select_from(m).where(m.task_id == t))
+                for m in task_tables}
+
+    before = {t: rows_of(t) for t in (gone, kept, theirs)}
+    assert all(n >= 1 for counts in before.values() for n in counts.values())
+    b_before = {m.__tablename__: count(db, m, b_id) for m in USER_TABLES}
+
+    assert api.delete(f"/tasks/{gone}", headers=a_h).status_code == 204
+
+    db.expire_all()
+    assert api.get(f"/tasks/{gone}", headers=a_h).status_code == 404
+    assert [t["id"] for t in api.get("/tasks", headers=a_h).json()] == [kept]
+    assert all(n == 0 for n in rows_of(gone).values())
+    assert rows_of(kept) == before[kept] and rows_of(theirs) == before[theirs]
+
+    memory = {r.key: r.value for r in db.query(models.Memory).filter_by(user_id=a_id)}
+    assert f"blocker.task.{gone}" not in memory and memory[f"blocker.task.{kept}"] == "afraid"
+    # Its confirmations come out of the counts: afraid 2 -> 1 (the other task's), tired 1 -> gone.
+    assert memory["pattern.blocker.afraid"] == "1" and "pattern.blocker.tired" not in memory
+    # Echo's week: its row goes, and its afraid comes out of that week's totals, so next week's
+    # "totals minus last week's" still counts new confirmations. Totals that name no task stay.
+    saved = json.loads(memory["echo.week.2026-11-01"])
+    assert [t["id"] for t in saved["open_tasks"]] == [kept] and saved["checkins"] == {"sent": 3}
+    assert saved["cause_totals"] == {"afraid": 1} and saved["causes_confirmed"] == {}
+    assert db.query(models.Message).filter_by(user_id=a_id, task_id=None).count() == 1
+    assert {m.__tablename__: count(db, m, b_id) for m in USER_TABLES} == b_before
+
+    # A check-in still sitting in the notification tray for the deleted task: nothing to act on.
+    r = api.post("/checkin/action", json={"task_id": gone, "stage": "task_state", "value": "done"}, headers=a_h)
+    assert r.status_code == 404
+
+
+def test_delete_task_uncounts_a_cause_from_before_turns_recorded_it(api, users, db):
+    # Turns saved before 2026-11-09 don't say which cause they counted: the task's blocker row stands in.
+    (a_id, a_h), _ = users
+    t = make_task(api, a_h)
+    db.add_all([
+        models.Message(user_id=a_id, task_id=t, role="assistant", content="ok", reasoning=json.dumps({"mode": "chat"})),
+        models.Memory(user_id=a_id, key=f"blocker.task.{t}", value="bored"),
+        models.Memory(user_id=a_id, key="pattern.blocker.bored", value="3"),
+    ])
+    db.commit()
+    assert api.delete(f"/tasks/{t}", headers=a_h).status_code == 204
+    db.expire_all()
+    memory = {r.key: r.value for r in db.query(models.Memory).filter_by(user_id=a_id)}
+    assert memory == {"pattern.blocker.bored": "2"}
+
+
+def test_cannot_delete_someone_elses_task(api, users):
+    (_, a_h), (_, b_h) = users
+    theirs = make_task(api, b_h, "Their secret plan")
+    r = api.delete(f"/tasks/{theirs}", headers=a_h)
+    assert r.status_code == 404 and "secret" not in r.text
+    assert api.get(f"/tasks/{theirs}", headers=b_h).json()["title"] == "Their secret plan"
+    assert api.delete("/tasks/999999", headers=a_h).status_code == 404
+
+
+# ── onboarding ──────────────────────────────────────────────────────────────
+
+def onboarding_of(db, user_id):
+    db.expire_all()
+    return db.query(models.Onboarding).filter_by(user_id=user_id).one_or_none()
+
+
+def test_onboarding_saves_the_answers_and_replaces_them(api, users, db):
+    (a_id, a_h), _ = users
+    r = api.post("/me/onboarding", json={"days": "school", "click_time": "evening",
+                                         "gets_in_way": ["tired", "afraid", "tired"]}, headers=a_h)
+    assert r.status_code == 200
+    assert r.json() == {"name": None, "days": "school", "click_time": "evening", "gets_in_way": ["afraid", "tired"]}
+    row = onboarding_of(db, a_id)
+    assert (row.days, row.click_time, row.gets_in_way) == ("school", "evening", "afraid,tired")
+
+    # Sent again (say, after a reinstall): one row, the new answers. Every answer is optional.
+    assert api.post("/me/onboarding", json={"click_time": "morning"}, headers=a_h).json() == \
+        {"name": None, "days": None, "click_time": "morning", "gets_in_way": []}
+    assert db.query(models.Onboarding).filter_by(user_id=a_id).count() == 1
+    row = onboarding_of(db, a_id)
+    assert (row.days, row.click_time, row.gets_in_way) == (None, "morning", None)
+    assert api.post("/me/onboarding", json={}, headers=a_h).status_code == 200
+
+
+@pytest.mark.parametrize("body", [
+    {"click_time": "3am"},
+    {"days": "everything"},
+    {"gets_in_way": ["lazy"]},
+    {"gets_in_way": "tired"},
+])
+def test_onboarding_only_takes_the_offered_choices(api, users, body):
+    (_, a_h), _ = users
+    assert api.post("/me/onboarding", json=body, headers=a_h).status_code == 422
+
+
+def test_onboarding_answers_are_you_said_never_causes(api, users, db):
+    # Picking "scared" in the questionnaire is not a confirmed cause: no cause memory, nothing for Echo.
+    (a_id, a_h), _ = users
+    api.post("/me/onboarding", json={"gets_in_way": ["afraid", "too_much"]}, headers=a_h)
+    db.expire_all()
+    assert db.query(models.Memory).filter_by(user_id=a_id).count() == 0
+    assert db.query(models.EmotionLog).filter_by(user_id=a_id).count() == 0
+
+
+def test_onboarding_keeps_the_name_cleaned_and_forgets_it_when_left_out(api, users, db):
+    (a_id, a_h), (b_id, b_h) = users
+
+    def name_of(uid):
+        db.expire_all()
+        row = db.query(models.Memory).filter_by(user_id=uid, key="profile.name").one_or_none()
+        return row.value if row else None
+
+    r = api.post("/me/onboarding", json={"name": "  Nithya \n  Sri\t", "click_time": "evening"}, headers=a_h)
+    assert r.json()["name"] == "Nithya Sri" and name_of(a_id) == "Nithya Sri"
+    assert name_of(b_id) is None                                   # only ever the caller's
+    api.post("/me/onboarding", json={"name": "x" * 50}, headers=a_h)
+    assert name_of(a_id) == "x" * 30                               # capped
+    assert api.post("/me/onboarding", json={"name": "x" * 61}, headers=a_h).status_code == 422
+    api.post("/me/onboarding", json={"click_time": "morning"}, headers=a_h)
+    assert name_of(a_id) is None                                   # sent again without a name: forgotten
+    api.post("/me/onboarding", json={"name": "   "}, headers=a_h)
+    assert name_of(a_id) is None
+
+
+def test_onboarding_is_only_ever_the_callers(api, users, db):
+    (a_id, a_h), (b_id, b_h) = users
+    api.post("/me/onboarding", json={"click_time": "late_night"}, headers=b_h)
+    # Identity comes only from the token: a user_id in the body is ignored.
+    api.post("/me/onboarding", json={"click_time": "morning", "user_id": b_id}, headers=a_h)
+    assert onboarding_of(db, b_id).click_time == "late_night"
+    assert onboarding_of(db, a_id).click_time == "morning"
+
+
+# ── keep-warm ping ──────────────────────────────────────────────────────────
+
+def test_health_is_public_and_cheap(api):
+    r = api.get("/health")
+    assert r.status_code == 200
+    assert r.json() == {"ok": True}
+
+
+def test_db_checks_connections_before_reuse():
+    # Neon drops idle connections when it sleeps; pre-ping swaps a dead one for a fresh one.
+    from db import engine
+    assert engine.pool._pre_ping is True

@@ -13,7 +13,8 @@ import Svg, { Path } from 'react-native-svg';
 import { BuddyBlob } from '@/components/buddy-blob';
 import { BrandHeader } from '@/components/side-menu';
 import { Card, Chip, Hatch, SketchButton, Txt } from '@/components/sketch';
-import { Border, Ink, Palette, Wobble } from '@/constants/sketch';
+import { Border, Wobble, type Colors } from '@/constants/sketch';
+import { useColors, useThemedStyles } from '@/hooks/use-theme';
 import { useToken } from '@/hooks/use-session';
 import { api, EchoWeek, EchoWeekSummary } from '@/lib/api';
 
@@ -72,6 +73,8 @@ function opensOnLastWeek() {
 }
 
 export default function EchoesScreen() {
+  const styles = useThemedStyles(makeStyles);
+  const c = useColors();
   const token = useToken();
   const client = useMemo(() => api(token), [token]);
   const router = useRouter();
@@ -127,13 +130,13 @@ export default function EchoesScreen() {
       ) : (
         <ScrollView
           contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 28 }]}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} colors={[Palette.deep]} />}>
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} colors={[c.deep]} progressBackgroundColor={c.card} />}>
           <View style={styles.titleBlock}>
             <Txt variant="title" style={styles.bigTitle} accessibilityRole="header">
-              Echoes<Txt variant="title" style={[styles.bigTitle, { color: Palette.deep }]}>.</Txt>
+              Echoes<Txt variant="title" style={[styles.bigTitle, { color: c.deep }]}>.</Txt>
             </Txt>
             <Svg width={120} height={12} viewBox="0 0 120 12">
-              <Path d="M4 8 Q30 2 60 7 T116 5" fill="none" stroke={Palette.deep} strokeWidth={3} strokeLinecap="round" />
+              <Path d="M4 8 Q30 2 60 7 T116 5" fill="none" stroke={c.deep} strokeWidth={3} strokeLinecap="round" />
             </Svg>
             <Txt variant="hand" style={styles.subtitle}>{`~ ${showing === 'last' ? 'last week' : 'this week'} · ${weekRange(shown.days)} ~`}</Txt>
           </View>
@@ -150,7 +153,7 @@ export default function EchoesScreen() {
               <BuddyBlob width={64} mood="happy" animated={false} />
               <View style={styles.bannerText}>
                 <Txt variant="hand" style={styles.bannerTitle}>Your first Echo lands on Monday!</Txt>
-                <Txt variant="small">Buddy’s still getting to know you. Here’s your week so far.</Txt>
+                <Txt variant="small" style={styles.onSoft}>Buddy’s still getting to know you. Here’s your week so far.</Txt>
               </View>
             </Card>
           ) : null}
@@ -159,7 +162,7 @@ export default function EchoesScreen() {
               <BuddyBlob width={64} mood="happy" animated={false} />
               <View style={styles.bannerText}>
                 <Txt variant="hand" style={styles.bannerTitle}>{`Your Echo for ${weekRange(shown.days)} is ready!`}</Txt>
-                <Txt variant="small">It makes way for a new one next week, so save it if you’d like to keep it.</Txt>
+                <Txt variant="small" style={styles.onSoft}>It makes way for a new one next week, so save it if you’d like to keep it.</Txt>
               </View>
             </Card>
           ) : null}
@@ -186,6 +189,8 @@ export default function EchoesScreen() {
 }
 
 function WeekView({ week, totalDays }: { week: EchoWeekSummary; totalDays: number | null }) {
+  const styles = useThemedStyles(makeStyles);
+  const c = useColors();
   const wins = winLines(week.wins);
   return (
     <>
@@ -207,8 +212,8 @@ function WeekView({ week, totalDays }: { week: EchoWeekSummary; totalDays: numbe
         <View style={styles.dayRow}>
           {week.days.map((d, i) => (
             <View key={d.date} style={styles.dayCell} accessible accessibilityLabel={`${DAY_NAMES[i]}: ${d.active ? 'showed up' : 'rest day'}`}>
-              <View style={[styles.dayDot, { backgroundColor: d.active ? Palette.pop : Palette.white }]}>
-                {d.active ? <Hatch color={Ink} style={[Wobble.round, styles.dayHatch]} /> : null}
+              <View style={[styles.dayDot, { backgroundColor: d.active ? c.pop : c.white }]}>
+                {d.active ? <Hatch color={c.onPop} style={[Wobble.round, styles.dayHatch]} /> : null}
               </View>
               <Txt variant="hand" importantForAccessibility="no">{DAY_NAMES[i][0]}</Txt>
             </View>
@@ -227,8 +232,9 @@ function WeekView({ week, totalDays }: { week: EchoWeekSummary; totalDays: numbe
   );
 }
 
-const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: Palette.bg },
+const makeStyles = (c: Colors) =>
+  StyleSheet.create({
+  screen: { flex: 1, backgroundColor: c.bg },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 14, padding: 24 },
   centerText: { textAlign: 'center' },
   content: { paddingHorizontal: 24, paddingTop: 4, gap: 20 },
@@ -236,18 +242,19 @@ const styles = StyleSheet.create({
   bigTitle: { fontSize: 52, lineHeight: 56 },
   subtitle: { fontSize: 21, marginTop: 2 },
   tabs: { flexDirection: 'row', justifyContent: 'center', gap: 10 },
-  banner: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 14, paddingVertical: 12, backgroundColor: Palette.soft },
+  banner: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 14, paddingVertical: 12, backgroundColor: c.soft },
   bannerText: { flex: 1, gap: 2 },
-  bannerTitle: { fontSize: 21, lineHeight: 25 },
+  bannerTitle: { fontSize: 21, lineHeight: 25, color: c.onPop },
+  onSoft: { color: c.onPop }, // text on sky stays dark in both looks
   wins: { paddingHorizontal: 18, paddingVertical: 14, gap: 8 },
   underline: { textDecorationLine: 'underline' },
   winRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  dot: { width: 12, height: 12, borderRadius: 6, borderWidth: 2, borderColor: Ink, backgroundColor: Palette.pop },
+  dot: { width: 12, height: 12, borderRadius: 6, borderWidth: 2, borderColor: c.ink, backgroundColor: c.pop },
   winText: { flex: 1 },
   days: { gap: 8 },
   dayRow: { flexDirection: 'row', justifyContent: 'space-between' },
   dayCell: { alignItems: 'center', gap: 4 },
-  dayDot: { width: 38, height: 38, borderWidth: Border, borderColor: Ink, overflow: 'hidden', ...Wobble.round },
+  dayDot: { width: 38, height: 38, borderWidth: Border, borderColor: c.ink, overflow: 'hidden', ...Wobble.round },
   dayHatch: { opacity: 0.35 },
   lineRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
   lineAvatar: { marginTop: 6 },
@@ -256,11 +263,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderWidth: Border,
-    borderColor: Ink,
-    backgroundColor: Palette.soft,
+    borderColor: c.ink,
+    backgroundColor: c.soft,
     ...Wobble.buddy,
   },
-  quoteText: { fontSize: 22, lineHeight: 27 },
+  quoteText: { fontSize: 22, lineHeight: 27, color: c.onPop },
   helped: { paddingHorizontal: 16, paddingVertical: 14, gap: 6 },
   helpedTitle: { fontSize: 22 },
   helpedText: { fontSize: 15, lineHeight: 21 },

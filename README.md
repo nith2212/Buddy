@@ -31,8 +31,11 @@ inside the app:
 **2. Offer, never assign.** Buddy asks before it suggests. If you already have a plan, Buddy backs it exactly as
 you said it. If something sounds bigger than work, Buddy steps back honestly and points you to someone you trust.
 
-**3. Proactive.** Buddy checks in on tasks that are due or untouched. The notification names the task and asks
-how it's going, in three taps.
+**3. Proactive.** Buddy checks in on tasks that are due or untouched: at most once a day per person, and only
+inside the hours you picked in onboarding. The notification names the task and asks how it's going: **Not yet /
+On it / Done!**. Then, if it's hard, it asks why, with all five reasons as buttons (Android allows three at a time,
+so "Something else" opens the other two), and offers a chat. *The buttons are being finished: for now, tapping a
+check-in opens the task.*
 
 **4. Echo: it learns what works for you.** Every week, Echo counts in code, with no model involved, so it can't
 invent anything:
@@ -51,11 +54,22 @@ usually bring your own plan, Buddy asks for yours first. Buddy never quotes thes
 
 Last week's report can be saved or shared as text. Ignored check-ins and "days untouched" are never shown.
 
+**Also in the app**
+- **Onboarding:** seven short screens, including what Buddy should call you and when check-ins suit you.
+  Your answers are "you said", never treated as a confirmed cause.
+- **Edit and delete tasks**, with a hand-drawn calendar. Deleting a task removes everything about it, including
+  the causes it added to your patterns.
+- **"Want me to mark it done?"** When you tell Buddy you finished, it asks first, with Yes / Not yet buttons. A
+  vague "kinda finished" never gets the offer.
+- **Goodbyes:** "bye", "I'll update tomo" or "going to sleep" gets one short line back, with no question.
+- **Dark mode** (Dusk Night), with a sun/moon toggle.
+- **Updates over the air** (EAS Update): screen and wording changes reach testers without a reinstall.
+
 ## Architecture
 
 ```mermaid
 flowchart LR
-  app["Android app<br/>Expo SDK 57 · React Native"] -- "HTTPS, bearer token" --> api["FastAPI on Render"]
+  app["Android app<br/>Expo SDK 57 · React Native"] -- "HTTPS, bearer token" --> api["FastAPI on Vercel<br/>(serverless, Singapore)"]
   api --> db[("Neon Postgres")]
   api --> llm["Claude Haiku 5.5<br/>(Groq models also supported)"]
   api --> push["Expo push → FCM"] --> app
@@ -71,11 +85,12 @@ stage. Every reply passes mechanical checks before it is sent:
 
 If the model fails, a canned reply goes out instead of an error.
 
-**Built for a free-tier host.**
-- No in-process schedulers: cron-job.org calls the `/cron/*` endpoints, which are idempotent.
+**Built for serverless.** The API runs as Vercel functions, so nothing runs between requests:
+- No in-process schedulers or background work: cron-job.org calls the `/cron/*` endpoints, which are idempotent.
+- No disk writes: all state lives in Postgres.
 - LLM calls are async, with timeouts and retries.
 - No database session is held while waiting on the model.
-- The app's loading screen is honest about the server waking up.
+- The app's loading screen is honest about a cold start.
 
 ## Tech stack
 
@@ -83,21 +98,21 @@ If the model fails, a canned reply goes out instead of an error.
 |---|---|
 | App | Expo SDK 57, React Native, expo-router, Reanimated, react-native-svg, Gaegu + Nunito |
 | Backend | Python 3.13, FastAPI, SQLAlchemy 2, Postgres (Neon) / SQLite locally |
-| Model | Claude Haiku 5.5 via the Anthropic SDK (structured outputs); Groq's OpenAI-compatible API as an alternative |
-| Push | Expo push service with three-button Android notifications |
-| Hosting | Render (API), Neon (database), cron-job.org (schedules), EAS (app builds) |
+| Model | Claude Haiku 5.5 via the Anthropic SDK (structured outputs) in production; Groq's OpenAI-compatible API as an alternative, and the default when `GROQ_MODEL` isn't set |
+| Push | Expo push service → FCM; Android check-in buttons in progress |
+| Hosting | Vercel (API), Neon (database), cron-job.org (schedules), EAS (app builds and updates) |
 
 ## Repository layout
 
 ```
 src/                 the app: screens in src/app, the hand-drawn components in src/components
-backend/             FastAPI app: auth, tasks, chat, notifications, cron
+backend/             FastAPI app: auth, tasks, chat, notifications, cron, me (onboarding, delete my data), echo
 backend/brain/       conversation engine (flow.py, agent.py), reply checks, Echo, model adapter
 backend/brain/buddy_docs/   the playbook: per-cause framework wording, reviewed by the developer
 backend/tests/       unit tests (fake model, no network)
 testing/             evals against the real model, hand-grading kit, Echo dev report
 scripts/             make_icons.py draws the app icon, splash and favicon from Buddy's vector art
-docs/                how Buddy works end to end, the conversation designs, the build log
+docs/                buddy.svg (the header image)
 ```
 
 ## Running locally
@@ -115,7 +130,7 @@ Environment variables:
 |---|---|
 | `INVITE_CODE` | Required to register |
 | `CRON_SECRET` | Protects the `/cron/*` endpoints |
-| `GROQ_MODEL` | Picks the model, e.g. `claude-haiku-5-5` |
+| `GROQ_MODEL` | Picks the model, e.g. `claude-haiku-5-5`. Unset, it uses `openai/gpt-oss-20b` on Groq |
 | `ANTHROPIC_API_KEY` or `GROQ_API_KEY` | Key for the chosen model's provider |
 | `DATABASE_URL` | Optional; defaults to a local SQLite file |
 
@@ -130,7 +145,7 @@ The app reads `EXPO_PUBLIC_API_URL` and `EXPO_PUBLIC_INVITE_CODE`. New native mo
 
 ## Testing
 
-- **Unit tests:** run `cd backend && venv/bin/python -m pytest -q`. There are 354 tests, covering:
+- **Unit tests:** run `cd backend && venv/bin/python -m pytest -q`. There are 470 tests, covering:
   - per-user data isolation on every table
   - the stage tables, walked through scripted conversations
   - reply checks
@@ -138,7 +153,7 @@ The app reads `EXPO_PUBLIC_API_URL` and `EXPO_PUBLIC_INVITE_CODE`. New native mo
   - cron
   - the model adapter
 - **Evals** (`testing/`): scripted conversations run through the real app against the real model, then
-  hand-graded on seven criteria (see `testing/GRADING.md`).
+  hand-graded on seven criteria.
 
   | | Old build | This build (Claude Haiku 5.5) |
   |---|---|---|
@@ -163,7 +178,6 @@ The app reads `EXPO_PUBLIC_API_URL` and `EXPO_PUBLIC_INVITE_CODE`. New native mo
 - **Exact citations** for every psychology claim in Buddy's playbook, so the advice is checkable.
 - **A small fine-tuned model** that holds Buddy's voice, trained only on Buddy's own consented conversations and
   measured against the eval suite.
-- **Dark mode** for the hand-drawn theme.
 
 ## License
 

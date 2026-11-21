@@ -18,9 +18,9 @@ from typing import Optional
 
 from brain import llm
 
-KINDS = ("idk", "answer", "confirm", "reject", "unsure", "own_plan", "accept", "wants_move", "ack", "new_cause",
-         "bigger")
-DONE_KINDS = ("ack", "own_plan", "accept")  # the user is set: wrap up
+KINDS = ("idk", "answer", "confirm", "reject", "unsure", "own_plan", "accept", "wants_move", "ack", "signoff",
+         "new_cause", "bigger")
+DONE_KINDS = ("ack", "own_plan", "accept", "signoff")  # the user is set: wrap up
 CAUSES = {
     "unclear": "not knowing where to start",
     "too_much": "the task feels too big",
@@ -138,7 +138,12 @@ def next_stage(state: str, stage: str, reading: Reading, tries: int) -> Step:
     note = _note(fw, stage, reading)
 
     if stage == "step_back" or kind == "bigger":
-        return Step(state, "step_back")  # stays stepped back for the rest of this session
+        # Stays stepped back for the rest of this session; a goodbye there is said lightly (developer, 2026-11-18).
+        return Step(state, "step_back", modifier="signoff" if kind == "signoff" else None)
+    if kind == "signoff":
+        # They're leaving for now ("I'll update tomo", "bye", "going to sleep"): one short goodbye, no
+        # question and no cause saved (putting it off confirms nothing). Phone test, 2026-11-18.
+        return Step(state, "release", modifier="signoff")
     if kind == "new_cause" and reading.cause and STATE_OF.get(reading.cause) not in (None, state):
         new_state = STATE_OF[reading.cause]
         return Step(new_state, FRAMEWORKS[new_state].switch_entry, save_cause=reading.cause, note=note)
@@ -228,12 +233,71 @@ _TIRED = re.compile(
     r"\b(?:exhausted|drained|wiped out|worn out|burn(?:ed|t) out|no energy|so tired|too tired|really tired|"
     r"dead tired|knackered)\b", re.IGNORECASE)
 _SIGN_OFF = re.compile(r"\b(?:thanks?|thx|ty|bye+|cya|later|appreciate)\b", re.IGNORECASE)
+# Leaving for now: a goodbye, putting it off till later, or going to sleep (phone test, 2026-11-18:
+# "Okieee, I'll update tomo!" got a question back instead of a goodbye).
+_LEAVING = re.compile(
+    r"\b(?:b+y+e+|cya|see (?:you|ya|u)|ttyl|talk (?:to (?:you|u) )?later|good ?night|gn|nite|night night|"
+    r"tomo+|tmrw?|tmr|tomorrow|tonight|later|going to (?:sleep|bed)|gonna (?:sleep|crash)|off to (?:sleep|bed)|"
+    r"heading (?:to bed|off|out)|(?:gotta|have to|need to) (?:go|sleep)|sleep(?:ing)? now|"
+    r"done for (?:now|today|tonight|the day)|signing off|i'?ll update)\b", re.IGNORECASE)
+# ...unless they're still asking for something or still stuck: then the model reads it.
+_STILL_IN_IT = re.compile(
+    r"\b(?:stuck|help|how|why|what|which|idk|don'?t know|dunno|not sure|can'?t|cannot|confused|but)\b",
+    re.IGNORECASE)
+SIGN_OFF_MAX_WORDS = 25
+
+
+def is_sign_off(message: str) -> bool:
+    """They're done for now. Read by code, so a goodbye never waits on (or gets misread by) a model."""
+    if "?" in message or len(message.split()) > SIGN_OFF_MAX_WORDS:
+        return False
+    return bool(_LEAVING.search(message)) and not _STILL_IN_IT.search(message)
+
+
+# They say the whole task is finished (developer, 2026-11-18): Buddy asks before marking it done, and only
+# on a clear claim. "kinda finished", "finished some exercises" or "almost done" never get the offer.
+_FINISHED = re.compile(
+    r"\b(?:i\s+(?:have\s+|'ve\s+|just\s+|finally\s+)*(?:finished|completed|done)|(?:finished|completed|did|nailed)\s+it|"
+    r"it'?s\s+(?:all\s+)?(?:done|finished|complete)|all\s+done|"
+    r"done\s+with\s+\w+|"
+    r"task\s+(?:is\s+)?(?:done|complete)|submitted\s+it)\b", re.IGNORECASE)
+# (A bare "done!" isn't enough: after Buddy's tiny move it usually means "did that step".)
+_NOT_ALL_OF_IT = re.compile(
+    r"\?|n't\b|\b(?:not|no|nothing|never|kinda|kind of|sort of|sorta|almost|nearly|mostly|half|partly|"
+    r"partially|some|part|bit|first|one of|few|yet|if|when|will|gonna|going to|should|maybe|might|hope|"
+    r"tomorrow|later|for (?:today|now|the day|tonight))\b", re.IGNORECASE)
+FINISHED_MAX_WORDS = 25
+
+
+def is_finished(message: str) -> bool:
+    """A clear 'I finished the task'. Read by code: marking done must never hang on a model's guess."""
+    if len(message.split()) > FINISHED_MAX_WORDS:
+        return False
+    return bool(_FINISHED.search(message)) and not _NOT_ALL_OF_IT.search(message)
+
+
+# Typed answers to "Want me to mark it done?" (the buttons send the same thing).
+_YES = re.compile(r"^\W*(?:yes+|yep|yeah|ya+|yup|sure|ok(?:ay|ie)?|please|pls|do it|mark it(?: done)?|go ahead)"
+                  r"(?:\W+(?:please|pls|yes|mark it(?: done)?|do it))*\W*$", re.IGNORECASE)
+_NOT_YET = re.compile(r"^\W*(?:no+|nope|nah|not yet|wait|not really|leave it(?: open)?)(?:\W+\w+){0,3}\W*$",
+                      re.IGNORECASE)
+
+
+def answer_to_done_offer(message: str) -> Optional[bool]:
+    """True for a clear yes, False for a clear not-yet, None for anything else (then it's a normal message)."""
+    if _YES.match(message):
+        return True
+    if _NOT_YET.match(message):
+        return False
+    return None
 
 
 def pattern_read(message: str, buddy_said: Optional[str] = None, state: Optional[str] = None) -> Optional[Reading]:
     """The easy cases, no model call."""
     if _DISTRESS.search(message):
         return Reading("bigger", source="pattern")
+    if is_sign_off(message):
+        return Reading("signoff", source="pattern")
     if state and state != "fatigue" and _TIRED.search(message):
         return Reading("new_cause", "tired", source="pattern")
     # A bare "okay" to a question isn't a sign-off ("sure" to "want a tiny move?" means yes): let the model read it.
@@ -260,7 +324,8 @@ _READ_SYSTEM = (
     "- accept: agrees to the step or move Buddy just offered (\"okay I can do that\", \"haha sounds fun\")\n"
     "- wants_move: asks Buddy for a step or for help choosing, or wants to do something without saying what "
     "(\"I need to get something done\")\n"
-    "- ack: only thanks or a sign-off\n"
+    "- ack: only thanks or okay, without leaving\n"
+    "- signoff: they're leaving for now: bye, putting it off till later or tomorrow, going to sleep\n"
     "- new_cause: reveals a DIFFERENT reason they're stuck than the one being discussed\n"
     "- bigger: distress beyond work (health, safety, grief, crisis, feeling worthless)\n"
     "cause (only for confirm or new_cause, else null): one of " + ", ".join(f"{k} ({v})" for k, v in CAUSES.items())

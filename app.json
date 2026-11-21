@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "buddy-app",
+    "name": "Buddy",
     "slug": "buddy-app",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -19,7 +19,10 @@
       },
       "predictiveBackGestureEnabled": false,
       "package": "com.nithya22.buddy",
-      "googleServicesFile": "./google-services.json"
+      "googleServicesFile": "./google-services.json",
+      "runtimeVersion": {
+        "policy": "fingerprint"
+      }
     },
     "web": {
       "output": "static",
@@ -27,13 +30,23 @@
     },
     "plugins": [
       "expo-router",
-      "expo-notifications",
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/images/notification-icon.png",
+          "color": "#2A2238",
+          "defaultChannel": "buddy-checkin"
+        }
+      ],
       [
         "expo-splash-screen",
         {
           "backgroundColor": "#F2EAE0",
           "image": "./assets/images/splash-icon.png",
-          "imageWidth": 200
+          "imageWidth": 200,
+          "dark": {
+            "backgroundColor": "#1C1826"
+          }
         }
       ],
       "expo-secure-store"
@@ -48,6 +61,9 @@
         "projectId": "cc46c583-0ae7-4c8b-8fe6-cddf3161db1b"
       }
     },
-    "owner": "nithya22"
+    "owner": "nithya22",
+    "updates": {
+      "url": "https://u.expo.dev/cc46c583-0ae7-4c8b-8fe6-cddf3161db1b"
+    }
   }
 }

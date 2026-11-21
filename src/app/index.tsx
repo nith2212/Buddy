@@ -1,23 +1,29 @@
-// Home: just the task list (mockup screen 2). Tap a task to open its own chat.
+// Home: just the task list (mockup screen 2). Tap a task to open its own chat; long-press it, or tap its pencil,
+// to edit or delete it.
 
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
-import { FlatList, KeyboardAvoidingView, Pressable, RefreshControl, StyleSheet, TextInput, View } from 'react-native';
+import { AppState, FlatList, Keyboard, KeyboardAvoidingView, Pressable, RefreshControl, StyleSheet, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Path } from 'react-native-svg';
 
 import { BuddyBlob } from '@/components/buddy-blob';
 import { Checkbox } from '@/components/checkbox';
+import { DuePicker } from '@/components/due-picker';
+import { EditTaskSheet } from '@/components/edit-task-sheet';
 import { BrandHeader } from '@/components/side-menu';
-import { Card, Chip, SketchButton, Txt } from '@/components/sketch';
-import { Border, Font, Ink, Palette, Wobble } from '@/constants/sketch';
+import { Card, SketchButton, Txt } from '@/components/sketch';
+import { Border, Font, Wobble, type Colors } from '@/constants/sketch';
+import { useColors, useThemedStyles } from '@/hooks/use-theme';
 import { useToken } from '@/hooks/use-session';
 import { api, Task } from '@/lib/api';
-import { DUE_OPTIONS, DueOption, dueDateFor, formatDue, isOverdue } from '@/lib/dates';
+import { DayKey, dueDateFor, formatDue, isOverdue } from '@/lib/dates';
 
 const CARD_WOBBLES = ['a', 'b', 'c'] as const;
 
 export default function TaskListScreen() {
+  const styles = useThemedStyles(makeStyles);
+  const c = useColors();
   const token = useToken();
   const client = useMemo(() => api(token), [token]);
   const router = useRouter();
@@ -28,9 +34,10 @@ export default function TaskListScreen() {
   const [refreshing, setRefreshing] = useState(false);
 
   const [title, setTitle] = useState('');
-  const [due, setDue] = useState<DueOption>('none');
+  const [due, setDue] = useState<DayKey | null>(null);
   const [adding, setAdding] = useState(false);
   const [addFailed, setAddFailed] = useState(false);
+  const [editing, setEditing] = useState<Task | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -41,10 +48,15 @@ export default function TaskListScreen() {
     }
   }, [client]);
 
-  // Refetch whenever this screen regains focus, so steps ticked in a chat show up here.
+  // Refetch whenever this screen regains focus, so steps ticked in a chat show up here, and whenever the app
+  // comes back to the front, so a Done tapped on a notification shows without pulling to refresh.
   useFocusEffect(
     useCallback(() => {
       load();
+      const sub = AppState.addEventListener('change', (state) => {
+        if (state === 'active') load();
+      });
+      return () => sub.remove();
     }, [load]),
   );
 
@@ -63,7 +75,7 @@ export default function TaskListScreen() {
       const created = await client.createTask(trimmed, dueDateFor(due));
       setTasks((prev) => [created, ...(prev ?? [])]);
       setTitle('');
-      setDue('none');
+      setDue(null);
     } catch {
       setAddFailed(true);
     } finally {
@@ -83,6 +95,8 @@ export default function TaskListScreen() {
   }
 
   const openTask = (id: number) => router.push({ pathname: '/task/[id]', params: { id: String(id) } });
+  const replaceTask = (t: Task) => setTasks((prev) => prev?.map((x) => (x.id === t.id ? t : x)) ?? prev);
+  const dropTask = (id: number) => setTasks((prev) => prev?.filter((x) => x.id !== id) ?? prev);
 
   // Open tasks first; the server already returns newest first within each group.
   const sorted = tasks ? [...tasks].sort((a, b) => Number(a.status === 'done') - Number(b.status === 'done')) : [];
@@ -97,19 +111,40 @@ export default function TaskListScreen() {
         <Checkbox checked={done} onPress={() => toggleDone(item)} label={`${done ? 'Mark not done' : 'Mark done'}: ${item.title ?? 'task'}`} />
         <Pressable
           onPress={() => openTask(item.id)}
+          onLongPress={() => setEditing(item)}
           accessibilityRole="button"
           accessibilityLabel={`Open ${item.title ?? 'task'}`}
+          accessibilityHint="Long-press to edit or delete"
           style={({ pressed }) => [styles.rowCard, pressed && styles.pressed]}>
           <Card wobble={CARD_WOBBLES[index % 3]} style={styles.cardBody}>
-            <Txt variant="bold" style={done ? styles.struck : undefined}>{item.title ?? 'Untitled'}</Txt>
-            <View style={styles.meta}>
-              {dueLabel ? (
-                <View style={[styles.dueChip, { backgroundColor: soon ? Palette.soft : done ? Palette.pop : Palette.bg }]}>
-                  <Txt variant="hand" style={styles.dueText}>{dueLabel}</Txt>
-                </View>
-              ) : null}
-              {item.subtasks.length ? <Txt variant="small">{`${stepsDone}/${item.subtasks.length} steps`}</Txt> : null}
+            <View style={styles.cardText}>
+              <Txt variant="bold" style={done ? styles.struck : undefined}>{item.title ?? 'Untitled'}</Txt>
+              <View style={styles.meta}>
+                {dueLabel ? (
+                  <View style={[styles.dueChip, { backgroundColor: soon ? c.soft : done ? c.pop : c.bg }]}>
+                    <Txt variant="hand" style={[styles.dueText, (soon || done) && { color: c.onPop }]}>{dueLabel}</Txt>
+                  </View>
+                ) : null}
+                {item.subtasks.length ? <Txt variant="small">{`${stepsDone}/${item.subtasks.length} steps`}</Txt> : null}
+              </View>
             </View>
+            <Pressable
+              onPress={() => setEditing(item)}
+              accessibilityRole="button"
+              accessibilityLabel={`Edit ${item.title ?? 'task'}`}
+              hitSlop={6}
+              style={({ pressed }) => [styles.pencil, pressed && { backgroundColor: c.soft }]}>
+              <Svg width={18} height={18} viewBox="0 0 18 18">
+                <Path
+                  d="M3 15 L3.6 11.6 L11.8 3.4 Q13 2.2 14.3 3.5 Q15.6 4.8 14.4 6 L6.2 14.2 Z M10.6 4.6 L13.2 7.2"
+                  fill="none"
+                  stroke={c.ink}
+                  strokeWidth={1.9}
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </Svg>
+            </Pressable>
           </Card>
         </Pressable>
       </View>
@@ -120,7 +155,7 @@ export default function TaskListScreen() {
     <View style={styles.tasksHeading}>
       <Txt variant="title" accessibilityRole="header">Tasks:</Txt>
       <Svg width={96} height={10} viewBox="0 0 96 10">
-        <Path d="M2 6 Q14 1 26 6 T50 6 T74 6 T94 5" fill="none" stroke={Palette.deep} strokeWidth={3} strokeLinecap="round" />
+        <Path d="M2 6 Q14 1 26 6 T50 6 T74 6 T94 5" fill="none" stroke={c.deep} strokeWidth={3} strokeLinecap="round" />
       </Svg>
     </View>
   );
@@ -153,7 +188,7 @@ export default function TaskListScreen() {
             </View>
           }
           ItemSeparatorComponent={() => <View style={{ height: 16 }} />}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} colors={[Palette.deep]} />}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} colors={[c.deep]} progressBackgroundColor={c.card} />}
           keyboardShouldPersistTaps="handled"
           contentContainerStyle={styles.list}
         />
@@ -165,7 +200,7 @@ export default function TaskListScreen() {
             value={title}
             onChangeText={setTitle}
             placeholder="Add a task…"
-            placeholderTextColor={Palette.muted}
+            placeholderTextColor={c.muted}
             accessibilityLabel="New task"
             maxLength={200}
             returnKeyType="done"
@@ -174,28 +209,37 @@ export default function TaskListScreen() {
           />
           <SketchButton label={adding ? '…' : '+ Add'} onPress={addTask} disabled={!title.trim() || adding} accessibilityLabel="Add task" />
         </View>
-        <View style={styles.chips} accessibilityLabel="Due date">
-          {DUE_OPTIONS.map((option) => (
-            <Chip key={option.key} label={option.label} selected={option.key === due} onPress={() => setDue(option.key)} />
-          ))}
-        </View>
-        {addFailed ? <Txt variant="small" style={{ color: Palette.danger }}>Couldn’t add that. Check your connection and try again.</Txt> : null}
+        <DuePicker value={due} onChange={setDue} onOpenCalendar={Keyboard.dismiss} />
+        {addFailed ? <Txt variant="small" style={{ color: c.danger }}>Couldn’t add that. Check your connection and try again.</Txt> : null}
       </View>
+
+      {editing ? (
+        <EditTaskSheet
+          task={editing}
+          client={client}
+          onClose={() => setEditing(null)}
+          onSaved={replaceTask}
+          onDeleted={dropTask}
+        />
+      ) : null}
     </KeyboardAvoidingView>
   );
 }
 
-const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: Palette.bg },
+const makeStyles = (c: Colors) =>
+  StyleSheet.create({
+  screen: { flex: 1, backgroundColor: c.bg },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 14, padding: 24 },
   list: { paddingHorizontal: 24, paddingTop: 8, paddingBottom: 24 },
   tasksHeading: { marginBottom: 16 },
   row: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   rowCard: { flex: 1, marginRight: 6 },
   pressed: { transform: [{ translateX: 2 }, { translateY: 2 }] },
-  cardBody: { paddingHorizontal: 16, paddingVertical: 12, gap: 6 },
+  cardBody: { paddingLeft: 16, paddingRight: 6, paddingVertical: 12, flexDirection: 'row', alignItems: 'center', gap: 6 },
+  cardText: { flex: 1, gap: 6 },
+  pencil: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center', borderRadius: 12 },
   meta: { flexDirection: 'row', alignItems: 'center', gap: 10, flexWrap: 'wrap' },
-  dueChip: { borderWidth: 2, borderColor: Ink, paddingHorizontal: 10, ...Wobble.c },
+  dueChip: { borderWidth: 2, borderColor: c.ink, paddingHorizontal: 10, ...Wobble.c },
   dueText: { fontSize: 16, lineHeight: 21 },
   struck: { textDecorationLine: 'line-through' },
   empty: { alignItems: 'center', gap: 12, paddingVertical: 40 },
@@ -204,10 +248,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingTop: 14,
     gap: 12,
-    backgroundColor: Palette.card,
+    backgroundColor: c.card,
     borderTopWidth: Border,
     borderStyle: 'dashed',
-    borderColor: Ink,
+    borderColor: c.ink,
   },
   inputRow: { flexDirection: 'row', gap: 10 },
   input: {
@@ -216,11 +260,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     fontFamily: Font.semi,
     fontSize: 16,
-    color: Ink,
-    backgroundColor: Palette.white,
+    color: c.ink,
+    backgroundColor: c.white,
     borderWidth: Border,
-    borderColor: Ink,
+    borderColor: c.ink,
     ...Wobble.c,
   },
-  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
 });

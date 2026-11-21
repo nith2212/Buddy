@@ -16,13 +16,14 @@
 from __future__ import annotations
 
 import json
+from collections import Counter
 from datetime import datetime, timezone
 from typing import Optional
 
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
-from brain.state_detection import EMOTION_TO_STATE
+from brain.state_detection import EMOTION_TO_STATE, as_utc
 from models import Event, Memory, Message, Task
 
 VALID_EVENT_TYPES = {
@@ -34,6 +35,17 @@ VALID_EMOTIONS = set(EMOTION_TO_STATE)  # the reasons a user can tap
 
 
 # ── Task history ──────────────────────────────────────────────────────────────
+
+
+def mark_task_done(db: Session, task: Task) -> None:
+    """The one way a task gets marked done: the checkbox (PATCH /tasks/{id}), the check-in's "done" tap and
+    "Yes, mark it done" in chat. Sets status and completed_at together and logs a "completed" event, which
+    state detection and Echo count. The caller commits."""
+    if task.status == "done":
+        return
+    task.status = "done"
+    task.completed_at = datetime.now(timezone.utc)
+    db.add(Event(user_id=task.user_id, task_id=task.id, type="completed", source="user"))
 
 def get_task_history(db: Session, user_id: str, task_id: int) -> dict:
     """Return the task row (scoped to user_id) and its events, oldest first."""
@@ -129,6 +141,74 @@ def record_confirmed_cause(db: Session, user_id: str, task_id: int, cause: str, 
     update_memory(db, user_id, f"pattern.blocker.{cause}", str(count + 1), confidence=0.8, source="buddy", commit=False)
     if commit:
         db.commit()
+
+
+
+def task_confirmations(db: Session, user_id: str, task_id: int) -> list[tuple[str, datetime]]:
+    """Each time a cause was confirmed for this task, and so counted in pattern.blocker.<cause>: (cause, when).
+    The turn that counted it stores it as reasoning["saved_cause"]. Turns saved before that existed
+    (2026-11-09) don't, so a task with none falls back to its blocker.task row: one confirmation."""
+    found = []
+    rows = db.execute(select(Message.reasoning, Message.created_at).where(
+        Message.user_id == user_id, Message.task_id == task_id, Message.role == "assistant",
+        Message.reasoning.is_not(None))).all()
+    for raw, at in rows:
+        try:
+            cause = json.loads(raw).get("saved_cause")
+        except (TypeError, ValueError, AttributeError):
+            continue
+        if cause:
+            found.append((cause, as_utc(at)))
+    if not found:
+        row = get_memory_entry(db, user_id, f"blocker.task.{task_id}")
+        if row is not None and row.value:
+            found.append((row.value, as_utc(row.updated_at or row.created_at)))
+    return found
+
+
+def forget_task_causes(db: Session, user_id: str, task_id: int,
+                       confirmations: list[tuple[str, datetime]]) -> None:
+    """A task was deleted: forget its cause and take its confirmations back out of the pattern counts,
+    so "everything about it is gone" is true. A count that reaches 0 is removed. Doesn't commit."""
+    for cause, n in Counter(cause for cause, _ in confirmations).items():
+        row = get_memory_entry(db, user_id, f"pattern.blocker.{cause}")
+        if row is None:
+            continue
+        try:
+            left = int(row.value) - n
+        except (TypeError, ValueError):
+            left = 0
+        if left > 0:
+            row.value = str(left)
+        else:
+            db.delete(row)
+    db.execute(delete(Memory).where(Memory.user_id == user_id, Memory.key == f"blocker.task.{task_id}"))
+
+
+# ── The person's name (onboarding screen 2, optional) ─────────────────────────
+# Kept as a memory row so DELETE /me and the isolation rules cover it. It never reaches the writer as a raw row
+# (agent._CAUSE_KEYS skips "profile."): one controlled line says how to use it (agent._name_line).
+
+NAME_KEY = "profile.name"
+NAME_MAX = 30
+
+
+def clean_name(raw: Optional[str]) -> Optional[str]:
+    """What they want to be called: one line, plain spaces, at most NAME_MAX characters. None when empty."""
+    if not raw:
+        return None
+    name = " ".join("".join(ch for ch in raw if ch.isprintable()).split())[:NAME_MAX].strip()
+    return name or None
+
+
+def get_name(db: Session, user_id: str) -> Optional[str]:
+    row = get_memory_entry(db, user_id, NAME_KEY)
+    return clean_name(row.value) if row else None
+
+
+def short_name(name: Optional[str]) -> Optional[str]:
+    """For tight spots like a notification title: the first word, at most 15 characters."""
+    return name.split()[0][:15] if name else None
 
 
 # ── Event logging ─────────────────────────────────────────────────────────────

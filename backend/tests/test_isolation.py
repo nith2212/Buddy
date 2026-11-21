@@ -18,14 +18,15 @@ def seed_rows(db, user_id):
     dev = models.DeviceToken(user_id=user_id, expo_push_token=f"ExponentPushToken[{user_id}]")
     event = models.Event(user_id=user_id, type="checkin_sent")
     mem = models.Memory(user_id=user_id, key="onboarding.x", value="secret memory")
-    db.add_all([task, dev, event, mem])
+    onboarding = models.Onboarding(user_id=user_id, click_time="secret evening")
+    db.add_all([task, dev, event, mem, onboarding])
     db.flush()  # need task.id before the subtask can reference it
     subtask = models.Subtask(user_id=user_id, task_id=task.id, title="secret subtask")
     db.add(subtask)
     db.commit()
     return {
         "task": task.id, "device_token": dev.id, "event": event.id, "memory": mem.id,
-        "subtask": subtask.id,
+        "subtask": subtask.id, "onboarding": onboarding.id,
     }
 
 
@@ -36,7 +37,7 @@ def two_users(client, db):
     return {"a": (a_id, a_h, seed_rows(db, a_id)), "b": (b_id, b_h, seed_rows(db, b_id))}
 
 
-KINDS = ["task", "device_token", "event", "memory", "subtask"]
+KINDS = ["task", "device_token", "event", "memory", "subtask", "onboarding"]
 
 
 @pytest.mark.parametrize("kind", KINDS)

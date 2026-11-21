@@ -1,6 +1,6 @@
 // Drives the check-in flow once a push/local notification's action button is tapped:
 // POST the tap to the backend, then present whatever stage comes back next as a
-// local notification — chaining task_state -> emotion -> chat_opt_in -> done
+// local notification — chaining task_state -> emotion (-> emotion_more) -> chat_opt_in -> done
 // without needing another server-sent push for each step. Choosing "Yes, let's
 // chat" skips the chaining and opens that task's chat screen directly.
 
@@ -93,8 +93,8 @@ async function process(response: Notifications.NotificationResponse, token: stri
       title: next.title,
       body: next.body,
       data: nextData,
-      // Only stages with buttons (task_state/emotion/chat_opt_in) have a matching
-      // registered category — "done" is a plain informational notification.
+      // Only stages with buttons (task_state/emotion/emotion_more/chat_opt_in) have a
+      // matching registered category — "done" is a plain informational notification.
       ...(nextData.actions ? { categoryIdentifier: nextData.stage } : {}),
     },
     trigger: null, // fire immediately

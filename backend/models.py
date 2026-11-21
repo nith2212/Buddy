@@ -141,12 +141,19 @@ class Message(Base):
 
 
 class Onboarding(Base):
+    """The first-launch questionnaire, every answer optional. Self-reported ("you said"), never a confirmed
+    cause: Echo and the cause memory don't count it, and it isn't in Buddy's memory rows.
+    The table is from the hackathon. The attributes are named for what they hold now; the database
+    column names stay as they were, so the live table needs no change."""
     __tablename__ = "onboarding"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     user_id: Mapped[str] = mapped_column(String(36), ForeignKey("users.id"), nullable=False, unique=True, index=True)
-    preferred_work_time: Mapped[Optional[str]] = mapped_column(String, nullable=True)
-    work_session_style: Mapped[Optional[str]] = mapped_column(String, nullable=True)
-    procrastination_style: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    # "When do things usually click for you?": morning | afternoon | evening | late_night | changes
+    click_time: Mapped[Optional[str]] = mapped_column("preferred_work_time", String, nullable=True)
+    # "What fills most of your days?": school | work | own_projects | mix
+    days: Mapped[Optional[str]] = mapped_column("work_session_style", String, nullable=True)
+    # "What usually gets in your way?" (pick any): comma-separated reasons and/or not_sure
+    gets_in_way: Mapped[Optional[str]] = mapped_column("procrastination_style", String, nullable=True)
     notification_opted_in: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     created_at: Mapped[datetime] = _ts()

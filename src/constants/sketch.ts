@@ -1,20 +1,61 @@
-// The hand-drawn look (developer-approved mockup, 2026-11-05): the "Dusk" palette, ink outlines,
-// slightly uneven corners and offset shadows. Light only for now.
+// The hand-drawn look (developer-approved mockup, 2026-11-05): ink outlines, slightly uneven corners and offset
+// shadows, in two palettes: "Dusk" (light) and "Dusk Night" (dark, developer's pick 2026-11-09). Screens read
+// colours from the theme (hooks/use-theme.tsx), never these objects directly, so both looks stay in step.
 
 import type { ViewStyle } from 'react-native';
 
-export const Ink = '#2A2238';
+export type Colors = {
+  bg: string; // screen background (paper)
+  card: string; // cards, Buddy's bubbles
+  soft: string; // sky: selected chips, highlights
+  pop: string; // lavender: buttons, your bubbles
+  deep: string; // violet: shadows and accents only (too light/dark for text)
+  white: string; // inputs and plain buttons, a step brighter than cards
+  danger: string; // errors
+  muted: string; // secondary text, placeholders
+  ink: string; // lines and text
+  onPop: string; // text and lines drawn ON lavender or sky (ink in light; dark in dark, for contrast)
+  lift: string; // the offset shadow under lifted buttons
+  scrim: string; // the dim layer behind sheets and the menu
+  pastDay: string; // greyed-out days in the calendar
+};
 
-export const Palette = {
-  bg: '#F2EAE0', // cream: screen background
-  card: '#FFFCF8', // cards, Buddy's bubbles
-  soft: '#B4D3D9', // sky: selected chips, highlights
-  pop: '#BDA6CE', // lavender: buttons, your bubbles
-  deep: '#9B8EC7', // violet: shadows and accents only (too light for text)
+export const Dusk: Colors = {
+  bg: '#F2EAE0',
+  card: '#FFFCF8',
+  soft: '#B4D3D9',
+  pop: '#BDA6CE',
+  deep: '#9B8EC7',
   white: '#FFFFFF',
-  danger: '#9E2F2A', // errors (passes contrast on cream)
-  muted: '#5A5168', // secondary text, placeholders
-} as const;
+  danger: '#9E2F2A', // passes contrast on cream
+  muted: '#5A5168',
+  ink: '#2A2238',
+  onPop: '#2A2238',
+  lift: '#2A2238',
+  scrim: 'rgba(42, 34, 56, 0.42)',
+  pastDay: '#8A8296',
+};
+
+// Every text pair checked for contrast (4.5:1 or more) on 2026-11-09.
+export const DuskNight: Colors = {
+  bg: '#1C1826',
+  card: '#282236',
+  soft: '#86B2BB',
+  pop: '#BDA6CE',
+  deep: '#7466B0',
+  white: '#2F2940',
+  danger: '#F28B82',
+  muted: '#BDB4CC',
+  ink: '#F2EAE0',
+  onPop: '#1C1826',
+  lift: '#7466B0',
+  scrim: 'rgba(0, 0, 0, 0.55)',
+  pastDay: '#6E6680',
+};
+
+/** Buddy's own colours: a white dumpling with dark ink, the same in both looks. */
+export const BuddyInk = '#2A2238';
+export const BuddyBody = '#FFFFFF';
 
 // Font family names = the @expo-google-fonts export names loaded in app/_layout.tsx.
 // Android ignores fontWeight for custom fonts, so each weight is its own family.

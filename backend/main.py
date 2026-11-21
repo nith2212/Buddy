@@ -45,3 +45,10 @@ app.include_router(chat_router)
 
 # The user's Echo page: GET /echo/week (read-only).
 app.include_router(echo_router)
+
+
+# Liveness check: is the API up? No auth and no database, so it stays cheap. (It was a keep-warm ping
+# while the API was on Render's free tier; Vercel doesn't sleep that way, so nothing needs to call it now.)
+@app.get("/health")
+def health():
+    return {"ok": True}

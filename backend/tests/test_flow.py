@@ -88,7 +88,7 @@ def test_reframe_declined_without_their_own_plan_offers_the_choice():
 
 @pytest.mark.parametrize("message,kind", [
     ("idk bro", "idk"), ("dunno", "idk"), ("not sure tbh", "idk"), ("hmm", "idk"),
-    ("thanks bye", "ack"), ("okay thanks!", "ack"),
+    ("thanks bye", "signoff"), ("okay thanks!", "ack"),
     ("honestly it's not the task, I can't stop crying", "bigger"), ("my dad's in the hospital", "bigger"),
 ])
 def test_easy_cases_are_read_without_a_model(message, kind):
@@ -153,3 +153,74 @@ def test_the_manager_report_chat_never_lands_on_a_persuading_stage():
     assert stages == ["narrow", "lighten", "lighten"] and saved == ["bored"]
     stages, _ = walk("low_interest", [R("reject"), R("answer", flavor="pointless"), R("reject")])
     assert stages == ["narrow", "purpose", "lighten"]
+
+
+# ── phone test, 2026-11-18: Buddy didn't let them go ──────────────────────────────
+
+@pytest.mark.parametrize("message", [
+    "Okieee, I'll update tomo!", "Okie byee", "Bye", "gn", "thanks bye",
+    "I did 1 sprint and finished some exercises. Now going to sleep!",
+    "Hey I'm going to do this tomo, I'm very tired", "I'm really tired, I'll do it tomorrow",
+])
+def test_leaving_for_now_is_a_signoff_read_by_code(message):
+    assert flow.pattern_read(message, "How do you think the variables will go?", "ambiguity") == \
+        Reading("signoff", source="pattern")
+
+
+@pytest.mark.parametrize("message", [
+    "I'll do it tomorrow but I don't know where to start", "what should I do tomorrow?",
+    "I'm stuck, maybe later", "okay thanks!",
+])
+def test_still_asking_or_stuck_is_not_a_signoff(message):
+    read = flow.pattern_read(message, "What feels risky?", "ambiguity")
+    assert read is None or read.kind != "signoff"
+
+
+def test_distress_still_wins_over_a_goodbye():
+    assert flow.pattern_read("I can't stop crying, bye", "What feels risky?").kind == "bigger"
+
+
+@pytest.mark.parametrize("stage", ["open", "core", "release", "followup", "offer"])
+def test_a_signoff_wraps_up_from_any_stage_with_a_goodbye_and_saves_nothing(stage):
+    step = next_stage("ambiguity", stage, R("signoff"), 1)
+    assert (step.stage, step.modifier, step.save_cause) == ("release", "signoff", None)
+
+
+def test_a_signoff_after_a_step_back_stays_stepped_back_but_says_goodbye():
+    step = next_stage("overwhelm", "step_back", R("signoff"), 1)
+    assert (step.stage, step.modifier) == ("step_back", "signoff")
+    assert next_stage("overwhelm", "step_back", R("answer"), 1) == flow.Step("overwhelm", "step_back")
+
+
+def test_the_goodbye_cards_exist():
+    assert "No question" in framework_section("shared", "Goodbye")
+    assert "someone you trust" in framework_section("shared", "Goodbye after a step back")
+
+
+# ── "I finished it!" → ask before marking it done (developer, 2026-11-18) ─────────
+
+@pytest.mark.parametrize("message", [
+    "I finished it!", "I finally finished the report", "I've completed it", "it's done!!", "all done :)",
+    "done with the report!", "done with python basics finally", "Submitted it", "I did it!!", "Finished it, yayyy",
+])
+def test_a_clear_finish_is_read_by_code(message):
+    assert flow.is_finished(message)
+
+
+@pytest.mark.parametrize("message", [
+    "kinda finished", "I did 1 sprint and finished some exercises. Now going to sleep!", "almost done",
+    "I'm not done", "I haven't finished it", "I finished the first part", "done!", "finished?",
+    "I'll be done tomorrow", "I'm done for today", "I have done nothing", "maybe I finished it",
+    "is it done if I skip the intro?",
+])
+def test_a_vague_or_partial_finish_is_not(message):
+    assert not flow.is_finished(message)
+
+
+@pytest.mark.parametrize("message,answer", [
+    ("yes", True), ("Yesss please", True), ("yep, mark it", True), ("ok", True), ("sure!", True),
+    ("not yet", False), ("nah", False), ("no wait", False), ("no, still fixing a bug", None),  # stays open; Buddy hears about the bug
+    ("yes but the intro still needs work", None), ("what do you mean?", None), ("I finished the slides", None),
+])
+def test_typed_answers_to_mark_it_done(message, answer):
+    assert flow.answer_to_done_offer(message) is answer

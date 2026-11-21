@@ -22,6 +22,8 @@ export type BuddyReply = {
   state: string | null;
   intervention: string | null;
   ask_reason?: boolean; // Buddy asked what's in the way: show the reason chips under its reply
+  offer_done?: boolean; // Buddy asked "Want me to mark it done?": show Yes / Not yet under its reply
+  task_status?: 'open' | 'done' | null; // this turn changed (or kept) the task's status
 };
 
 // GET /echo/week (backend brain/echo.py "The user's Echo page"): kind, earned things only.
@@ -39,13 +41,21 @@ export type EchoWeek = EchoWeekSummary & {
   last_week: EchoWeekSummary | null; // saved by the Sunday 23:00 cron; null until the first one
 };
 
+// POST /me/onboarding: what the person said about themselves. Every answer is optional; "you said", never a cause.
+export type OnboardingAnswers = {
+  name?: string; // what Buddy calls them (check-in titles, now and then in chat)
+  days?: 'school' | 'work' | 'own_projects' | 'mix';
+  click_time?: 'morning' | 'afternoon' | 'evening' | 'late_night' | 'changes';
+  gets_in_way?: ('unclear' | 'too_much' | 'afraid' | 'bored' | 'tired' | 'not_sure')[];
+};
+
 export class ApiError extends Error {
   constructor(public status: number) {
     super(`Request failed with status ${status}`);
   }
 }
 
-// Render's free tier can take ~50s to wake from sleep; don't hang past a minute.
+// Don't hang past a minute on a bad connection.
 const TIMEOUT_MS = 60_000;
 
 async function request<T>(token: string, path: string, method = 'GET', body?: unknown): Promise<T> {
@@ -71,18 +81,24 @@ export function api(token: string) {
     getTask: (id: number) => request<Task>(token, `/tasks/${id}`),
     createTask: (title: string, due_date: string | null) =>
       request<Task>(token, '/tasks', 'POST', { title, due_date }),
-    updateTask: (id: number, patch: { status?: 'open' | 'done' }) =>
+    // due_date: null clears it; leave a field out to keep it as it is.
+    updateTask: (id: number, patch: { status?: 'open' | 'done'; title?: string; due_date?: string | null }) =>
       request<Task>(token, `/tasks/${id}`, 'PATCH', patch),
+    // For good: the server also deletes its steps, chat, check-ins and what Buddy learned from it.
+    deleteTask: (id: number) => request<void>(token, `/tasks/${id}`, 'DELETE'),
     createSubtask: (taskId: number, title: string) =>
       request<Subtask>(token, `/tasks/${taskId}/subtasks`, 'POST', { title }),
     updateSubtask: (taskId: number, subtaskId: number, patch: { done?: boolean }) =>
       request<Subtask>(token, `/tasks/${taskId}/subtasks/${subtaskId}`, 'PATCH', patch),
     chatHistory: (taskId: number) => request<ChatTurn[]>(token, `/chat/history?task_id=${taskId}`),
-    // A typed message, a tapped reason, or both (the backend needs at least one).
-    chat: (taskId: number, input: { message?: string; reason?: Reason }) =>
+    // A typed message, a tapped reason, or both (the backend needs at least one). Or, on its own, the answer
+    // to "Want me to mark it done?" (mark_done: true = "Yes, mark it done", false = "Not yet").
+    chat: (taskId: number, input: { message?: string; reason?: Reason } | { mark_done: boolean }) =>
       request<BuddyReply>(token, '/chat', 'POST', { task_id: taskId, ...input }),
     initiate: (taskId: number) => request<BuddyReply>(token, '/initiate', 'POST', { task_id: taskId }),
     echoWeek: () => request<EchoWeek>(token, '/echo/week'),
     deleteMe: () => request<void>(token, '/me', 'DELETE'),
+    saveOnboarding: (answers: OnboardingAnswers) =>
+      request<OnboardingAnswers>(token, '/me/onboarding', 'POST', answers),
   };
 }

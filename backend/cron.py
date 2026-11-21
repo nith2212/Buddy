@@ -1,8 +1,10 @@
 # Cron-triggered endpoints, called by an external scheduler (cron-job.org).
-# Render free has no in-process scheduler and an ephemeral disk, so all scheduling lives outside the app.
+# The API runs as Vercel serverless functions: no in-process scheduler and no background work, so all
+# scheduling lives outside the app.
 #
-#   POST /cron/checkins — gated by X-Cron-Secret; sends the daily check-in push to users with a
-#                          due-soon/overdue task or an untouched one, skipping tasks nudged recently.
+#   POST /cron/checkins — gated by X-Cron-Secret; runs hourly. Sends the daily check-in push to users with a
+#                          due-soon/overdue task or an untouched one, at most once a day per person, and only
+#                          inside the hours their onboarding answer picked (CHECKIN_HOURS).
 #   POST /cron/echo     — gated by X-Cron-Secret; weekly (Sunday 23:00 India time): Echo counts each
 #                          user's finished week for Buddy (brain/echo.py). Safe to call twice.
 
@@ -11,6 +13,7 @@ import logging
 import os
 from datetime import datetime, timedelta, timezone
 from typing import Optional
+from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, Depends, Header, HTTPException
 from sqlalchemy import select
@@ -18,7 +21,7 @@ from sqlalchemy.orm import Session
 
 from brain import echo
 from db import SessionLocal
-from models import Event, Task, User
+from models import Event, Onboarding, Task, User
 from notifications.service import send_daily_checkin
 
 router = APIRouter(prefix="/cron", tags=["cron"])
@@ -27,6 +30,21 @@ logger = logging.getLogger(__name__)
 DUE_SOON_WINDOW = timedelta(hours=24)
 UNTOUCHED_AFTER = timedelta(hours=24)
 NUDGE_COOLDOWN = timedelta(hours=20)
+
+# When a check-in may go out, from "When do things usually click for you?" (onboarding). The cron runs at
+# the top of every hour; these are the hours, India time, whose run may nudge that person.
+CHECKIN_TZ = ZoneInfo("Asia/Kolkata")  # testers are in India; per-person time zones aren't stored yet
+CHECKIN_HOURS = {
+    "morning": range(7, 12),       # 07:00 … 11:00
+    "afternoon": range(12, 17),    # 12:00 … 16:00
+    "evening": range(17, 22),      # 17:00 … 21:00
+    "late_night": range(21, 24),   # 21:00 … 23:00
+}
+DEFAULT_HOURS = range(9, 22)       # "It changes", no answer, or no onboarding: 09:00 … 21:00, as before
+
+
+def in_checkin_window(click_time: Optional[str], now: datetime) -> bool:
+    return now.astimezone(CHECKIN_TZ).hour in CHECKIN_HOURS.get(click_time, DEFAULT_HOURS)
 
 
 def require_cron_secret(x_cron_secret: Optional[str] = Header(default=None)) -> None:
@@ -47,16 +65,24 @@ def _eligible_tasks(db: Session, now: datetime) -> list[Task]:
         .order_by(Task.user_id, Task.due_date.is_(None), Task.due_date.asc(), Task.created_at.asc())
     ).scalars().all()
 
-    # Skip tasks nudged within the cooldown window.
+    # At most one check-in per person per day: skip anyone nudged within the cooldown, whichever task it
+    # was about. (A per-task wait let someone with 3 waiting tasks get 3 pings in 3 hours.)
     cutoff = now - NUDGE_COOLDOWN
-    recent_ids = set(db.execute(
-        select(Event.task_id).where(Event.type == "checkin_sent", Event.created_at >= cutoff)
+    recent_users = set(db.execute(
+        select(Event.user_id).where(Event.type == "checkin_sent", Event.created_at >= cutoff)
     ).scalars().all())
 
-    # One task per user: keep the first (most urgent, per ordering above) not recently nudged.
+    # Only inside each person's hours (their onboarding answer, or the default).
+    click_times = dict(db.execute(
+        select(Onboarding.user_id, Onboarding.click_time).where(Onboarding.user_id.in_({t.user_id for t in rows}))
+    ).all()) if rows else {}
+
+    # One task per person: keep their first (most urgent, per ordering above).
     picked: dict[str, Task] = {}
     for t in rows:
-        if t.id in recent_ids or t.user_id in picked:
+        if t.user_id in recent_users or t.user_id in picked:
+            continue
+        if not in_checkin_window(click_times.get(t.user_id), now):
             continue
         picked[t.user_id] = t
     return list(picked.values())
